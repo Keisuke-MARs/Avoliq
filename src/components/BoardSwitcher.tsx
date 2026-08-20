@@ -45,12 +45,18 @@ export function BoardSwitcher() {
     setMode("create");
   };
 
+  // 通信完了前のEnter連打による二重実行を防ぐ(StatusSettingsと同じ方式。
+  // create/rename/deleteは排他的なモードからしか呼ばれないため単一のrefを共有する)
+  const submittingRef = useRef(false);
+
   const commitCreate = async () => {
     const name = draft.trim();
     if (name === "") {
       setMode("list");
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       const created = await boardCreate(name);
       await loadBoards();
@@ -61,6 +67,8 @@ export function BoardSwitcher() {
         description: String(error),
       });
       setMode("list");
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -70,6 +78,8 @@ export function BoardSwitcher() {
       setMode("list");
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       await boardRename(targetBoard.id, name);
       await loadBoards();
@@ -77,6 +87,8 @@ export function BoardSwitcher() {
       toast.error("ボードを改名できませんでした", {
         description: String(error),
       });
+    } finally {
+      submittingRef.current = false;
     }
     setMode("list");
   };
@@ -86,6 +98,8 @@ export function BoardSwitcher() {
       setMode("list");
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       await boardDelete(targetBoard.id);
       await loadBoards();
@@ -99,6 +113,8 @@ export function BoardSwitcher() {
       toast.error("ボードを削除できませんでした", {
         description: String(error),
       });
+    } finally {
+      submittingRef.current = false;
     }
     setMode("list");
   };

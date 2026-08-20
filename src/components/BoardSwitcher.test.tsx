@@ -136,6 +136,28 @@ describe("BoardSwitcher の作成・改名・削除", () => {
     await vi.waitFor(() => expect(selectBoard).toHaveBeenCalledWith("b4"));
   });
 
+  it("作成応答の完了前にEnterを連打してもboardCreateは1回だけ呼ばれる", async () => {
+    // 応答を保留したままにして、2回目のEnterが二重実行にならないことを見る
+    let release: (() => void) | undefined;
+    vi.mocked(api.boardCreate).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ id: "b4", name: "新ボード", position: 3 });
+        }),
+    );
+    const user = userEvent.setup();
+    render(<BoardSwitcher />);
+
+    await user.keyboard("n");
+    const input = screen.getByLabelText("新しいボード名");
+    await user.type(input, "新ボード{Enter}{Enter}");
+
+    expect(api.boardCreate).toHaveBeenCalledTimes(1);
+    release?.();
+    await vi.waitFor(() => expect(selectBoard).toHaveBeenCalledWith("b4"));
+  });
+
   it("空の名前ではボードを作成しない", async () => {
     const user = userEvent.setup();
     render(<BoardSwitcher />);
