@@ -111,7 +111,7 @@ export function TaskDetail() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-2 px-4 pb-3 pt-4">
+      <header className="flex items-center gap-2 px-8 pb-3 pt-4">
         <button
           type="button"
           aria-label="ボードに戻る (Esc)"
@@ -167,10 +167,10 @@ export function TaskDetail() {
         }}
         aria-label="タスクのタイトル"
         placeholder="タイトルを入力"
-        className="mx-4 mb-2 bg-transparent text-xl font-semibold st-text-1 outline-none st-input"
+        className="mx-8 mb-3 bg-transparent text-xl font-semibold st-text-1 outline-none st-input"
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4">
         <BlockNoteView
           editor={editor}
           theme={isDark ? "dark" : "light"}
