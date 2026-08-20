@@ -296,6 +296,46 @@ pub fn status_reorder(conn: &mut Connection, id: &str, new_index: i64) -> Result
     statuses_list(conn, &target.board_id)
 }
 
+/// ステータスを削除する。所属タスクはボード先頭ステータスへ退避する。
+/// ボードに1つしかステータスが無い場合はエラー。
+pub fn status_delete(conn: &mut Connection, id: &str) -> Result<()> {
+    let target = status_by_id(conn, id)?;
+
+    let total: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM statuses WHERE board_id = ?1",
+        params![&target.board_id],
+        |row| row.get(0),
+    )?;
+    if total <= 1 {
+        return Err(RepoError::Rule(
+            "最後のステータスは削除できません".to_string(),
+        ));
+    }
+
+    // 退避先 = 削除対象を除いたボード先頭のステータス
+    let fallback_id: String = conn.query_row(
+        "SELECT id FROM statuses
+         WHERE board_id = ?1 AND id <> ?2
+         ORDER BY position, rowid LIMIT 1",
+        params![&target.board_id, &target.id],
+        |row| row.get(0),
+    )?;
+
+    let tx = conn.transaction()?;
+    // 削除済みタスクも含めて退避させる（復元したときに壊れたIDを指さないように）
+    tx.execute(
+        "UPDATE tasks SET status_id = ?2, updated_at = datetime('now') WHERE status_id = ?1",
+        params![&target.id, &fallback_id],
+    )?;
+    tx.execute("DELETE FROM statuses WHERE id = ?1", params![&target.id])?;
+    let remaining = status_ids_in_order(&tx, &target.board_id)?;
+    write_status_positions(&tx, &remaining)?;
+    renumber_lane(&tx, &fallback_id)?;
+    tx.commit()?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -461,5 +501,78 @@ mod tests {
 
         let names: Vec<&str> = reordered.iter().map(|s| s.name.as_str()).collect();
         assert_eq!(names, vec!["進行中", "確認中", "完了", "未着手"]);
+    }
+
+    #[test]
+    fn ステータスを消すと所属タスクは先頭ステータスへ退避する() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        let doing_id = statuses[1].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "既存").expect("タスクを作れること");
+        let moved = task_create(&mut conn, &board_id, &doing_id, "退避対象")
+            .expect("タスクを作れること");
+
+        status_delete(&mut conn, &doing_id).expect("ステータスを削除できること");
+
+        let tasks = tasks_list(&mut conn, &board_id).expect("タスク一覧を取れること");
+        let target = tasks
+            .iter()
+            .find(|t| t.id == moved.id)
+            .expect("退避したタスクが残っていること");
+        assert_eq!(target.status_id, todo_id, "ボード先頭ステータスへ移る");
+        assert_eq!(tasks.len(), 2);
+    }
+
+    #[test]
+    fn ステータス削除後に退避先レーンが再採番される() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        let doing_id = statuses[1].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("タスクを作れること");
+        task_create(&mut conn, &board_id, &doing_id, "B").expect("タスクを作れること");
+
+        status_delete(&mut conn, &doing_id).expect("ステータスを削除できること");
+
+        let tasks = tasks_list(&mut conn, &board_id).expect("タスク一覧を取れること");
+        let mut positions: Vec<i64> = tasks.iter().map(|t| t.position).collect();
+        positions.sort();
+        assert_eq!(positions, vec![0, 1], "0から連番になっていること");
+    }
+
+    #[test]
+    fn ステータス削除後に残りのステータスが再採番される() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+
+        status_delete(&mut conn, &todo_id).expect("ステータスを削除できること");
+
+        let remaining = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let names: Vec<&str> = remaining.iter().map(|s| s.name.as_str()).collect();
+        let positions: Vec<i64> = remaining.iter().map(|s| s.position).collect();
+        assert_eq!(names, vec!["進行中", "確認中", "完了"]);
+        assert_eq!(positions, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn 最後の1つのステータスは削除できない() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        for status in statuses.iter().take(3) {
+            status_delete(&mut conn, &status.id).expect("3つまでは削除できること");
+        }
+
+        let last = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        assert_eq!(last.len(), 1);
+        let result = status_delete(&mut conn, &last[0].id);
+
+        assert!(matches!(result, Err(RepoError::Rule(_))));
+        assert_eq!(
+            statuses_list(&mut conn, &board_id).expect("一覧").len(),
+            1,
+            "失敗したので消えていないこと"
+        );
     }
 }
