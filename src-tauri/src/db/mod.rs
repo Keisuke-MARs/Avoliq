@@ -1,6 +1,7 @@
 //! DB層のエントリポイント。接続の生成・初期化と、フロントへ渡すモデル型を定義する。
 
 pub mod migrations;
+pub mod repo;
 
 use std::path::Path;
 
