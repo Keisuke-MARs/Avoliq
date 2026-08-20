@@ -1,3 +1,4 @@
+import { ja } from "@blocknote/core/locales";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
@@ -31,7 +32,8 @@ export function TaskDetail() {
   const titleRef = useRef<HTMLInputElement>(null);
   const isDark = usePrefersDark();
 
-  const editor = useCreateBlockNote();
+  // エディタのUI文言(スラッシュメニュー・プレースホルダ等)を日本語にする
+  const editor = useCreateBlockNote({ dictionary: ja });
   // 初期読み込み中のonChangeを保存として拾わないためのフラグ
   const loadingRef = useRef(true);
 
