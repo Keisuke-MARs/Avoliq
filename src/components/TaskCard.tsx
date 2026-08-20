@@ -33,11 +33,20 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
         setSelectedTask(task.id);
         setView("detail");
       }}
-      className="cursor-default rounded-xl bg-white px-3 py-2 text-[13px] leading-snug text-neutral-900 shadow-sm"
-      style={{
-        outline: selected ? `2px solid ${statusColor}` : "none",
-        outlineOffset: "1px",
-      }}
+      className={
+        selected
+          ? "cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug"
+          : "cursor-default rounded-xl bg-white px-3 py-2 text-[13px] leading-snug text-neutral-900 shadow-sm"
+      }
+      style={
+        selected
+          ? {
+              backgroundColor: statusColor,
+              color: "#fff",
+              boxShadow: `0 4px 12px ${statusColor}59`,
+            }
+          : undefined
+      }
     >
       {task.title}
     </div>

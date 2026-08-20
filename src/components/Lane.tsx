@@ -13,7 +13,7 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
     <section
       data-testid="lane"
       data-status-id={status.id}
-      className="flex w-56 shrink-0 flex-col"
+      className="flex flex-1 min-w-0 flex-col"
     >
       <header className="mb-2 flex items-center gap-1.5 px-1">
         {/*

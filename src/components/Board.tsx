@@ -13,7 +13,7 @@ export function Board() {
   const lanes = buildLanes(statuses, filterTasks(tasks, searchQuery));
 
   return (
-    <div data-testid="board" className="flex flex-1 gap-3 overflow-x-auto px-3 py-3">
+    <div data-testid="board" className="flex flex-1 gap-3 overflow-hidden px-3 py-3">
       {lanes.map((lane) => (
         <Lane
           key={lane.status.id}

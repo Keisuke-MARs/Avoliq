@@ -69,7 +69,7 @@ describe("Board", () => {
     expect(selected[0].getAttribute("data-task-id")).toBe("t-b");
   });
 
-  it("選択中のカードにステータス色の枠線を付ける", () => {
+  it("選択中のカードの背景色をステータス色で塗る", () => {
     setupBoard();
     useAppStore.setState({ selectedTaskId: "t-d" });
     render(<Board />);
