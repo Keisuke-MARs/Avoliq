@@ -1,8 +1,11 @@
 //! macOSウィンドウまわりの副作用をまとめる。
 //! NSPanel化・グローバルショートカット・メニューバートレイをここで扱う。
 
-use tauri::Emitter;
-use tauri::{App, AppHandle, Manager, WebviewWindow};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+    App, AppHandle, Emitter, Manager, WebviewWindow,
+};
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, ManagerExt, PanelLevel, StyleMask, WebviewWindowExt,
 };
@@ -148,4 +151,28 @@ pub fn reregister_hotkey(app: &AppHandle) -> Result<(), String> {
         .unregister_all()
         .map_err(|e| e.to_string())?;
     register_hotkey(app)
+}
+
+/// メニューバー常駐アイコン（開く / 終了）を作る。
+pub fn init_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
+    let open_item = MenuItem::with_id(app, "open", "開く", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open_item, &quit_item])?;
+
+    TrayIconBuilder::new()
+        .icon(
+            app.default_window_icon()
+                .ok_or("既定のウィンドウアイコンが見つかりません")?
+                .clone(),
+        )
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => show_panel(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .build(app)?;
+
+    Ok(())
 }

@@ -9,6 +9,11 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // single-instance は最初に登録しないと正しく動かない
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // 2つ目のインスタンスが起動されたら、既存のパレットを出すだけにする
+            panel::show_panel(app);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -33,6 +38,10 @@ pub fn run() {
             commands::palette_hide,
         ])
         .setup(|app| {
+            // Dockアイコンを出さずメニューバー常駐アプリとして振る舞う
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             // ~/Library/Application Support/smartTask/smart-task.db
             // app_data_dir() だとバンドル識別子のディレクトリになるので data_dir() を使う
             let db_path = app
@@ -49,6 +58,8 @@ pub fn run() {
 
             // settingsのhotkeyキー（既定 Alt+Space）でグローバルショートカットを登録する
             panel::register_hotkey(app.handle())?;
+            // メニューバー常駐アイコン
+            panel::init_tray(app)?;
 
             Ok(())
         })
