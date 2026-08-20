@@ -25,6 +25,7 @@ export interface AppState {
   setSearchQuery(q: string): void;
   setSelectedTask(id: string | null): void;
   createTaskFromSearch(): Promise<void>;
+  createNewTask(): Promise<void>;
   moveSelectedTask(dir: "left" | "right"): Promise<void>;
   reorderSelectedTask(dir: "up" | "down"): Promise<void>;
   deleteSelectedTask(): Promise<void>;
@@ -32,6 +33,10 @@ export interface AppState {
   updateTaskContent(id: string, contentMd: string): Promise<void>;
   updateTaskTitle(id: string, title: string): Promise<void>;
 }
+
+/** ⌘Nで新規タスクを作るときの既定タイトル。TaskDetailはこの値と一致するかで
+ * 「新規作成直後(タイトル未入力)」か「それ以外」かを判定し、フォーカス先を出し分ける。 */
+export const NEW_TASK_TITLE = "新しいタスク";
 
 /**
  * ボード切替の世代(エポック)。selectBoard の要求と同時に(awaitの前に)同期的に進める。
@@ -186,6 +191,36 @@ export const useAppStore = create<AppState>()((set, get) => ({
       set({
         tasks: [...shifted, created],
         searchQuery: "",
+        selectedTaskId: created.id,
+        view: "detail",
+      });
+    } catch (e) {
+      if (epoch !== boardEpoch) return;
+      toast.error(`タスクの作成に失敗しました: ${String(e)}`);
+    }
+  },
+
+  async createNewTask() {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
+    const { currentBoardId, statuses, tasks } = get();
+    const firstStatus = [...statuses].sort((a, b) => a.position - b.position)[0];
+    if (currentBoardId === null || firstStatus === undefined) return;
+
+    // 応答が返ってきた時点でも同じ切替要求を見ているか確認するため、開始時点のエポックを覚えておく
+    const epoch = boardEpoch;
+
+    // IDはRust側で採番するUUIDなので、ここだけは楽観的更新ではなくAPI先行で作る
+    try {
+      const created = await api.taskCreate(currentBoardId, firstStatus.id, NEW_TASK_TITLE);
+      // 待っている間にボードが切り替えられていたら、作成自体はDBに済んでいるので
+      // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
+      if (epoch !== boardEpoch) return;
+      // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす
+      const shifted = tasks.map((t) =>
+        t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
+      );
+      set({
+        tasks: [...shifted, created],
         selectedTaskId: created.id,
         view: "detail",
       });

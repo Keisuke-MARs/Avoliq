@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/lib/api";
 import { toast } from "sonner";
-import { isBoardLoading, useAppStore } from "./appStore";
+import { NEW_TASK_TITLE, isBoardLoading, useAppStore } from "./appStore";
 import { board, board2, statuses, tasks } from "@/test/fixtures";
 import type { Status, Task } from "@/types";
 
@@ -326,6 +326,97 @@ describe("appStore: createTaskFromSearch", () => {
 
     useAppStore.getState().setSearchQuery("新しいタスク");
     await useAppStore.getState().createTaskFromSearch();
+
+    const s = useAppStore.getState();
+    expect(s.tasks.some((t) => t.id === "t-new")).toBe(false);
+    expect(s.selectedTaskId).not.toBe("t-new");
+    expect(s.view).not.toBe("detail");
+
+    await switchPromise;
+  });
+});
+
+describe("appStore: createNewTask", () => {
+  beforeEach(async () => {
+    await loadFixtureBoard();
+  });
+
+  it("先頭ステータスへ既定タイトルで作成し、詳細画面へ遷移する", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: NEW_TASK_TITLE,
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+
+    await useAppStore.getState().createNewTask();
+
+    expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", NEW_TASK_TITLE);
+    const s = useAppStore.getState();
+    expect(s.tasks).toHaveLength(7);
+    expect(s.selectedTaskId).toBe("t-new");
+    expect(s.view).toBe("detail");
+    // 先頭挿入なので同レーンの既存タスクは1つずつ後ろへずれる
+    expect(s.tasks.find((t) => t.id === "t-a")?.position).toBe(1);
+    // 別レーンのタスクのpositionは動かない
+    expect(s.tasks.find((t) => t.id === "t-d")?.position).toBe(0);
+  });
+
+  it("失敗したらトーストを出し、タスクを増やさない", async () => {
+    mocked.taskCreate.mockRejectedValue("DB error");
+    await useAppStore.getState().createNewTask();
+    expect(useAppStore.getState().tasks).toHaveLength(6);
+    expect(useAppStore.getState().view).toBe("board");
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("boardLoading中はAPIを呼ばず何もしない", async () => {
+    let resolveStatuses: (value: Status[]) => void = () => {};
+    let resolveTasks: (value: Task[]) => void = () => {};
+    mocked.statusesList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStatuses = resolve;
+      }),
+    );
+    mocked.tasksList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTasks = resolve;
+      }),
+    );
+    const selectPromise = useAppStore.getState().selectBoard("board-2");
+
+    await useAppStore.getState().createNewTask();
+
+    expect(mocked.taskCreate).not.toHaveBeenCalled();
+
+    resolveStatuses([]);
+    resolveTasks([]);
+    await selectPromise;
+  });
+
+  it("応答が届く前に別ボードへの切替要求が先行していたら、作成結果を反映しない", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: NEW_TASK_TITLE,
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    let switchPromise: Promise<boolean> = Promise.resolve(true);
+    mocked.taskCreate.mockImplementation(async () => {
+      switchPromise = useAppStore.getState().selectBoard("board-2");
+      return created;
+    });
+
+    await useAppStore.getState().createNewTask();
 
     const s = useAppStore.getState();
     expect(s.tasks.some((t) => t.id === "t-new")).toBe(false);
