@@ -354,6 +354,63 @@ pub fn task_update(
     task_by_id(conn, id)
 }
 
+/// 指定レーンの生存タスクIDを並び順で取り出す（except_id は除外する）
+fn lane_ids_in_order(
+    tx: &Transaction<'_>,
+    status_id: &str,
+    except_id: &str,
+) -> Result<Vec<String>> {
+    let mut stmt = tx.prepare(
+        "SELECT id FROM tasks
+         WHERE status_id = ?1 AND deleted_at IS NULL AND id <> ?2
+         ORDER BY position, rowid",
+    )?;
+    let ids = stmt
+        .query_map(params![status_id, except_id], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()?;
+    Ok(ids)
+}
+
+/// 渡された順序どおりに position を 0..n-1 で書き込む
+fn write_task_positions(tx: &Transaction<'_>, ids: &[String]) -> Result<()> {
+    for (index, id) in ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE tasks SET position = ?2 WHERE id = ?1",
+            params![id, index as i64],
+        )?;
+    }
+    Ok(())
+}
+
+/// タスクを status_id レーンの new_index へ移す。移動元・移動先の両レーンを再採番する。
+pub fn task_move(
+    conn: &mut Connection,
+    id: &str,
+    status_id: &str,
+    new_index: i64,
+) -> Result<Task> {
+    let current = task_by_id(conn, id)?;
+    let from_status_id = current.status_id.clone();
+
+    let tx = conn.transaction()?;
+    let mut ids = lane_ids_in_order(&tx, status_id, id)?;
+    // 0..len の範囲に丸める（len を指定すると末尾になる）
+    let insert_at = new_index.clamp(0, ids.len() as i64) as usize;
+    ids.insert(insert_at, id.to_string());
+
+    tx.execute(
+        "UPDATE tasks SET status_id = ?2, updated_at = datetime('now') WHERE id = ?1",
+        params![id, status_id],
+    )?;
+    write_task_positions(&tx, &ids)?;
+    if from_status_id != status_id {
+        renumber_lane(&tx, &from_status_id)?;
+    }
+    tx.commit()?;
+
+    task_by_id(conn, id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -673,5 +730,88 @@ mod tests {
         let result = task_update(&mut conn, "no-such-id", Some("題"), None);
 
         assert!(matches!(result, Err(RepoError::NotFound(_))));
+    }
+
+    /// テスト用: 指定レーンの生存タスクのタイトルを並び順で返す
+    fn lane_titles(conn: &mut rusqlite::Connection, board_id: &str, status_id: &str) -> Vec<String> {
+        tasks_list(conn, board_id)
+            .expect("一覧を取れること")
+            .into_iter()
+            .filter(|t| t.status_id == status_id)
+            .map(|t| t.title)
+            .collect()
+    }
+
+    #[test]
+    fn 同じレーン内で並び順を変えられる() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        task_create(&mut conn, &board_id, &todo_id, "B").expect("作れること");
+        let c = task_create(&mut conn, &board_id, &todo_id, "C").expect("作れること");
+        // この時点のレーンは C, B, A
+
+        let moved = task_move(&mut conn, &c.id, &todo_id, 2).expect("移動できること");
+
+        assert_eq!(moved.position, 2);
+        assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["B", "A", "C"]);
+    }
+
+    #[test]
+    fn 別レーンへ移すと両方のレーンが再採番される() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        let doing_id = statuses[1].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        let b = task_create(&mut conn, &board_id, &todo_id, "B").expect("作れること");
+        task_create(&mut conn, &board_id, &doing_id, "X").expect("作れること");
+        // todo は B, A / doing は X
+
+        let moved = task_move(&mut conn, &b.id, &doing_id, 0).expect("移動できること");
+
+        assert_eq!(moved.status_id, doing_id);
+        assert_eq!(moved.position, 0);
+        assert_eq!(lane_titles(&mut conn, &board_id, &doing_id), vec!["B", "X"]);
+        assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["A"]);
+        let remaining = tasks_list(&mut conn, &board_id)
+            .expect("一覧を取れること")
+            .into_iter()
+            .find(|t| t.title == "A")
+            .expect("A が残っていること");
+        assert_eq!(remaining.position, 0, "移動元レーンが0から詰め直される");
+    }
+
+    #[test]
+    fn 範囲外のインデックスは末尾にクランプされる_タスク版() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        let doing_id = statuses[1].id.clone();
+        task_create(&mut conn, &board_id, &doing_id, "X").expect("作れること");
+        task_create(&mut conn, &board_id, &doing_id, "Y").expect("作れること");
+        let a = task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+
+        let moved = task_move(&mut conn, &a.id, &doing_id, 99).expect("移動できること");
+
+        assert_eq!(moved.position, 2);
+        assert_eq!(lane_titles(&mut conn, &board_id, &doing_id), vec!["Y", "X", "A"]);
+    }
+
+    #[test]
+    fn 負のインデックスは先頭にクランプされる() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        let b = task_create(&mut conn, &board_id, &todo_id, "B").expect("作れること");
+        // レーンは B, A
+        task_move(&mut conn, &b.id, &todo_id, 1).expect("いったん末尾へ");
+
+        let moved = task_move(&mut conn, &b.id, &todo_id, -5).expect("移動できること");
+
+        assert_eq!(moved.position, 0);
+        assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["B", "A"]);
     }
 }
