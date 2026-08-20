@@ -30,6 +30,11 @@ tauri_panel! {
             hides_on_deactivate: false
         }
     })
+
+    // パネルのNSWindowDelegate。キーウィンドウでなくなったことを検知する。
+    panel_event!(SmartTaskPanelEvents {
+        window_did_resign_key(notification: &NSNotification) -> ()
+    })
 }
 
 /// メインウィンドウをNSPanel化し、Spotlight風の見た目・挙動を設定する。
@@ -65,6 +70,16 @@ pub fn init_panel(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     panel.set_corner_radius(16.0);
     panel.set_transparent(true);
     panel.set_has_shadow(true);
+
+    // パレット外のクリック等でキーウィンドウでなくなったら、Spotlightと同様に自動で閉じる。
+    // 非アクティブ化パネルは hides_on_deactivate では拾えないため、resignKey で検知する。
+    // ハンドラは set_event_handler 側が retain して保持する。
+    let events = SmartTaskPanelEvents::new();
+    let app_handle = window.app_handle().clone();
+    events.window_did_resign_key(move |_notification| {
+        hide_panel(&app_handle);
+    });
+    panel.set_event_handler(Some(events.as_ref()));
 
     Ok(())
 }
