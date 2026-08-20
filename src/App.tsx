@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { Palette } from "@/components/Palette";
 
 // Rust側 panel.rs の HOTKEY_ERROR_EVENT と同じ文字列
 const HOTKEY_ERROR_EVENT = "hotkey-error";
 // Rust側 repo.rs の HOTKEY_ERROR_SETTING_KEY と同じ文字列
 const HOTKEY_ERROR_SETTING_KEY = "hotkeyError";
 
-function App() {
+export default function App() {
   const [hotkeyError, setHotkeyError] = useState("");
 
   useEffect(() => {
-    // Escでパレットを閉じる。NSPanelなのでRust側のhideを呼ぶ必要がある
+    // Escでパレットを閉じる。NSPanelなのでRust側のhideを呼ぶ必要がある。
+    // 計画書1由来の暫定処理。ビュー別のEsc制御（detail→board等）はTask 8でuseKeyboardに統合する。
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -44,11 +46,16 @@ function App() {
   }, []);
 
   return (
-    <div className="palette-shell">
-      <span className="palette-title">smartTask</span>
-      {hotkeyError !== "" && <p className="palette-error">{hotkeyError}</p>}
-    </div>
+    <>
+      {hotkeyError !== "" && (
+        <p
+          data-testid="hotkey-error"
+          className="fixed left-1/2 top-2 z-50 -translate-x-1/2 rounded bg-red-600 px-3 py-1 text-[12px] text-white shadow-lg"
+        >
+          {hotkeyError}
+        </p>
+      )}
+      <Palette />
+    </>
   );
 }
-
-export default App;
