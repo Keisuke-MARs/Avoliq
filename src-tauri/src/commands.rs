@@ -152,12 +152,23 @@ pub fn setting_get(state: State<'_, DbState>, key: String) -> Result<Option<Stri
 
 #[tauri::command]
 pub fn setting_set(
+    app: AppHandle,
     state: State<'_, DbState>,
     key: String,
     value: String,
 ) -> Result<(), String> {
-    let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
-    repo::setting_set(&mut conn, &key, &value).map_err(|e| e.to_string())
+    {
+        // ここでロックを解放してから再登録に進む（register_hotkey が同じロックを取る）
+        let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
+        repo::setting_set(&mut conn, &key, &value).map_err(|e| e.to_string())?;
+    }
+
+    // ホットキーを変えたら即座に登録し直す
+    if key == repo::HOTKEY_SETTING_KEY {
+        panel::reregister_hotkey(&app)?;
+    }
+
+    Ok(())
 }
 
 /// パレットを隠す。フロントの Esc から呼ぶ。

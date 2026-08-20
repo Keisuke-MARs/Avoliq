@@ -1,10 +1,15 @@
 //! macOSウィンドウまわりの副作用をまとめる。
 //! NSPanel化・グローバルショートカット・メニューバートレイをここで扱う。
 
+use tauri::Emitter;
 use tauri::{App, AppHandle, Manager, WebviewWindow};
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, ManagerExt, PanelLevel, StyleMask, WebviewWindowExt,
 };
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+use crate::commands::DbState;
+use crate::db::repo;
 
 /// メインウィンドウのラベル（tauri.conf.json の windows[].label と一致させる）
 pub const MAIN_WINDOW_LABEL: &str = "main";
@@ -85,4 +90,62 @@ pub fn toggle_panel(app: &AppHandle) {
             panel.show_and_make_key();
         }
     }
+}
+
+/// ホットキー登録に失敗したときにフロントへ通知するイベント名（payloadは失敗メッセージ文字列）
+pub const HOTKEY_ERROR_EVENT: &str = "hotkey-error";
+
+/// settingsテーブルの hotkey キー（既定 Alt+Space）を読んでグローバルショートカットを登録する。
+///
+/// 登録に失敗したらフロントへ `hotkey-error` を emit する。ただし起動直後はフロントの
+/// listen が間に合わないことがあるので、同じメッセージを settings の `hotkeyError` にも書く。
+/// 成功したときは空文字で上書きして過去のエラーをクリアする。
+pub fn register_hotkey(app: &AppHandle) -> Result<(), String> {
+    let hotkey = {
+        let state = app.state::<DbState>();
+        let mut conn = state
+            .0
+            .lock()
+            .map_err(|_| "DB接続のロックに失敗しました".to_string())?;
+        repo::setting_get(&mut conn, repo::HOTKEY_SETTING_KEY)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| repo::DEFAULT_HOTKEY.to_string())
+    };
+
+    let result = app
+        .global_shortcut()
+        .on_shortcut(hotkey.as_str(), |app, _shortcut, event| {
+            // 押した瞬間だけ反応させる（離したときにも来るので無視する）
+            if event.state() == ShortcutState::Pressed {
+                toggle_panel(app);
+            }
+        });
+
+    let message = match result {
+        Ok(()) => String::new(),
+        Err(error) => format!("ホットキー {hotkey} を登録できませんでした: {error}"),
+    };
+
+    if !message.is_empty() {
+        let _ = app.emit(HOTKEY_ERROR_EVENT, message.clone());
+    }
+
+    let state = app.state::<DbState>();
+    let mut conn = state
+        .0
+        .lock()
+        .map_err(|_| "DB接続のロックに失敗しました".to_string())?;
+    repo::setting_set(&mut conn, repo::HOTKEY_ERROR_SETTING_KEY, &message)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// 登録済みのショートカットを全部外してから、settingsのhotkeyで登録し直す。
+/// ホットキー設定を変更したときに呼ぶ。
+pub fn reregister_hotkey(app: &AppHandle) -> Result<(), String> {
+    app.global_shortcut()
+        .unregister_all()
+        .map_err(|e| e.to_string())?;
+    register_hotkey(app)
 }

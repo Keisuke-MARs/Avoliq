@@ -11,6 +11,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_nspanel::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::boards_list,
             commands::board_create,
@@ -45,6 +46,9 @@ pub fn run() {
 
             // ウィンドウをNSPanel化する
             panel::init_panel(app)?;
+
+            // settingsのhotkeyキー（既定 Alt+Space）でグローバルショートカットを登録する
+            panel::register_hotkey(app.handle())?;
 
             Ok(())
         })
