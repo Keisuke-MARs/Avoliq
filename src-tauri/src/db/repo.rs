@@ -448,6 +448,51 @@ pub fn task_restore(conn: &mut Connection, id: &str) -> Result<Task> {
     task_by_id(conn, id)
 }
 
+/// ホットキー設定の settings キー名
+pub const HOTKEY_SETTING_KEY: &str = "hotkey";
+
+/// ホットキー登録に失敗したメッセージを保存する settings キー名。
+/// 起動直後のイベント取りこぼし対策として、フロントはここも読む。
+pub const HOTKEY_ERROR_SETTING_KEY: &str = "hotkeyError";
+
+/// ホットキーの既定値
+pub const DEFAULT_HOTKEY: &str = "Alt+Space";
+
+/// 設定値を1件取る。未設定なら None。
+pub fn setting_get(conn: &mut Connection, key: &str) -> Result<Option<String>> {
+    let value = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?1",
+            params![key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    Ok(value)
+}
+
+/// 設定値を保存する（既にあれば上書き）
+pub fn setting_set(conn: &mut Connection, key: &str, value: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value],
+    )?;
+    Ok(())
+}
+
+/// 初回起動時のシード。ボードが1枚も無ければ「メイン」を作り、ホットキー既定値を入れる。
+pub fn seed_if_empty(conn: &mut Connection) -> Result<()> {
+    let board_count: i64 =
+        conn.query_row("SELECT COUNT(*) FROM boards", [], |row| row.get(0))?;
+    if board_count == 0 {
+        board_create(conn, "メイン")?;
+    }
+    if setting_get(conn, HOTKEY_SETTING_KEY)?.is_none() {
+        setting_set(conn, HOTKEY_SETTING_KEY, DEFAULT_HOTKEY)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -934,5 +979,79 @@ mod tests {
 
         assert_eq!(b.position, 0);
         assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["B"]);
+    }
+
+    #[test]
+    fn 未設定のキーはNoneを返す() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        let value = setting_get(&mut conn, "hotkey").expect("取得できること");
+
+        assert_eq!(value, None);
+    }
+
+    #[test]
+    fn 設定は上書き保存できる() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        setting_set(&mut conn, "hotkey", "Alt+Space").expect("保存できること");
+        setting_set(&mut conn, "hotkey", "Ctrl+Space").expect("上書きできること");
+
+        assert_eq!(
+            setting_get(&mut conn, "hotkey").expect("取得できること"),
+            Some("Ctrl+Space".to_string())
+        );
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))
+            .expect("件数を数えられること");
+        assert_eq!(rows, 1, "行が増えないこと");
+    }
+
+    #[test]
+    fn 初回シードでメインボードとホットキー既定値が入る() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        seed_if_empty(&mut conn).expect("シードできること");
+
+        let boards = boards_list(&mut conn).expect("一覧を取れること");
+        assert_eq!(boards.len(), 1);
+        assert_eq!(boards[0].name, "メイン");
+        let statuses = statuses_list(&mut conn, &boards[0].id).expect("一覧を取れること");
+        assert_eq!(statuses.len(), 4);
+        assert_eq!(
+            setting_get(&mut conn, HOTKEY_SETTING_KEY).expect("取得できること"),
+            Some(DEFAULT_HOTKEY.to_string())
+        );
+    }
+
+    #[test]
+    fn 二度目のシードでは何も増えない() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        seed_if_empty(&mut conn).expect("1回目");
+
+        seed_if_empty(&mut conn).expect("2回目");
+
+        assert_eq!(boards_list(&mut conn).expect("一覧").len(), 1);
+    }
+
+    #[test]
+    fn ホットキーを変更済みならシードで上書きしない() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        setting_set(&mut conn, HOTKEY_SETTING_KEY, "Ctrl+Shift+T").expect("保存できること");
+
+        seed_if_empty(&mut conn).expect("シードできること");
+
+        assert_eq!(
+            setting_get(&mut conn, HOTKEY_SETTING_KEY).expect("取得できること"),
+            Some("Ctrl+Shift+T".to_string())
+        );
+    }
+
+    #[test]
+    fn 設定キー名は計画書2と3が参照するので固定する() {
+        // 実装コントラクトで固定された名前。変えると後続の計画書が壊れる。
+        assert_eq!(HOTKEY_SETTING_KEY, "hotkey");
+        assert_eq!(HOTKEY_ERROR_SETTING_KEY, "hotkeyError");
+        assert_eq!(DEFAULT_HOTKEY, "Alt+Space");
     }
 }
