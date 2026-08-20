@@ -101,4 +101,12 @@ describe("reflowStrayMarkdownTables", () => {
 
     expect(reflowStrayMarkdownTables(input)).toBe(expected);
   });
+  it("フェンス列の後ろに文字がある行では閉じない(閉じフェンスは空白のみ)", () => {
+    // `~~~ not a closing fence` のような行はCommonMarkでは閉じフェンスにならない。
+    // 旧実装はこれで閉じ判定してしまい、以降のコード内テーブルを連結・変形していた
+    const input =
+      "~~~\ncode start\n~~~ not a closing fence\n| a | b |\n\n| --- | --- |\n~~~\nafter\n";
+
+    expect(reflowStrayMarkdownTables(input)).toBe(input);
+  });
 });

@@ -34,18 +34,20 @@ function isSeparatorRowShape(line: string): boolean {
 // 「同じ文字種かつ開始長以上の連続長」の行だけを閉じフェンスとして扱う。
 // これにより ~~~ フェンスや、````(4連)フェンス内に混じる```(3連)行を誤って
 // 閉じフェンスと判定しない(単純トグルだと文字種・長さを無視してズレてしまうため)。
-const FENCE_LINE_RE = /^\s*(`{3,}|~{3,})/;
+const FENCE_LINE_RE = /^\s*(`{3,}|~{3,})(.*)$/;
 
 interface FenceMark {
   char: string;
   len: number;
+  /** 閉じフェンスになり得るか(CommonMark: フェンス列の後ろが空白のみ) */
+  closable: boolean;
 }
 
 function matchFenceLine(line: string): FenceMark | null {
   const m = FENCE_LINE_RE.exec(line);
   if (m === null) return null;
   const run = m[1];
-  return { char: run[0], len: run.length };
+  return { char: run[0], len: run.length, closable: m[2].trim() === "" };
 }
 
 export function reflowStrayMarkdownTables(markdown: string): string {
@@ -60,8 +62,14 @@ export function reflowStrayMarkdownTables(markdown: string): string {
     const maybeFence = matchFenceLine(lines[i]);
 
     if (fence !== null) {
-      // フェンス内: 同じ文字種かつ開始長以上の連続長の行だけを閉じフェンスとして扱う
-      if (maybeFence !== null && maybeFence.char === fence.char && maybeFence.len >= fence.len) {
+      // フェンス内: 同じ文字種・開始長以上・フェンス列の後ろが空白のみ、の行だけを
+      // 閉じフェンスとして扱う(`~~~ not a closing fence` のような行では閉じない)
+      if (
+        maybeFence !== null &&
+        maybeFence.closable &&
+        maybeFence.char === fence.char &&
+        maybeFence.len >= fence.len
+      ) {
         fence = null;
       }
       result.push(lines[i]);
