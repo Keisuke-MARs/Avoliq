@@ -29,6 +29,11 @@ export function StatusSettings() {
   const containerRef = useRef<HTMLDivElement>(null);
   const colorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 通信中(commit系関数の実行中)かどうかのフラグ。Enter連打や⌘↑↓の連続入力で
+  // 応答が返る前に同じ更新系関数が多重起動され、同名ステータスの重複作成などを
+  // 起こさないようにするためのガード。各commit系関数は排他的なUIモードから
+  // しか呼ばれないので、1つのrefで共有して問題ない。
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (mode === "rename" || mode === "create") inputRef.current?.focus();
@@ -55,7 +60,11 @@ export function StatusSettings() {
   const reload = async (epoch: number): Promise<number | null> => {
     if (currentBoardId === null) return null;
     if (getBoardEpoch() !== epoch) return null;
-    await selectBoard(currentBoardId);
+    // selectBoardが読込失敗、またはこの呼び出しより新しい切替要求に追い越されてfalseを返したら、
+    // stateは反映されていないので「読み直せなかった」ものとして中断する
+    // (falseを見ずに進むと、呼び出し元が古い一覧に対してsetIndex等を実行してしまう)
+    const ok = await selectBoard(currentBoardId);
+    if (!ok) return null;
     return getBoardEpoch();
   };
 
@@ -65,6 +74,8 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    if (submittingRef.current) return; // 通信中の二重実行(Enter連打)を防ぐ
+    submittingRef.current = true;
     const epoch = getBoardEpoch();
     try {
       await statusUpdate(target.id, name, null);
@@ -73,6 +84,8 @@ export function StatusSettings() {
       toast.error("ステータス名を変更できませんでした", {
         description: String(error),
       });
+    } finally {
+      submittingRef.current = false;
     }
     setMode("list");
   };
@@ -83,12 +96,16 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    if (submittingRef.current) return; // 通信中の二重実行(Enter連打)を防ぐ
+    submittingRef.current = true;
     const epoch = getBoardEpoch();
     try {
       await statusUpdate(target.id, null, color);
       await reload(epoch);
     } catch (error) {
       toast.error("色を変更できませんでした", { description: String(error) });
+    } finally {
+      submittingRef.current = false;
     }
     setMode("list");
   };
@@ -99,6 +116,8 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    if (submittingRef.current) return; // 通信中の二重実行(Enter連打)を防ぐ。これが本来のバグ修正対象
+    submittingRef.current = true;
     const epoch = getBoardEpoch();
     try {
       // 色はプリセット先頭(グレー)を初期値にし、あとからCキーで変更してもらう
@@ -109,6 +128,8 @@ export function StatusSettings() {
       toast.error("ステータスを追加できませんでした", {
         description: String(error),
       });
+    } finally {
+      submittingRef.current = false;
     }
     setMode("list");
   };
@@ -117,6 +138,8 @@ export function StatusSettings() {
     if (target === null) return;
     const nextIndex = direction === "up" ? index - 1 : index + 1;
     if (nextIndex < 0 || nextIndex >= statuses.length) return;
+    if (submittingRef.current) return; // 通信中の二重実行(⌘↑↓連打)を防ぐ
+    submittingRef.current = true;
     const epoch = getBoardEpoch();
     try {
       await statusReorder(target.id, nextIndex);
@@ -126,6 +149,8 @@ export function StatusSettings() {
       toast.error("並び順を変更できませんでした", {
         description: String(error),
       });
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -134,6 +159,8 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    if (submittingRef.current) return; // 通信中の二重実行(連続クリック等)を防ぐ
+    submittingRef.current = true;
     const epoch = getBoardEpoch();
     try {
       await statusDelete(target.id);
@@ -143,6 +170,8 @@ export function StatusSettings() {
       toast.error("ステータスを削除できませんでした", {
         description: String(error),
       });
+    } finally {
+      submittingRef.current = false;
     }
     setMode("list");
   };

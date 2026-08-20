@@ -15,7 +15,12 @@ export interface AppState {
   lastDeletedTaskId: string | null;
 
   loadBoards(): Promise<void>;
-  selectBoard(boardId: string): Promise<void>;
+  /**
+   * ボードを切り替える。戻り値はこの呼び出しの結果が実際にstateへ反映されたか。
+   * 読込に失敗した場合、またはこの呼び出しより新しい切替要求に追い越された場合はfalseを返す
+   * (この場合stateは変更されない)。呼び出し元はfalseのとき「切替は完了しなかった」ものとして扱うこと。
+   */
+  selectBoard(boardId: string): Promise<boolean>;
   setView(view: View): void;
   setSearchQuery(q: string): void;
   setSelectedTask(id: string | null): void;
@@ -123,7 +128,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         api.statusesList(boardId),
         api.tasksList(boardId),
       ]);
-      if (epoch !== boardEpoch) return; // 追い越されたので破棄する(boardLoadingは触らない)
+      if (epoch !== boardEpoch) return false; // 追い越されたので破棄する(boardLoadingは触らない)
       set({
         currentBoardId: boardId,
         statuses,
@@ -133,10 +138,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
         view: "board",
       });
       boardLoading = false;
+      return true;
     } catch (e) {
-      if (epoch !== boardEpoch) return; // 追い越されたので破棄する(boardLoadingは触らない)
+      if (epoch !== boardEpoch) return false; // 追い越されたので破棄する(boardLoadingは触らない)
       boardLoading = false;
       toast.error(`ボードの読み込みに失敗しました: ${String(e)}`);
+      return false;
     }
   },
 

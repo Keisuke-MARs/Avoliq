@@ -18,7 +18,7 @@ const boards: Board[] = [
   { id: "b3", name: "個人", position: 2 },
 ];
 
-const selectBoard = vi.fn(async () => undefined);
+const selectBoard = vi.fn(async () => true);
 const setView = vi.fn();
 
 describe("BoardSwitcher 一覧と切替", () => {

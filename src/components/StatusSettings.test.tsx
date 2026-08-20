@@ -34,7 +34,7 @@ const statuses: Status[] = [
   },
 ];
 
-const selectBoard = vi.fn(async () => undefined);
+const selectBoard = vi.fn(async () => true);
 // 本物のselectBoard実装(呼ぶとappStore内部のボード切替エポックが進む)を、
 // テストがselectBoardスパイで上書きする前に確保しておく。
 const realSelectBoard = useAppStore.getState().selectBoard;
@@ -235,6 +235,70 @@ describe("StatusSettings", () => {
         "true",
       );
     });
+  });
+
+  it("selectBoardが失敗(false)を返したら、reloadは読み直さずsetIndexも走らない", async () => {
+    // selectBoardスパイをfalse(読込失敗またはエポック追い越しで破棄)で応答させ、
+    // commitCreate内のreload()がnullを返して新規行へ選択を移動させない(setIndexを呼ばない)ことを確認する。
+    selectBoard.mockResolvedValue(false);
+    vi.mocked(api.statusCreate).mockResolvedValue({
+      id: "st-3",
+      boardId: "b1",
+      name: "保留",
+      color: "#8E8E93",
+      position: 2,
+    });
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("n");
+    const input = screen.getByLabelText("新しいステータス名");
+    await user.type(input, "保留{Enter}");
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("新しいステータス名")).not.toBeInTheDocument();
+    });
+    expect(api.statusCreate).toHaveBeenCalledWith("b1", "保留", "#8E8E93");
+    expect(selectBoard).toHaveBeenCalledWith("b1");
+    // storeのstatusesはモックのままなので新規行は存在せず、選択は先頭(未着手)のまま
+    expect(screen.getByRole("option", { name: /未着手/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("作成中のEnter連打では、statusCreateの応答待ちに二度目のcommitCreateが多重起動されない", async () => {
+    // statusCreateの応答を手元で止めた状態でEnterを2回押し、通信中の二重実行ガードにより
+    // statusCreateが1回しか呼ばれないことを確認する回帰テスト。
+    let resolveCreate: (value: Status) => void = () => {};
+    const createPromise = new Promise<Status>((resolve) => {
+      resolveCreate = resolve;
+    });
+    vi.mocked(api.statusCreate).mockReturnValue(createPromise);
+
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("n");
+    const input = screen.getByLabelText("新しいステータス名");
+    await user.type(input, "保留");
+    // 1回目のEnter。statusCreateの応答待ちに入る(まだmode==="create"のまま)
+    await user.keyboard("{Enter}");
+    // 応答が返る前に2回目のEnterを押す(Enter連打の再現)
+    await user.keyboard("{Enter}");
+
+    resolveCreate({
+      id: "st-3",
+      boardId: "b1",
+      name: "保留",
+      color: "#8E8E93",
+      position: 2,
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText("新しいステータス名")).not.toBeInTheDocument();
+    });
+
+    expect(api.statusCreate).toHaveBeenCalledTimes(1);
   });
 
   it("最後の1つのステータスは削除できない", async () => {
