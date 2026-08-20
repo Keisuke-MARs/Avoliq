@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { Board } from "./Board";
+import { BoardSwitcher } from "./BoardSwitcher";
 import { FooterHints } from "./FooterHints";
 import { SearchBar } from "./SearchBar";
 import { TaskDetail } from "./TaskDetail";
@@ -43,12 +44,7 @@ export function Palette() {
 
       {view === "board" && <Board />}
       {view === "detail" && <TaskDetail key={selectedTaskId ?? "none"} />}
-      {view === "switcher" && (
-        <ViewPlaceholder
-          testId="switcher-placeholder"
-          label="ボードスイッチャーは計画書3で実装します"
-        />
-      )}
+      {view === "switcher" && <BoardSwitcher />}
       {view === "settings" && (
         <ViewPlaceholder testId="settings-placeholder" label="ボード設定は計画書3で実装します" />
       )}

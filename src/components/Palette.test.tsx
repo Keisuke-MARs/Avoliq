@@ -385,10 +385,13 @@ describe("Palette: Escとビュー切替", () => {
   it("⌘Bでスイッチャービューへ移り、Escで戻る", async () => {
     const user = await renderPalette();
     await user.keyboard("{Meta>}b{/Meta}");
-    expect(screen.getByTestId("switcher-placeholder")).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "ボード一覧" })).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
     expect(screen.getByTestId("board")).toBeInTheDocument();
+    // BoardSwitcher自身がEscを処理して盤面へ戻すため、useKeyboard側の汎用フォールバックで
+    // 二重に処理（hidePalette等）が走っていないことも確認する
+    expect(mocked.hidePalette).not.toHaveBeenCalled();
   });
 
   it("⌘,で設定ビューへ移り、Escで戻る", async () => {

@@ -180,9 +180,12 @@ function handleDetailKey(event: KeyboardEvent): void {
 
 /**
  * window に keydown を1本だけ張り、現在のviewに応じてキーを振り分ける。
- * スイッチャー・設定は将来的に各コンポーネント側でキーを処理する想定だが、
- * 現状はまだ専用ハンドラを持たない（ViewPlaceholderのみ）ため、
+ * スイッチャーは BoardSwitcher が自前でキー（Escを含む）を処理するため、ここでは何もしない。
+ * 設定は計画書3の別タスクでまだ専用ハンドラを持たない（ViewPlaceholderのみ）ため、
  * 既存動作を維持してEscで盤面へ戻る導線だけ通してある。
+ * （BoardSwitcher 側の処理とここでのフォールバックが両方効くと、
+ *   盤面へ戻した直後に state.view==="board" と判定されて handleBoardKey が
+ *   二重発火してしまうため、switcher はここで早期returnして避ける）
  */
 export function useKeyboard(): void {
   useEffect(() => {
@@ -197,6 +200,9 @@ export function useKeyboard(): void {
       }
       if (state.view === "detail") {
         handleDetailKey(e);
+        return;
+      }
+      if (state.view === "switcher") {
         return;
       }
       if (e.key === "Escape") {
