@@ -411,6 +411,43 @@ pub fn task_move(
     task_by_id(conn, id)
 }
 
+/// タスクをソフトデリートする。deleted_at を入れ、レーンの生存タスクを詰め直す。
+/// 削除した行の position はそのまま残すので、復元時に元の位置へ戻せる。
+pub fn task_delete(conn: &mut Connection, id: &str) -> Result<Task> {
+    let current = task_by_id(conn, id)?;
+
+    let tx = conn.transaction()?;
+    tx.execute(
+        "UPDATE tasks SET deleted_at = datetime('now'), updated_at = datetime('now')
+         WHERE id = ?1",
+        params![id],
+    )?;
+    renumber_lane(&tx, &current.status_id)?;
+    tx.commit()?;
+
+    task_by_id(conn, id)
+}
+
+/// ソフトデリートしたタスクを復元する。削除時に保持していた position の位置へ戻す。
+pub fn task_restore(conn: &mut Connection, id: &str) -> Result<Task> {
+    let current = task_by_id(conn, id)?;
+
+    let tx = conn.transaction()?;
+    let mut ids = lane_ids_in_order(&tx, &current.status_id, id)?;
+    // 生存タスクは 0..n-1 に詰まっているので、保持していた position をそのまま挿入位置に使える
+    let insert_at = current.position.clamp(0, ids.len() as i64) as usize;
+    ids.insert(insert_at, id.to_string());
+
+    tx.execute(
+        "UPDATE tasks SET deleted_at = NULL, updated_at = datetime('now') WHERE id = ?1",
+        params![id],
+    )?;
+    write_task_positions(&tx, &ids)?;
+    tx.commit()?;
+
+    task_by_id(conn, id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -813,5 +850,89 @@ mod tests {
 
         assert_eq!(moved.position, 0);
         assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["B", "A"]);
+    }
+
+    #[test]
+    fn 削除したタスクは一覧から消えるが行は残る() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let task = task_create(&mut conn, &board_id, &statuses[0].id, "消す")
+            .expect("作れること");
+
+        let deleted = task_delete(&mut conn, &task.id).expect("削除できること");
+
+        assert_eq!(deleted.id, task.id);
+        assert_eq!(tasks_list(&mut conn, &board_id).expect("一覧").len(), 0);
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get(0))
+            .expect("件数を数えられること");
+        assert_eq!(rows, 1, "物理削除ではないこと");
+    }
+
+    #[test]
+    fn 削除後に残ったタスクが再採番される() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        let b = task_create(&mut conn, &board_id, &todo_id, "B").expect("作れること");
+        task_create(&mut conn, &board_id, &todo_id, "C").expect("作れること");
+        // レーンは C, B, A
+
+        task_delete(&mut conn, &b.id).expect("削除できること");
+
+        assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["C", "A"]);
+        let positions: Vec<i64> = tasks_list(&mut conn, &board_id)
+            .expect("一覧")
+            .iter()
+            .map(|t| t.position)
+            .collect();
+        assert_eq!(positions, vec![0, 1]);
+    }
+
+    #[test]
+    fn 復元すると元の位置に戻る() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        let b = task_create(&mut conn, &board_id, &todo_id, "B").expect("作れること");
+        task_create(&mut conn, &board_id, &todo_id, "C").expect("作れること");
+        // レーンは C, B, A
+        task_delete(&mut conn, &b.id).expect("削除できること");
+
+        let restored = task_restore(&mut conn, &b.id).expect("復元できること");
+
+        assert_eq!(restored.position, 1);
+        assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["C", "B", "A"]);
+    }
+
+    #[test]
+    fn 先頭のタスクを削除して復元しても先頭に戻る() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        let c = task_create(&mut conn, &board_id, &todo_id, "C").expect("作れること");
+        // レーンは C, A
+        task_delete(&mut conn, &c.id).expect("削除できること");
+
+        task_restore(&mut conn, &c.id).expect("復元できること");
+
+        assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["C", "A"]);
+    }
+
+    #[test]
+    fn 削除済みタスクは他レーンの採番に影響しない() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+        let a = task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        task_delete(&mut conn, &a.id).expect("削除できること");
+
+        let b = task_create(&mut conn, &board_id, &todo_id, "B").expect("作れること");
+
+        assert_eq!(b.position, 0);
+        assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["B"]);
     }
 }
