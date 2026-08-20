@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/lib/api";
 import { toast } from "sonner";
-import { useAppStore } from "./appStore";
+import { isBoardLoading, useAppStore } from "./appStore";
 import { board, board2, statuses, tasks } from "@/test/fixtures";
 import type { Status, Task } from "@/types";
 
@@ -113,6 +113,61 @@ describe("appStore: selectBoard", () => {
     expect(s.currentBoardId).toBe("board-1");
     expect(s.statuses).toEqual(secondStatuses);
     expect(s.tasks).toEqual(secondTasks);
+  });
+
+  it("読込中はboardLoadingがtrueになり、完了後にfalseへ戻る", async () => {
+    await loadFixtureBoard();
+    let resolveStatuses: (value: Status[]) => void = () => {};
+    let resolveTasks: (value: Task[]) => void = () => {};
+    mocked.statusesList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStatuses = resolve;
+      }),
+    );
+    mocked.tasksList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTasks = resolve;
+      }),
+    );
+
+    expect(isBoardLoading()).toBe(false);
+    const selectPromise = useAppStore.getState().selectBoard("board-2");
+    expect(isBoardLoading()).toBe(true);
+
+    resolveStatuses([]);
+    resolveTasks([]);
+    await selectPromise;
+
+    expect(isBoardLoading()).toBe(false);
+  });
+
+  it("読込中に別ボードへの切替要求が先行していても、最終的にはboardLoadingがfalseに戻る", async () => {
+    await loadFixtureBoard();
+    let resolveFirstStatuses: (value: Status[]) => void = () => {};
+    let resolveFirstTasks: (value: Task[]) => void = () => {};
+    mocked.statusesList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirstStatuses = resolve;
+      }),
+    );
+    mocked.tasksList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirstTasks = resolve;
+      }),
+    );
+    const firstCall = useAppStore.getState().selectBoard("board-2");
+
+    mocked.statusesList.mockResolvedValueOnce([statuses[0]]);
+    mocked.tasksList.mockResolvedValueOnce([tasks[0]]);
+    const secondCall = useAppStore.getState().selectBoard("board-1");
+    await secondCall;
+    expect(isBoardLoading()).toBe(false);
+
+    // 追い越された1回目の応答が今さら届いても、boardLoadingは(2回目が既に戻したので)falseのまま
+    resolveFirstStatuses([]);
+    resolveFirstTasks([]);
+    await firstCall;
+    expect(isBoardLoading()).toBe(false);
   });
 });
 
@@ -351,6 +406,38 @@ describe("appStore: moveSelectedTask", () => {
     expect(s.currentBoardId).toBe("board-2");
     // 切替要求より古い失敗応答は、トーストも含めてエポック不一致として抑止される
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("selectBoardの読込中はmoveSelectedTaskを拒否し、tasksもAPIも変化させない", async () => {
+    useAppStore.getState().setSelectedTask("t-b");
+
+    // 応答を保留したままselectBoardを呼び、「切替要求済み・読込未完了」の間隙を作る。
+    // このときtasks/selectedTaskIdはまだ旧ボード(board-1)のままだが、epochはすでに
+    // 新ボード用に進んでいるので、epoch一致だけを見るmoveSelectedTaskは素通りしてしまう
+    // (=修正前のバグ)。boardLoadingで拒否できているかを確認する。
+    let resolveStatuses: (value: Status[]) => void = () => {};
+    let resolveTasks: (value: Task[]) => void = () => {};
+    mocked.statusesList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStatuses = resolve;
+      }),
+    );
+    mocked.tasksList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTasks = resolve;
+      }),
+    );
+    const selectPromise = useAppStore.getState().selectBoard("board-2");
+
+    const tasksBefore = useAppStore.getState().tasks;
+    await useAppStore.getState().moveSelectedTask("right");
+
+    expect(mocked.taskMove).not.toHaveBeenCalled();
+    expect(useAppStore.getState().tasks).toBe(tasksBefore);
+
+    resolveStatuses([]);
+    resolveTasks([]);
+    await selectPromise;
   });
 });
 

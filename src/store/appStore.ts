@@ -42,6 +42,21 @@ export function getBoardEpoch(): number {
 }
 
 /**
+ * ボード切替の読込中フラグ。selectBoardの要求と同時に(awaitの前に)同期的にtrueにし、
+ * 応答が返って(そのエポックがまだ最新であることを確認した上で)falseへ戻す。
+ * epochだけでは「切替要求後・読込完了前」の間隙を塞げない
+ * (この間もtasks/selectedTaskIdは旧ボードのものが残ったままなので、
+ * 新epochを捕捉したミューテーション系操作がその上に楽観的更新を重ねてしまう)ため、
+ * この間はミューテーション系アクションを丸ごと拒否するための同期フラグとして用意する。
+ */
+let boardLoading = false;
+
+/** テスト用: 現在ボード切替の読込中かどうかを取得する。 */
+export function isBoardLoading(): boolean {
+  return boardLoading;
+}
+
+/**
  * 楽観的更新の失敗時に呼ぶ復旧処理。
  * 古いsnapshot全体で巻き戻すと待機中の他操作まで巻き戻してしまうので、
  * DBの実状態を読み直して合わせる。読み直し自体も失敗したらsnapshotへ戻す。
@@ -98,6 +113,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     // これ以降に届く「この呼び出しより古い」非同期応答はすべてエポック不一致として破棄される。
     boardEpoch += 1;
     const epoch = boardEpoch;
+    // 読込完了までミューテーション系操作を拒否するためのフラグも同期的に立てる。
+    boardLoading = true;
     // 削除のundoはボードローカルな操作とする。切替を要求した時点で同期的にクリアし、
     // 別ボードで削除したタスクが⌘Zで新しいボードに復活しないようにする。
     set({ lastDeletedTaskId: null });
@@ -106,7 +123,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         api.statusesList(boardId),
         api.tasksList(boardId),
       ]);
-      if (epoch !== boardEpoch) return; // 追い越されたので破棄する
+      if (epoch !== boardEpoch) return; // 追い越されたので破棄する(boardLoadingは触らない)
       set({
         currentBoardId: boardId,
         statuses,
@@ -115,8 +132,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
         searchQuery: "",
         view: "board",
       });
+      boardLoading = false;
     } catch (e) {
-      if (epoch !== boardEpoch) return; // 追い越されたので破棄する
+      if (epoch !== boardEpoch) return; // 追い越されたので破棄する(boardLoadingは触らない)
+      boardLoading = false;
       toast.error(`ボードの読み込みに失敗しました: ${String(e)}`);
     }
   },
@@ -138,6 +157,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async createTaskFromSearch() {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     const { currentBoardId, statuses, searchQuery, tasks } = get();
     const title = searchQuery.trim();
     const firstStatus = [...statuses].sort((a, b) => a.position - b.position)[0];
@@ -169,6 +189,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async moveSelectedTask(dir) {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     const { tasks, statuses, selectedTaskId, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const task = tasks.find((t) => t.id === selectedTaskId);
@@ -203,6 +224,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async reorderSelectedTask(dir) {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     const { tasks, selectedTaskId, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const task = tasks.find((t) => t.id === selectedTaskId);
@@ -237,6 +259,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async deleteSelectedTask() {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     const { tasks, statuses, selectedTaskId, searchQuery, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const target = tasks.find((t) => t.id === selectedTaskId);
@@ -265,6 +288,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async undoDelete() {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     const { lastDeletedTaskId } = get();
     if (lastDeletedTaskId === null) return;
     // undoはボードローカルな操作。selectBoardが要求時点でlastDeletedTaskIdを同期的に
@@ -286,6 +310,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async updateTaskContent(id, contentMd) {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     const { tasks: snapshot, currentBoardId } = get();
     const epoch = boardEpoch;
     set({ tasks: snapshot.map((t) => (t.id === id ? { ...t, contentMd } : t)) });
@@ -299,6 +324,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async updateTaskTitle(id, title) {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     const { tasks: snapshot, currentBoardId } = get();
     const epoch = boardEpoch;
     set({ tasks: snapshot.map((t) => (t.id === id ? { ...t, title } : t)) });
