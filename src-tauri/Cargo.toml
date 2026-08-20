@@ -34,6 +34,9 @@ tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
 
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2.5.1"
+
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

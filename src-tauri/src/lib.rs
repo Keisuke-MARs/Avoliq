@@ -53,6 +53,13 @@ pub fn run() {
             db::repo::seed_if_empty(&mut conn).map_err(|e| e.to_string())?;
             app.manage(commands::DbState(Mutex::new(conn)));
 
+            // ログイン時の自動起動プラグイン(既定はOFF、設定画面でトグルする)
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))?;
+
             // ウィンドウをNSPanel化する
             panel::init_panel(app)?;
 
