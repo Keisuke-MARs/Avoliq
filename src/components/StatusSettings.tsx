@@ -293,7 +293,7 @@ export function StatusSettings() {
       {mode === "confirm-delete" && target !== null && (
         <ConfirmDialog
           title={`「${target.name}」を削除しますか？`}
-          description={`このステータスのタスクは「${statuses[0]?.name ?? ""}」へ移動します。元に戻せません。`}
+          description={`このステータスのタスクは「${statuses.find((s) => s.id !== target.id)?.name ?? ""}」へ移動します。元に戻せません。`}
           confirmLabel="削除する"
           onConfirm={() => void commitDelete()}
           onCancel={() => setMode("list")}

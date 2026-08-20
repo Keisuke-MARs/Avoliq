@@ -144,6 +144,21 @@ describe("StatusSettings", () => {
     ).toBeInTheDocument();
   });
 
+  it("削除対象自身が先頭でも、削除対象を除いた先頭のステータス名を表示する", async () => {
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+    // 初期選択(index 0)は statuses[0]("未着手")。削除対象自身なので、
+    // 移動先は次点の statuses[1]("進行中")になるはず。
+
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+
+    expect(
+      screen.getByText(
+        "このステータスのタスクは「進行中」へ移動します。元に戻せません。",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("最後の1つのステータスは削除できない", async () => {
     useAppStore.setState({ statuses: [statuses[0]] });
     const user = userEvent.setup();
