@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Board } from "../types";
 import { useAppStore } from "../store/appStore";
 import { BoardSwitcher } from "./BoardSwitcher";
+import * as api from "../lib/api";
 
 vi.mock("../lib/api", () => ({
   boardCreate: vi.fn(),
@@ -95,5 +96,100 @@ describe("BoardSwitcher 一覧と切替", () => {
 
     expect(setView).toHaveBeenCalledWith("board");
     expect(selectBoard).not.toHaveBeenCalled();
+  });
+});
+
+describe("BoardSwitcher の作成・改名・削除", () => {
+  beforeEach(() => {
+    vi.mocked(api.boardCreate).mockReset();
+    vi.mocked(api.boardRename).mockReset();
+    vi.mocked(api.boardDelete).mockReset();
+    selectBoard.mockClear();
+    setView.mockClear();
+    useAppStore.setState({
+      boards,
+      currentBoardId: "b1",
+      statuses: [],
+      tasks: [],
+      selectedTaskId: null,
+      view: "switcher",
+      selectBoard,
+      setView,
+      loadBoards: vi.fn(async () => undefined),
+    });
+  });
+
+  it("Nキーで名前入力に入り、Enterでボードを作成して切り替える", async () => {
+    vi.mocked(api.boardCreate).mockResolvedValue({
+      id: "b4",
+      name: "新ボード",
+      position: 3,
+    });
+    const user = userEvent.setup();
+    render(<BoardSwitcher />);
+
+    await user.keyboard("n");
+    const input = screen.getByLabelText("新しいボード名");
+    await user.type(input, "新ボード{Enter}");
+
+    expect(api.boardCreate).toHaveBeenCalledWith("新ボード");
+    await vi.waitFor(() => expect(selectBoard).toHaveBeenCalledWith("b4"));
+  });
+
+  it("空の名前ではボードを作成しない", async () => {
+    const user = userEvent.setup();
+    render(<BoardSwitcher />);
+
+    await user.keyboard("n");
+    await user.keyboard("{Enter}");
+
+    expect(api.boardCreate).not.toHaveBeenCalled();
+  });
+
+  it("Rキーで改名に入り、Enterで改名する", async () => {
+    vi.mocked(api.boardRename).mockResolvedValue({
+      id: "b1",
+      name: "本業",
+      position: 0,
+    });
+    const user = userEvent.setup();
+    render(<BoardSwitcher />);
+
+    await user.keyboard("r");
+    const input = screen.getByLabelText("ボード名");
+    await user.clear(input);
+    await user.type(input, "本業{Enter}");
+
+    expect(api.boardRename).toHaveBeenCalledWith("b1", "本業");
+  });
+
+  it("⌘⌫で確認ダイアログを出し、EnterでCASCADE削除する", async () => {
+    vi.mocked(api.boardDelete).mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<BoardSwitcher />);
+
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "このボードのタスクとステータスもすべて削除されます。元に戻せません。",
+      ),
+    ).toBeInTheDocument();
+
+    await user.keyboard("{Enter}");
+
+    expect(api.boardDelete).toHaveBeenCalledWith("b1");
+  });
+
+  it("ボードが1枚のときは削除できない", async () => {
+    useAppStore.setState({ boards: [boards[0]], currentBoardId: "b1" });
+    const user = userEvent.setup();
+    render(<BoardSwitcher />);
+
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(api.boardDelete).not.toHaveBeenCalled();
   });
 });
