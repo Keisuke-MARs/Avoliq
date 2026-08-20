@@ -4,9 +4,11 @@
 use std::sync::Mutex;
 
 use rusqlite::Connection;
+use tauri::AppHandle;
 use tauri::State;
 
 use crate::db::{repo, Board, Status, Task};
+use crate::panel;
 
 /// DB接続をアプリ全体で共有するための状態。
 pub struct DbState(pub Mutex<Connection>);
@@ -156,4 +158,12 @@ pub fn setting_set(
 ) -> Result<(), String> {
     let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
     repo::setting_set(&mut conn, &key, &value).map_err(|e| e.to_string())
+}
+
+/// パレットを隠す。フロントの Esc から呼ぶ。
+/// NSPanel なので JS 側の window.hide() ではなく Rust 側で orderOut する必要がある。
+#[tauri::command]
+pub fn palette_hide(app: AppHandle) -> Result<(), String> {
+    panel::hide_panel(&app);
+    Ok(())
 }

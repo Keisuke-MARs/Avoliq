@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod panel;
 
 use std::sync::Mutex;
 
@@ -9,6 +10,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_nspanel::init())
         .invoke_handler(tauri::generate_handler![
             commands::boards_list,
             commands::board_create,
@@ -27,6 +29,7 @@ pub fn run() {
             commands::task_restore,
             commands::setting_get,
             commands::setting_set,
+            commands::palette_hide,
         ])
         .setup(|app| {
             // ~/Library/Application Support/smartTask/smart-task.db
@@ -39,6 +42,9 @@ pub fn run() {
             let mut conn = db::open_at(&db_path).map_err(|e| e.to_string())?;
             db::repo::seed_if_empty(&mut conn).map_err(|e| e.to_string())?;
             app.manage(commands::DbState(Mutex::new(conn)));
+
+            // ウィンドウをNSPanel化する
+            panel::init_panel(app)?;
 
             Ok(())
         })

@@ -15,6 +15,7 @@
       {
         "label": "main",
         "title": "smartTask",
+        "visible": false,
         "width": 720,
         "height": 480,
         "center": true,
