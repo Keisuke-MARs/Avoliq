@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { hidePalette } from "@/lib/api";
 import { buildLanes, filterTasks, nextSelectedTaskId } from "@/lib/boardNav";
+import { flushDetail, focusDetailTitle } from "@/lib/detailBridge";
 import { useAppStore } from "@/store/appStore";
 import type { AppState } from "@/store/appStore";
 
@@ -146,9 +147,42 @@ function handleBoardKey(e: KeyboardEvent, s: AppState): void {
 }
 
 /**
+ * 詳細画面のキーマップ。
+ * Esc=保存を確定してボードへ戻る / ⌘←→=ステータス変更 / ⌘T=タイトルへフォーカス
+ */
+function handleDetailKey(event: KeyboardEvent): void {
+  const store = useAppStore.getState();
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    flushDetail();
+    store.setView("board");
+    return;
+  }
+
+  if (event.metaKey && event.key === "ArrowLeft") {
+    event.preventDefault();
+    void store.moveSelectedTask("left");
+    return;
+  }
+
+  if (event.metaKey && event.key === "ArrowRight") {
+    event.preventDefault();
+    void store.moveSelectedTask("right");
+    return;
+  }
+
+  if (event.metaKey && (event.key === "t" || event.key === "T")) {
+    event.preventDefault();
+    focusDetailTitle();
+  }
+}
+
+/**
  * window に keydown を1本だけ張り、現在のviewに応じてキーを振り分ける。
- * board以外のビューのキーマップ（詳細の⌘←→/⌘T、スイッチャー・設定の操作）は計画書3の担当で、
- * ここではEscで盤面へ戻る導線だけ通してある。
+ * スイッチャー・設定は将来的に各コンポーネント側でキーを処理する想定だが、
+ * 現状はまだ専用ハンドラを持たない（ViewPlaceholderのみ）ため、
+ * 既存動作を維持してEscで盤面へ戻る導線だけ通してある。
  */
 export function useKeyboard(): void {
   useEffect(() => {
@@ -159,6 +193,10 @@ export function useKeyboard(): void {
       const state = useAppStore.getState();
       if (state.view === "board") {
         handleBoardKey(e, state);
+        return;
+      }
+      if (state.view === "detail") {
+        handleDetailKey(e);
         return;
       }
       if (e.key === "Escape") {

@@ -1,22 +1,12 @@
 import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { Board } from "./Board";
+import { FooterHints } from "./FooterHints";
 import { SearchBar } from "./SearchBar";
 import { TaskDetail } from "./TaskDetail";
 import { useFlushOnHide } from "@/hooks/useFlushOnHide";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useAppStore } from "@/store/appStore";
-
-/** フッターに常時出すキーボードヒント */
-const HINTS: { keys: string; label: string }[] = [
-  { keys: "↑↓←→", label: "移動" },
-  { keys: "⏎", label: "開く / 作成" },
-  { keys: "⌘←→", label: "ステータス" },
-  { keys: "⌘↑↓", label: "並び替え" },
-  { keys: "⌘⌫", label: "削除" },
-  { keys: "⌘Z", label: "元に戻す" },
-  { keys: "esc", label: "閉じる" },
-];
 
 /** 計画書3で本実装されるビューの仮表示 */
 function ViewPlaceholder({ testId, label }: { testId: string; label: string }) {
@@ -63,19 +53,7 @@ export function Palette() {
         <ViewPlaceholder testId="settings-placeholder" label="ボード設定は計画書3で実装します" />
       )}
 
-      <footer
-        data-testid="keyboard-hints"
-        className="flex h-8 shrink-0 items-center gap-3 border-t border-black/5 px-4 text-[11px] text-neutral-500"
-      >
-        {HINTS.map((hint) => (
-          <span key={hint.keys} className="flex items-center gap-1">
-            <kbd className="rounded bg-black/5 px-1 py-0.5 font-sans text-[10px] text-neutral-600">
-              {hint.keys}
-            </kbd>
-            {hint.label}
-          </span>
-        ))}
-      </footer>
+      <FooterHints view={view} />
 
       <Toaster />
     </div>
