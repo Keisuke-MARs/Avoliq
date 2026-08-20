@@ -7,6 +7,7 @@ import { FooterHints } from "./FooterHints";
 import { SearchBar } from "./SearchBar";
 import { TaskDetail } from "./TaskDetail";
 import { useFlushOnHide } from "@/hooks/useFlushOnHide";
+import { useHotkeyErrorToast } from "@/hooks/useHotkeyErrorToast";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useAppStore } from "@/store/appStore";
 
@@ -17,6 +18,7 @@ export function Palette() {
 
   useKeyboard();
   useFlushOnHide();
+  useHotkeyErrorToast();
 
   useEffect(() => {
     void loadBoards();

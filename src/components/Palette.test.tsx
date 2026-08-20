@@ -17,6 +17,7 @@ vi.mock("@/lib/api", () => ({
   taskDelete: vi.fn(),
   taskRestore: vi.fn(),
   hidePalette: vi.fn(),
+  settingGet: vi.fn(),
 }));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
@@ -27,6 +28,10 @@ vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     onFocusChanged: () => Promise.resolve(() => undefined),
   }),
+}));
+// useHotkeyErrorToastがlistenを呼ぶため、jsdom環境で落ちないようスタブする。
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: () => Promise.resolve(() => undefined),
 }));
 
 const mocked = vi.mocked(api);
@@ -54,6 +59,7 @@ beforeEach(() => {
   mocked.statusesList.mockResolvedValue(statuses);
   mocked.tasksList.mockResolvedValue(tasks);
   mocked.hidePalette.mockResolvedValue(undefined);
+  mocked.settingGet.mockResolvedValue(null);
 });
 
 describe("Palette: キーボードの基本動作", () => {
