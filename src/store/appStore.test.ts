@@ -3,6 +3,7 @@ import * as api from "@/lib/api";
 import { toast } from "sonner";
 import { useAppStore } from "./appStore";
 import { board, board2, statuses, tasks } from "@/test/fixtures";
+import type { Task } from "@/types";
 
 vi.mock("@/lib/api", () => ({
   boardsList: vi.fn(),
@@ -115,5 +116,271 @@ describe("appStore: setView / setSelectedTask", () => {
     expect(useAppStore.getState().selectedTaskId).toBe("t-a");
     useAppStore.getState().setSelectedTask(null);
     expect(useAppStore.getState().selectedTaskId).toBeNull();
+  });
+});
+
+describe("appStore: createTaskFromSearch", () => {
+  beforeEach(async () => {
+    await loadFixtureBoard();
+  });
+
+  it("検索文字列をタイトルに先頭ステータスへ作成し、詳細画面へ遷移する", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "新しいタスク",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+
+    useAppStore.getState().setSearchQuery("新しいタスク");
+    await useAppStore.getState().createTaskFromSearch();
+
+    expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "新しいタスク");
+    const s = useAppStore.getState();
+    expect(s.tasks).toHaveLength(7);
+    expect(s.selectedTaskId).toBe("t-new");
+    expect(s.view).toBe("detail");
+    expect(s.searchQuery).toBe("");
+    // 先頭挿入なので同レーンの既存タスクは1つずつ後ろへずれる
+    expect(s.tasks.find((t) => t.id === "t-a")?.position).toBe(1);
+    // 別レーンのタスクのpositionは動かない
+    expect(s.tasks.find((t) => t.id === "t-d")?.position).toBe(0);
+  });
+
+  it("検索文字列が空なら何もしない", async () => {
+    await useAppStore.getState().createTaskFromSearch();
+    expect(mocked.taskCreate).not.toHaveBeenCalled();
+    expect(useAppStore.getState().view).toBe("board");
+  });
+
+  it("失敗したらトーストを出し、タスクを増やさない", async () => {
+    mocked.taskCreate.mockRejectedValue("DB error");
+    useAppStore.getState().setSearchQuery("失敗するタスク");
+    await useAppStore.getState().createTaskFromSearch();
+    expect(useAppStore.getState().tasks).toHaveLength(6);
+    expect(useAppStore.getState().view).toBe("board");
+    expect(toast.error).toHaveBeenCalled();
+  });
+});
+
+describe("appStore: moveSelectedTask", () => {
+  beforeEach(async () => {
+    await loadFixtureBoard();
+    mocked.taskMove.mockResolvedValue(tasks[0]);
+  });
+
+  it("→で隣のステータスの先頭へ移す", async () => {
+    useAppStore.getState().setSelectedTask("t-b");
+    await useAppStore.getState().moveSelectedTask("right");
+
+    expect(mocked.taskMove).toHaveBeenCalledWith("t-b", "st-doing", 0);
+    const s = useAppStore.getState();
+    const moved = s.tasks.find((t) => t.id === "t-b");
+    expect(moved?.statusId).toBe("st-doing");
+    expect(moved?.position).toBe(0);
+    // 移動先レーンの既存タスクは後ろへずれる
+    expect(s.tasks.find((t) => t.id === "t-d")?.position).toBe(1);
+    // 移動元レーンで後ろにいたタスクは前へ詰まる
+    expect(s.tasks.find((t) => t.id === "t-c")?.position).toBe(1);
+    // 選択は移動したタスクに追従する
+    expect(s.selectedTaskId).toBe("t-b");
+  });
+
+  it("←で1つ前のステータスへ移す", async () => {
+    useAppStore.getState().setSelectedTask("t-d");
+    await useAppStore.getState().moveSelectedTask("left");
+    expect(mocked.taskMove).toHaveBeenCalledWith("t-d", "st-todo", 0);
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-d")?.statusId).toBe("st-todo");
+  });
+
+  it("空のレーンへも移せる（空レーンは飛ばさない）", async () => {
+    useAppStore.getState().setSelectedTask("t-d");
+    await useAppStore.getState().moveSelectedTask("right");
+    expect(mocked.taskMove).toHaveBeenCalledWith("t-d", "st-check", 0);
+  });
+
+  it("左端のレーンで←なら何もしない", async () => {
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().moveSelectedTask("left");
+    expect(mocked.taskMove).not.toHaveBeenCalled();
+  });
+
+  it("右端のレーンで→なら何もしない", async () => {
+    useAppStore.getState().setSelectedTask("t-f");
+    await useAppStore.getState().moveSelectedTask("right");
+    expect(mocked.taskMove).not.toHaveBeenCalled();
+  });
+
+  it("未選択なら何もしない", async () => {
+    await useAppStore.getState().moveSelectedTask("right");
+    expect(mocked.taskMove).not.toHaveBeenCalled();
+  });
+
+  it("失敗したら元の状態へロールバックしトーストを出す", async () => {
+    mocked.taskMove.mockRejectedValue("DB error");
+    useAppStore.getState().setSelectedTask("t-b");
+    await useAppStore.getState().moveSelectedTask("right");
+
+    const s = useAppStore.getState();
+    expect(s.tasks.find((t) => t.id === "t-b")?.statusId).toBe("st-todo");
+    expect(s.tasks.find((t) => t.id === "t-b")?.position).toBe(1);
+    expect(toast.error).toHaveBeenCalled();
+  });
+});
+
+describe("appStore: reorderSelectedTask", () => {
+  beforeEach(async () => {
+    await loadFixtureBoard();
+    mocked.taskMove.mockResolvedValue(tasks[0]);
+  });
+
+  it("↑で同レーンの1つ上と入れ替える", async () => {
+    useAppStore.getState().setSelectedTask("t-b");
+    await useAppStore.getState().reorderSelectedTask("up");
+
+    expect(mocked.taskMove).toHaveBeenCalledWith("t-b", "st-todo", 0);
+    const s = useAppStore.getState();
+    expect(s.tasks.find((t) => t.id === "t-b")?.position).toBe(0);
+    expect(s.tasks.find((t) => t.id === "t-a")?.position).toBe(1);
+  });
+
+  it("↓で同レーンの1つ下と入れ替える", async () => {
+    useAppStore.getState().setSelectedTask("t-b");
+    await useAppStore.getState().reorderSelectedTask("down");
+    expect(mocked.taskMove).toHaveBeenCalledWith("t-b", "st-todo", 2);
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-b")?.position).toBe(2);
+  });
+
+  it("先頭で↑なら何もしない", async () => {
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().reorderSelectedTask("up");
+    expect(mocked.taskMove).not.toHaveBeenCalled();
+  });
+
+  it("末尾で↓なら何もしない", async () => {
+    useAppStore.getState().setSelectedTask("t-c");
+    await useAppStore.getState().reorderSelectedTask("down");
+    expect(mocked.taskMove).not.toHaveBeenCalled();
+  });
+
+  it("絞り込み中でも絞り込み前の行番号で並び替える", async () => {
+    // 「牛」で絞ると t-a(行0) と t-c(行2) だけが見えるが、
+    // t-c を↑した結果は絞り込み前の1つ上である t-b との入れ替えになる
+    useAppStore.getState().setSelectedTask("t-c");
+    useAppStore.getState().setSearchQuery("牛");
+    await useAppStore.getState().reorderSelectedTask("up");
+    expect(mocked.taskMove).toHaveBeenCalledWith("t-c", "st-todo", 1);
+  });
+
+  it("失敗したら元の並びへロールバックしトーストを出す", async () => {
+    mocked.taskMove.mockRejectedValue("DB error");
+    useAppStore.getState().setSelectedTask("t-b");
+    await useAppStore.getState().reorderSelectedTask("up");
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-b")?.position).toBe(1);
+    expect(toast.error).toHaveBeenCalled();
+  });
+});
+
+describe("appStore: deleteSelectedTask / undoDelete", () => {
+  beforeEach(async () => {
+    await loadFixtureBoard();
+  });
+
+  it("選択中のタスクを消し、1つ下を選び直し、undo用に覚えておく", async () => {
+    mocked.taskDelete.mockResolvedValue(tasks[0]);
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().deleteSelectedTask();
+
+    expect(mocked.taskDelete).toHaveBeenCalledWith("t-a");
+    const s = useAppStore.getState();
+    expect(s.tasks.map((t) => t.id)).not.toContain("t-a");
+    expect(s.selectedTaskId).toBe("t-b");
+    expect(s.lastDeletedTaskId).toBe("t-a");
+  });
+
+  it("レーンの最後の1件を消したら選択を外す", async () => {
+    mocked.taskDelete.mockResolvedValue(tasks[5]);
+    useAppStore.getState().setSelectedTask("t-f");
+    await useAppStore.getState().deleteSelectedTask();
+    expect(useAppStore.getState().selectedTaskId).toBeNull();
+  });
+
+  it("未選択なら何もしない", async () => {
+    await useAppStore.getState().deleteSelectedTask();
+    expect(mocked.taskDelete).not.toHaveBeenCalled();
+  });
+
+  it("削除に失敗したらタスクを戻しトーストを出す", async () => {
+    mocked.taskDelete.mockRejectedValue("DB error");
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().deleteSelectedTask();
+
+    const s = useAppStore.getState();
+    expect(s.tasks.map((t) => t.id)).toContain("t-a");
+    expect(s.selectedTaskId).toBe("t-a");
+    expect(s.lastDeletedTaskId).toBeNull();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("undoDelete で直前に削除したタスクを復元して選択する", async () => {
+    mocked.taskDelete.mockResolvedValue(tasks[0]);
+    mocked.taskRestore.mockResolvedValue(tasks[0]);
+
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().deleteSelectedTask();
+    await useAppStore.getState().undoDelete();
+
+    expect(mocked.taskRestore).toHaveBeenCalledWith("t-a");
+    const s = useAppStore.getState();
+    expect(s.tasks).toHaveLength(6);
+    expect(s.tasks.filter((t) => t.id === "t-a")).toHaveLength(1);
+    expect(s.selectedTaskId).toBe("t-a");
+    expect(s.lastDeletedTaskId).toBeNull();
+  });
+
+  it("削除していなければ undoDelete は何もしない", async () => {
+    await useAppStore.getState().undoDelete();
+    expect(mocked.taskRestore).not.toHaveBeenCalled();
+  });
+
+  it("復元に失敗したらトーストを出す", async () => {
+    mocked.taskDelete.mockResolvedValue(tasks[0]);
+    mocked.taskRestore.mockRejectedValue("DB error");
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().deleteSelectedTask();
+    await useAppStore.getState().undoDelete();
+    expect(useAppStore.getState().tasks).toHaveLength(5);
+    expect(toast.error).toHaveBeenCalled();
+  });
+});
+
+describe("appStore: updateTaskTitle / updateTaskContent", () => {
+  beforeEach(async () => {
+    await loadFixtureBoard();
+    mocked.taskUpdate.mockResolvedValue(tasks[0]);
+  });
+
+  it("タイトルを先にローカル反映してから保存する", async () => {
+    await useAppStore.getState().updateTaskTitle("t-a", "牛乳と卵を買う");
+    expect(mocked.taskUpdate).toHaveBeenCalledWith("t-a", "牛乳と卵を買う", null);
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-a")?.title).toBe("牛乳と卵を買う");
+  });
+
+  it("本文を先にローカル反映してから保存する", async () => {
+    await useAppStore.getState().updateTaskContent("t-a", "# メモ");
+    expect(mocked.taskUpdate).toHaveBeenCalledWith("t-a", null, "# メモ");
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-a")?.contentMd).toBe("# メモ");
+  });
+
+  it("保存に失敗したらロールバックしトーストを出す", async () => {
+    mocked.taskUpdate.mockRejectedValue("DB error");
+    await useAppStore.getState().updateTaskTitle("t-a", "壊れるタイトル");
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-a")?.title).toBe("牛乳を買う");
+    expect(toast.error).toHaveBeenCalled();
   });
 });
