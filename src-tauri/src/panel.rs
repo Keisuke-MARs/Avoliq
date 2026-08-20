@@ -118,6 +118,9 @@ pub const HOTKEY_ERROR_EVENT: &str = "hotkey-error";
 /// 登録に失敗したらフロントへ `hotkey-error` を emit する。ただし起動直後はフロントの
 /// listen が間に合わないことがあるので、同じメッセージを settings の `hotkeyError` にも書く。
 /// 成功したときは空文字で上書きして過去のエラーをクリアする。
+///
+/// emit・settings記録は成功/失敗いずれでも行ったうえで、失敗時は呼び出し元へ Err を返す。
+/// 呼び出し元（起動時 / reregister_hotkey）が失敗時の扱いを判断する。
 pub fn register_hotkey(app: &AppHandle) -> Result<(), String> {
     let hotkey = {
         let state = app.state::<DbState>();
@@ -156,7 +159,11 @@ pub fn register_hotkey(app: &AppHandle) -> Result<(), String> {
     repo::setting_set(&mut conn, repo::HOTKEY_ERROR_SETTING_KEY, &message)
         .map_err(|e| e.to_string())?;
 
-    Ok(())
+    if message.is_empty() {
+        Ok(())
+    } else {
+        Err(message)
+    }
 }
 
 /// 登録済みのショートカットを全部外してから、settingsのhotkeyで登録し直す。
