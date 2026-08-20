@@ -2,6 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* BlockNoteのshadcn版UI(スラッシュメニュー等)はTailwindクラスで組まれているが、
+   Tailwind v4の自動検出はnode_modulesを見ないためクラスが生成されず未適用になる。
+   このパッケージも走査対象に加える */
+@source "../node_modules/@blocknote/shadcn/dist";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -300,6 +305,33 @@ body {
   --bn-colors-editor-background: transparent;
   --bn-colors-editor-text: #1c1c1e;
   --bn-colors-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============ スラッシュメニュー(BlockNoteのサジェスト) ============
+   shadcn既定の選択色(bg-accent = ほぼ白)は、半透明白のパレット上では
+   選択行が背景と見分けられない。macOSのメニューに合わせてシステムブルーで塗る。
+   Tailwindのユーティリティは@layer内なので、レイヤー外のこの指定が優先される */
+.bn-suggestion-menu [aria-selected="true"] {
+  background-color: #007aff;
+  border-radius: 8px;
+}
+
+/* 選択行の中身(タイトル・説明文・アイコン)は白に統一して可読性を保つ */
+.bn-suggestion-menu [aria-selected="true"],
+.bn-suggestion-menu [aria-selected="true"] * {
+  color: #ffffff;
+}
+
+.bn-suggestion-menu [aria-selected="true"] svg {
+  color: #ffffff;
+}
+
+/* ショートカットのバッジは青地に埋もれるので、半透明白の地に置き換える */
+.bn-suggestion-menu [aria-selected="true"] kbd,
+.bn-suggestion-menu [aria-selected="true"] [class*="badge"],
+.bn-suggestion-menu [aria-selected="true"] [data-slot="badge"] {
+  background-color: rgba(255, 255, 255, 0.22);
+  border-color: transparent;
 }
 
 /* OSの視差効果を減らす設定を尊重する */
