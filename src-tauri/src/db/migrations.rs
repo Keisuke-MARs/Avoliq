@@ -75,6 +75,8 @@ pub fn migrate(conn: &mut Connection) -> Result<()> {
 }
 
 /// 適用済みの最大バージョンを返す。1件も無ければ 0。
+/// 現状はテストの検証専用（本体コードから使うようになったら cfg を外す）
+#[cfg(test)]
 pub fn current_version(conn: &Connection) -> Result<i64> {
     let version: Option<i64> = conn.query_row(
         "SELECT MAX(version) FROM schema_migrations",
