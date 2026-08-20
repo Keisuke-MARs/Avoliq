@@ -11,18 +11,8 @@ const HOTKEY_ERROR_SETTING_KEY = "hotkeyError";
 export default function App() {
   const [hotkeyError, setHotkeyError] = useState("");
 
-  useEffect(() => {
-    // Escでパレットを閉じる。NSPanelなのでRust側のhideを呼ぶ必要がある。
-    // 計画書1由来の暫定処理。ビュー別のEsc制御（detail→board等）はTask 8でuseKeyboardに統合する。
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        void invoke("palette_hide");
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  // Escの処理はuseKeyboard（Palette内で呼ばれる）に統合済み。
+  // 計画書1由来のグローバルEscリスナーはTask 8でここから撤去した（二重処理防止）。
 
   useEffect(() => {
     // ホットキー登録に失敗したらメッセージを出す（別キーへの変更は設定画面で行う）
