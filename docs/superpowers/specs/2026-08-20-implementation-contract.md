@@ -13,6 +13,15 @@
 - Rust: rusqlite（bundled）, uuid, serde
 - Tauriプラグイン: `global-shortcut` / `single-instance` / `autostart` / `tauri-nspanel`（GitHub配布crate）
 
+### shadcn/ui 導入の実態（実装時判明・Task P1-T2で確定）
+
+- 現行shadcn CLIはプリセット方式に変わり `init` は非決定的なため、**手動インストール**で導入済み
+  （components.json 手書き / style は `base-nova` / baseColor neutral / iconLibrary lucide）
+- 現行styleのコンポーネントは **Radixではなく Base UI（`@base-ui/react`）ベース**
+- **レジストリは依存を宣言しない**：`npx shadcn@latest add <component> --yes` の後は
+  必ず `npm run build` を実行し、未解決importがあれば必要パッケージを手動で追加すること
+- 禁止依存（設計と衝突）: `@fontsource-*` / `geist` / `radix-ui`（一括パッケージ）
+
 ## ディレクトリ / ファイル構成
 
 ```
