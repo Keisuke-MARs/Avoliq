@@ -29,25 +29,55 @@ function isSeparatorRowShape(line: string): boolean {
   return line.includes("|") && SEPARATOR_ROW_RE.test(line);
 }
 
-// fenced code block(```で始まる行)の開始行判定。言語指定(```ts 等)も含めて先頭が```なら開始/終了とみなす。
-const FENCE_RE = /^\s*```/;
+// fenced code block(```または~~~で始まる行)の開始/終了行判定。
+// CommonMarkの仕様に合わせ、文字種(`または~)と3文字以上の連続長を記録し、
+// 「同じ文字種かつ開始長以上の連続長」の行だけを閉じフェンスとして扱う。
+// これにより ~~~ フェンスや、````(4連)フェンス内に混じる```(3連)行を誤って
+// 閉じフェンスと判定しない(単純トグルだと文字種・長さを無視してズレてしまうため)。
+const FENCE_LINE_RE = /^\s*(`{3,}|~{3,})/;
+
+interface FenceMark {
+  char: string;
+  len: number;
+}
+
+function matchFenceLine(line: string): FenceMark | null {
+  const m = FENCE_LINE_RE.exec(line);
+  if (m === null) return null;
+  const run = m[1];
+  return { char: run[0], len: run.length };
+}
 
 export function reflowStrayMarkdownTables(markdown: string): string {
   const lines = markdown.split("\n");
   const result: string[] = [];
   let i = 0;
-  // ```の開閉状態。フェンス内はコード例そのものなので、パイプ行や空行があっても連結対象にしない
-  let inFence = false;
+  // 現在開いているフェンスの文字種・長さ。フェンス外はnull。
+  // フェンス内はコード例そのものなので、パイプ行や空行があっても連結対象にしない
+  let fence: FenceMark | null = null;
 
   while (i < lines.length) {
-    if (FENCE_RE.test(lines[i])) {
-      inFence = !inFence;
+    const maybeFence = matchFenceLine(lines[i]);
+
+    if (fence !== null) {
+      // フェンス内: 同じ文字種かつ開始長以上の連続長の行だけを閉じフェンスとして扱う
+      if (maybeFence !== null && maybeFence.char === fence.char && maybeFence.len >= fence.len) {
+        fence = null;
+      }
       result.push(lines[i]);
       i += 1;
       continue;
     }
 
-    if (!inFence && isNonBlankTableRowShape(lines[i])) {
+    if (maybeFence !== null) {
+      // フェンス外で新たにフェンス開始行を見つけた
+      fence = maybeFence;
+      result.push(lines[i]);
+      i += 1;
+      continue;
+    }
+
+    if (isNonBlankTableRowShape(lines[i])) {
       // 単一の空行だけを挟んで「行っぽい」行が続く限り候補グループへ集める
       const group: string[] = [lines[i]];
       let j = i + 1;

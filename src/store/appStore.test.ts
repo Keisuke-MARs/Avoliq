@@ -273,13 +273,26 @@ describe("appStore: createTaskFromSearch", () => {
       updatedAt: "2026-08-20T01:00:00Z",
     };
     mocked.taskCreate.mockResolvedValue(created);
+    // 作成成功後の反映はtasksListでの正引きなので、Rust側が再採番した後の実状態を用意する
+    const freshFromDb: Task[] = [
+      { ...tasks[0], position: 1 },
+      { ...tasks[1], position: 2 },
+      { ...tasks[2], position: 3 },
+      tasks[3],
+      tasks[4],
+      tasks[5],
+      created,
+    ];
+    mocked.tasksList.mockResolvedValueOnce(freshFromDb);
 
     useAppStore.getState().setSearchQuery("新しいタスク");
     await useAppStore.getState().createTaskFromSearch();
 
     expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "新しいタスク");
+    expect(mocked.tasksList).toHaveBeenLastCalledWith("board-1");
     const s = useAppStore.getState();
-    expect(s.tasks).toHaveLength(7);
+    // 反映結果はtasksListが返した実状態そのもの(手動position計算はしない)
+    expect(s.tasks).toEqual(freshFromDb);
     expect(s.selectedTaskId).toBe("t-new");
     expect(s.view).toBe("detail");
     expect(s.searchQuery).toBe("");
@@ -415,12 +428,25 @@ describe("appStore: createNewTask", () => {
       updatedAt: "2026-08-20T01:00:00Z",
     };
     mocked.taskCreate.mockResolvedValue(created);
+    // 作成成功後の反映はtasksListでの正引きなので、Rust側が再採番した後の実状態を用意する
+    const freshFromDb: Task[] = [
+      { ...tasks[0], position: 1 },
+      { ...tasks[1], position: 2 },
+      { ...tasks[2], position: 3 },
+      tasks[3],
+      tasks[4],
+      tasks[5],
+      created,
+    ];
+    mocked.tasksList.mockResolvedValueOnce(freshFromDb);
 
     await useAppStore.getState().createNewTask();
 
     expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", NEW_TASK_TITLE);
+    expect(mocked.tasksList).toHaveBeenLastCalledWith("board-1");
     const s = useAppStore.getState();
-    expect(s.tasks).toHaveLength(7);
+    // 反映結果はtasksListが返した実状態そのもの(手動position計算はしない)
+    expect(s.tasks).toEqual(freshFromDb);
     expect(s.selectedTaskId).toBe("t-new");
     expect(s.view).toBe("detail");
     // TaskDetail側が「新規作成直後」を判定するための目印
@@ -455,6 +481,8 @@ describe("appStore: createNewTask", () => {
 
     expect(mocked.taskCreate).toHaveBeenCalledTimes(1);
 
+    // 作成成功後の反映はtasksListでの正引きになるので、フラグ解放の検証に必要な分だけ用意する
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
     resolveCreate(created);
     await first;
     await second;
@@ -463,7 +491,7 @@ describe("appStore: createNewTask", () => {
     expect(useAppStore.getState().tasks).toHaveLength(7);
   });
 
-  it("応答待ち中に他の操作でtasksが変化していても、反映時は最新stateへ適用する(捕捉スナップショットで上書きしない)", async () => {
+  it("作成応答待ち中に同レーンの別タスクが削除されても、反映後のtasksはtasksListが返す実状態と一致する", async () => {
     mocked.taskDelete.mockResolvedValue(tasks[0]);
     const created: Task = {
       id: "t-new",
@@ -484,19 +512,33 @@ describe("appStore: createNewTask", () => {
 
     const createPromise = useAppStore.getState().createNewTask();
 
-    // 作成の応答待ち中に、別の操作(削除)でtasksが進む
+    // 作成の応答待ち中に、同レーン(st-todo)の別タスク(t-a)が削除される
     useAppStore.getState().setSelectedTask("t-a");
     await useAppStore.getState().deleteSelectedTask();
     expect(useAppStore.getState().tasks.some((t) => t.id === "t-a")).toBe(false);
+
+    // Rust側は削除後の実際の並びを踏まえてpositionを再採番するので、手元の
+    // 「残存タスクのposition+1」という楽観計算とはズレたfreshFromDbを用意する。
+    // 反映結果はこのtasksListの応答そのものと一致するべき(手動position計算はしない)
+    const freshFromDb: Task[] = [
+      created,
+      { ...tasks[1], position: 1 },
+      { ...tasks[2], position: 2 },
+      tasks[3],
+      tasks[4],
+      tasks[5],
+    ];
+    mocked.tasksList.mockResolvedValueOnce(freshFromDb);
 
     resolveCreate(created);
     await createPromise;
 
     const s = useAppStore.getState();
-    // 削除の結果が消されていない(=開始時に捕捉した古いtasksスナップショットで上書きしていない)
-    expect(s.tasks.some((t) => t.id === "t-a")).toBe(false);
-    // 作成したタスクも反映されている
-    expect(s.tasks.some((t) => t.id === "t-new")).toBe(true);
+    expect(mocked.tasksList).toHaveBeenLastCalledWith("board-1");
+    expect(s.tasks).toEqual(freshFromDb);
+    expect(s.selectedTaskId).toBe("t-new");
+    expect(s.pendingNewTaskId).toBe("t-new");
+    expect(s.view).toBe("detail");
   });
 
   it("作成完了後は再度呼び出せる(フラグが解放される)", async () => {

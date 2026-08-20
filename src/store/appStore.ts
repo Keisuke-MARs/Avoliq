@@ -203,19 +203,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
       // 待っている間にボードが切り替えられていたら、作成自体はDBに済んでいるので
       // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
       if (epoch !== boardEpoch) return;
-      // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす。
-      // 開始時点で捕捉したtasksスナップショットではなく、反映時点の最新stateに対して適用する
-      // (応答待ち中に他の操作でtasksが進んでいても、その変化を消さずに取り込むため)
-      set((s) => {
-        const shifted = s.tasks.map((t) =>
-          t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
-        );
-        return {
-          tasks: [...shifted, created],
-          searchQuery: "",
-          selectedTaskId: created.id,
-          view: "detail",
-        };
+      // Rust側が先頭挿入時に同レーンを再採番した後の実状態をDBから正引きする。
+      // 手元での「残存タスクのposition+1」という楽観計算だと、応答待ち中に同レーンで
+      // 削除等が起きた場合にRust側の再採番結果とズレるため、必ずtasksListで正引きする
+      const fresh = await api.tasksList(currentBoardId);
+      // 正引き中にもボードが切り替えられている可能性があるので、反映直前にも確認する
+      if (epoch !== boardEpoch) return;
+      set({
+        tasks: fresh,
+        searchQuery: "",
+        selectedTaskId: created.id,
+        view: "detail",
       });
     } catch (e) {
       if (epoch !== boardEpoch) return;
@@ -242,19 +240,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
       // 待っている間にボードが切り替えられていたら、作成自体はDBに済んでいるので
       // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
       if (epoch !== boardEpoch) return;
-      // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす。
-      // 開始時点で捕捉したtasksスナップショットではなく、反映時点の最新stateに対して適用する
-      set((s) => {
-        const shifted = s.tasks.map((t) =>
-          t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
-        );
-        return {
-          tasks: [...shifted, created],
-          selectedTaskId: created.id,
-          // TaskDetail側の初回フォーカス判定用。タイトル文字列ではなくIDで判定するための目印
-          pendingNewTaskId: created.id,
-          view: "detail",
-        };
+      // Rust側が先頭挿入時に同レーンを再採番した後の実状態をDBから正引きする。
+      // 手元での「残存タスクのposition+1」という楽観計算だと、応答待ち中に同レーンで
+      // 削除等が起きた場合にRust側の再採番結果とズレるため、必ずtasksListで正引きする
+      const fresh = await api.tasksList(currentBoardId);
+      // 正引き中にもボードが切り替えられている可能性があるので、反映直前にも確認する
+      if (epoch !== boardEpoch) return;
+      set({
+        tasks: fresh,
+        selectedTaskId: created.id,
+        // TaskDetail側の初回フォーカス判定用。タイトル文字列ではなくIDで判定するための目印
+        pendingNewTaskId: created.id,
+        view: "detail",
       });
     } catch (e) {
       if (epoch !== boardEpoch) return;

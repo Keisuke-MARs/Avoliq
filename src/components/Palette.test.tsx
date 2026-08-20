@@ -203,6 +203,9 @@ describe("Palette: 検索と新規作成", () => {
     mocked.taskCreate.mockResolvedValue(created);
 
     const user = await renderPalette();
+    // 作成成功後の反映はtasksListでの正引きになるので、作成タスクを含む実状態を用意する
+    // (初回読込のtasksList呼び出しを消費させないよう、renderPalette完了後にキューする)
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
     fireEvent.change(screen.getByTestId("search-input"), { target: { value: "牛乳を買い足す" } });
     await user.keyboard("{Enter}");
 
@@ -257,6 +260,9 @@ describe("Palette: 検索と新規作成", () => {
     mocked.taskCreate.mockResolvedValue(created);
 
     const user = await renderPalette();
+    // 作成成功後の反映はtasksListでの正引きになるので、作成タスクを含む実状態を用意する
+    // (初回読込のtasksList呼び出しを消費させないよう、renderPalette完了後にキューする)
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
     await user.keyboard("{Meta>}n{/Meta}");
 
     await waitFor(() => {

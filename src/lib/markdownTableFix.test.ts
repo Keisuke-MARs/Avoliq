@@ -66,4 +66,39 @@ describe("reflowStrayMarkdownTables", () => {
 
     expect(reflowStrayMarkdownTables(input)).toBe(input);
   });
+
+  it("~~~フェンス内のテーブル風行+空行は連結せずそのままにする", () => {
+    const input = "~~~\n| aa | bb |\n\n| --- | --- |\n\n| 1 | 2 |\n~~~\n";
+
+    expect(reflowStrayMarkdownTables(input)).toBe(input);
+  });
+
+  it("```フェンスは~~~では閉じない(文字種が異なる行は閉じフェンスとみなさない)", () => {
+    // ```で開いたフェンスの中に~~~行が来ても閉じフェンスと誤認せず、
+    // 最後の```まで一貫してフェンス内として扱う(=中のテーブル風行は連結しない)
+    const input = "```\n~~~\n| aa | bb |\n\n| --- | --- |\n```\n";
+
+    expect(reflowStrayMarkdownTables(input)).toBe(input);
+  });
+
+  it("````(4連)フェンス内に```(3連)を含むコードでは、3連の```ではフェンスが閉じない", () => {
+    // 旧実装は文字数を無視して```始まりの行を単純トグルしていたため、
+    // 4連フェンスの中に現れる3連の```で誤って閉じ判定してしまい、
+    // その内側にあるテーブル風の行+空行を連結して中身を改変してしまっていた。
+    // CommonMark準拠(同じ文字種かつ開始長以上)なら、閉じるのは最後の````だけであるべき
+    const input =
+      "````\n```\n| a | b |\n\n| --- | --- |\n```\nmore code\n````\n";
+
+    expect(reflowStrayMarkdownTables(input)).toBe(input);
+  });
+
+  it("開始長より長い連続長の行でも閉じフェンスとして扱い、閉じた後の本物のテーブルは連結する", () => {
+    // ```(3連)で開いたフェンスが````(4連、開始長以上)で正しく閉じられることを確認する。
+    // フェンス内のテーブル風行+空行は連結されず、フェンスが閉じた後にある
+    // 本物のテーブルは通常通り連結される
+    const input = "```\n| a | b |\n\n| --- | --- |\n````\n\n| x | y |\n\n| --- | --- |\n";
+    const expected = "```\n| a | b |\n\n| --- | --- |\n````\n\n| x | y |\n| --- | --- |\n";
+
+    expect(reflowStrayMarkdownTables(input)).toBe(expected);
+  });
 });

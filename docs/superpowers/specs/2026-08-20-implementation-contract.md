@@ -144,9 +144,11 @@ CREATE TABLE schema_migrations (
 - `selectBoard` 要求時に `lastDeletedTaskId` を同期クリア（⌘Z undoはボードローカルな操作）
 - UIのcommit系関数（BoardSwitcher / StatusSettings）は `submittingRef` で二重実行を防ぐ
 - `appStore.ts` のタスク作成系（`createNewTask` / `createTaskFromSearch`）はモジュールスコープの
-  `taskCreating` フラグ（両関数で共有）で二重実行を防ぐ。加えて、応答反映は開始時に捕捉した
-  tasksスナップショットではなく `set((s) => ...)` の関数型更新で現在のtasksに対して行う
-  （epoch一致チェックは別途維持する）
+  `taskCreating` フラグ（両関数で共有）で二重実行を防ぐ。加えて、応答反映は手元での楽観的
+  position計算（残存タスクのposition+1）ではなく、`task_create` 成功後に
+  `api.tasksList(boardId)` でDBの実状態を正引きして反映する（採番はRust側の再採番結果に委ねる）。
+  epoch一致チェックは `task_create` 応答時・`tasksList` 応答時の両方で行い、いずれかの時点で
+  追い越されていたら黙って破棄する
 - 切替後に届いた古い応答のトースト・反映は黙って破棄する（意図した仕様）
 
 ## フロント側の追加固定名
