@@ -232,15 +232,87 @@ describe("Palette: 検索と新規作成", () => {
     expect(mocked.taskCreate).not.toHaveBeenCalled();
   });
 
-  it("⌘Nで検索バーが空になりフォーカスが戻る", async () => {
+  it("⌘Pで検索バーが空になりフォーカスが戻る", async () => {
     const user = await renderPalette();
     fireEvent.change(screen.getByTestId("search-input"), { target: { value: "牛" } });
     await user.keyboard("{ArrowDown}");
-    await user.keyboard("{Meta>}n{/Meta}");
+    await user.keyboard("{Meta>}p{/Meta}");
 
     expect(useAppStore.getState().searchQuery).toBe("");
     expect(selectedCardId()).toBeNull();
     expect(document.activeElement?.id).toBe("smarttask-search");
+  });
+
+  it("⌘Nでボード先頭ステータスへ新しいタスクを作成し、詳細画面へ遷移する", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "新しいタスク",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T02:00:00Z",
+      updatedAt: "2026-08-20T02:00:00Z",
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+
+    const user = await renderPalette();
+    await user.keyboard("{Meta>}n{/Meta}");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
+      ).toBeInTheDocument();
+    });
+    expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "新しいタスク");
+    expect(useAppStore.getState().selectedTaskId).toBe("t-new");
+    expect(useAppStore.getState().view).toBe("detail");
+  });
+});
+
+describe("Palette: 詳細画面での⌘N・⌘P", () => {
+  it("詳細画面で⌘Nを押すと新しいタスクを作成し、その詳細に差し替わる", async () => {
+    const created: Task = {
+      id: "t-new2",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "新しいタスク",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T02:00:00Z",
+      updatedAt: "2026-08-20T02:00:00Z",
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+
+    const user = await renderPalette();
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(screen.getByDisplayValue("牛乳を買う")).toBeInTheDocument();
+
+    await user.keyboard("{Meta>}n{/Meta}");
+
+    await waitFor(() => {
+      expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "新しいタスク");
+    });
+    await waitFor(() => {
+      expect(useAppStore.getState().selectedTaskId).toBe("t-new2");
+    });
+  });
+
+  it("詳細画面で⌘Pを押すとボードへ戻り検索バーへフォーカスする", async () => {
+    const user = await renderPalette();
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(
+      screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
+    ).toBeInTheDocument();
+
+    await user.keyboard("{Meta>}p{/Meta}");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("board")).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(document.activeElement?.id).toBe("smarttask-search");
+    });
   });
 });
 

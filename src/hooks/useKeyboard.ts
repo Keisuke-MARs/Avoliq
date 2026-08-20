@@ -57,7 +57,12 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
       return true;
     case "n":
     case "N":
-      // 新規タスク: 検索バーを空にしてフォーカスを戻す
+      // 新規タスク作成: ボード先頭ステータスへ即時作成し、詳細画面へ遷移する
+      void s.createNewTask();
+      return true;
+    case "p":
+    case "P":
+      // 検索: 検索バーを空にしてフォーカスを戻す(旧⌘Nと同じ挙動)
       s.setSelectedTask(null);
       s.setSearchQuery("");
       focusSearchInput();
@@ -148,7 +153,8 @@ function handleBoardKey(e: KeyboardEvent, s: AppState): void {
 
 /**
  * 詳細画面のキーマップ。
- * Esc=保存を確定してボードへ戻る / ⌘←→=ステータス変更 / ⌘T=タイトルへフォーカス
+ * Esc=保存を確定してボードへ戻る / ⌘←→=ステータス変更 / ⌘T=タイトルへフォーカス /
+ * ⌘N=新規タスク作成 / ⌘P=検索(保存を確定してボード+検索バーへ)
  */
 function handleDetailKey(event: KeyboardEvent): void {
   const store = useAppStore.getState();
@@ -175,6 +181,25 @@ function handleDetailKey(event: KeyboardEvent): void {
   if (event.metaKey && (event.key === "t" || event.key === "T")) {
     event.preventDefault();
     focusDetailTitle();
+    return;
+  }
+
+  if (event.metaKey && (event.key === "n" || event.key === "N")) {
+    event.preventDefault();
+    // 詳細画面の保留中の自動保存を確定してから、新規タスクを作って詳細を差し替える
+    flushDetail();
+    void store.createNewTask();
+    return;
+  }
+
+  if (event.metaKey && (event.key === "p" || event.key === "P")) {
+    event.preventDefault();
+    flushDetail();
+    store.setView("board");
+    // viewの切替(TaskDetailのアンマウント・SearchBarの再描画)がDOMへ反映されてから
+    // フォーカスを当てないと、切替前のDOMにフォーカスしてしまうことがあるため1フレーム遅らせる
+    requestAnimationFrame(() => focusSearchInput());
+    return;
   }
 }
 
