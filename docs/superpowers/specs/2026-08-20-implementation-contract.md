@@ -143,6 +143,10 @@ CREATE TABLE schema_migrations (
 - `selectBoard` 読込中は `boardLoading` フラグが立ち、ミューテーション系アクションは冒頭で即return
 - `selectBoard` 要求時に `lastDeletedTaskId` を同期クリア（⌘Z undoはボードローカルな操作）
 - UIのcommit系関数（BoardSwitcher / StatusSettings）は `submittingRef` で二重実行を防ぐ
+- `appStore.ts` のタスク作成系（`createNewTask` / `createTaskFromSearch`）はモジュールスコープの
+  `taskCreating` フラグ（両関数で共有）で二重実行を防ぐ。加えて、応答反映は開始時に捕捉した
+  tasksスナップショットではなく `set((s) => ...)` の関数型更新で現在のtasksに対して行う
+  （epoch一致チェックは別途維持する）
 - 切替後に届いた古い応答のトースト・反映は黙って破棄する（意図した仕様）
 
 ## フロント側の追加固定名
@@ -150,8 +154,11 @@ CREATE TABLE schema_migrations (
 - `src/lib/boardNav.ts`: カーソル移動・レーン跨ぎの純関数置き場（ストアを太らせない）
 - `src/store/appStore.ts` は `initialAppState` もexport（テストのリセット用。AppStateの形は不変）
 - 検索バーのDOM id: `SEARCH_INPUT_ID = "smarttask-search"`
-- `src/store/appStore.ts` は `NEW_TASK_TITLE = "新しいタスク"` もexport（⌘Nの既定タイトル。
-  TaskDetailはこの値と一致するかで「タイトルへ全選択フォーカス」か「本文へフォーカス」かを出し分ける）
+- `src/store/appStore.ts` は `NEW_TASK_TITLE = "新しいタスク"` もexport（⌘Nの既定タイトル文字列。
+  タイトル入力欄の初期値・作成時の引数として使うのみで、「新規作成直後か」の判定には使わない。
+  既存タスクがたまたま同名だった場合の誤爆を避けるため、判定はAppStateの`pendingNewTaskId`
+  （createNewTask成功時にセットし、TaskDetailが`selectedTaskId === pendingNewTaskId`で判定した後
+  クリアする）で行う）
 
 並び順は**整数positionの全件再採番方式**（レーン内タスク数は少ない前提。分数position等は使わない）。
 
@@ -198,6 +205,8 @@ interface AppState {
   view: View;
   searchQuery: string;
   lastDeletedTaskId: string | null;   // ⌘Z undo 用（直近1件）
+  pendingNewTaskId: string | null;    // createNewTask成功時にセット。TaskDetailが
+                                       // 「⌘N直後か」をidで判定し、判定後にクリアする
 
   loadBoards(): Promise<void>;
   selectBoard(boardId: string): Promise<boolean>; // statuses/tasksも再読込。反映=true/失敗・追い越し=false
@@ -228,9 +237,10 @@ interface AppState {
   ⌘N新規タスク作成(flushDetail→createNewTask、新タスクの詳細に差し替わる) /
   ⌘P検索(flushDetail→board遷移→検索バーへフォーカス、1フレーム遅延させて確実にフォーカスする) /
   Esc戻る（自動保存済み）
-- detail画面を開いた瞬間: タイトルが既定タイトル(`NEW_TASK_TITLE`)のままならタイトルへ全選択フォーカス、
-  それ以外(カードから開いた・検索から作成した等)は本文エディタ(BlockNote)へ自動フォーカス。
-  タイトル入力中にEnter/Tabを押すと本文エディタへフォーカスが移る（⌘Tで再度タイトルへ戻れる）
+- detail画面を開いた瞬間: `selectedTaskId === pendingNewTaskId`(⌘Nで作った直後)ならタイトルへ
+  全選択フォーカス、それ以外(カードから開いた・検索から作成した等)は本文エディタ(BlockNote)へ
+  自動フォーカス。タイトル入力中にEnter/Tabを押すと本文エディタへフォーカスが移る
+  （⌘Tで再度タイトルへ戻れる）
 
 ## UI原則
 

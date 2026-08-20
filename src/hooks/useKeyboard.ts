@@ -197,8 +197,13 @@ function handleDetailKey(event: KeyboardEvent): void {
     flushDetail();
     store.setView("board");
     // viewの切替(TaskDetailのアンマウント・SearchBarの再描画)がDOMへ反映されてから
-    // フォーカスを当てないと、切替前のDOMにフォーカスしてしまうことがあるため1フレーム遅らせる
-    requestAnimationFrame(() => focusSearchInput());
+    // フォーカスを当てないと、切替前のDOMにフォーカスしてしまうことがあるため1フレーム遅らせる。
+    // ただしrAF発火までの間に(Escやボード切替などで)別のviewへ遷移している可能性があるので、
+    // 実行直前に現在のviewを確認し、boardのままのときだけフォーカスを奪う
+    requestAnimationFrame(() => {
+      if (useAppStore.getState().view !== "board") return;
+      focusSearchInput();
+    });
     return;
   }
 }

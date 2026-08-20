@@ -334,6 +334,68 @@ describe("appStore: createTaskFromSearch", () => {
 
     await switchPromise;
   });
+
+  it("応答保留中に再度呼んでも、taskCreateは1回しか呼ばれない", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "新しいタスク",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    let resolveCreate: (value: Task) => void = () => {};
+    mocked.taskCreate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+
+    useAppStore.getState().setSearchQuery("新しいタスク");
+    const first = useAppStore.getState().createTaskFromSearch();
+    const second = useAppStore.getState().createTaskFromSearch();
+
+    expect(mocked.taskCreate).toHaveBeenCalledTimes(1);
+
+    resolveCreate(created);
+    await first;
+    await second;
+
+    expect(mocked.taskCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("createNewTaskと二重実行防止フラグを共有する(⌘Enter直後の⌘N連打でも2重作成しない)", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "新しいタスク",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    let resolveCreate: (value: Task) => void = () => {};
+    mocked.taskCreate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+
+    useAppStore.getState().setSearchQuery("新しいタスク");
+    const first = useAppStore.getState().createTaskFromSearch();
+    const second = useAppStore.getState().createNewTask();
+
+    expect(mocked.taskCreate).toHaveBeenCalledTimes(1);
+
+    resolveCreate(created);
+    await first;
+    await second;
+
+    expect(mocked.taskCreate).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("appStore: createNewTask", () => {
@@ -361,10 +423,98 @@ describe("appStore: createNewTask", () => {
     expect(s.tasks).toHaveLength(7);
     expect(s.selectedTaskId).toBe("t-new");
     expect(s.view).toBe("detail");
+    // TaskDetail側が「新規作成直後」を判定するための目印
+    expect(s.pendingNewTaskId).toBe("t-new");
     // 先頭挿入なので同レーンの既存タスクは1つずつ後ろへずれる
     expect(s.tasks.find((t) => t.id === "t-a")?.position).toBe(1);
     // 別レーンのタスクのpositionは動かない
     expect(s.tasks.find((t) => t.id === "t-d")?.position).toBe(0);
+  });
+
+  it("応答保留中に⌘N連打しても、taskCreateは1回しか呼ばれない(後着応答が先着タスクを画面から消さない)", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: NEW_TASK_TITLE,
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    let resolveCreate: (value: Task) => void = () => {};
+    mocked.taskCreate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+
+    const first = useAppStore.getState().createNewTask();
+    // 1回目が応答待ちの間に2回目(⌘N連打)を呼ぶ
+    const second = useAppStore.getState().createNewTask();
+
+    expect(mocked.taskCreate).toHaveBeenCalledTimes(1);
+
+    resolveCreate(created);
+    await first;
+    await second;
+
+    expect(mocked.taskCreate).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().tasks).toHaveLength(7);
+  });
+
+  it("応答待ち中に他の操作でtasksが変化していても、反映時は最新stateへ適用する(捕捉スナップショットで上書きしない)", async () => {
+    mocked.taskDelete.mockResolvedValue(tasks[0]);
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: NEW_TASK_TITLE,
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    let resolveCreate: (value: Task) => void = () => {};
+    mocked.taskCreate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+
+    const createPromise = useAppStore.getState().createNewTask();
+
+    // 作成の応答待ち中に、別の操作(削除)でtasksが進む
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().deleteSelectedTask();
+    expect(useAppStore.getState().tasks.some((t) => t.id === "t-a")).toBe(false);
+
+    resolveCreate(created);
+    await createPromise;
+
+    const s = useAppStore.getState();
+    // 削除の結果が消されていない(=開始時に捕捉した古いtasksスナップショットで上書きしていない)
+    expect(s.tasks.some((t) => t.id === "t-a")).toBe(false);
+    // 作成したタスクも反映されている
+    expect(s.tasks.some((t) => t.id === "t-new")).toBe(true);
+  });
+
+  it("作成完了後は再度呼び出せる(フラグが解放される)", async () => {
+    mocked.taskCreate.mockResolvedValue({
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: NEW_TASK_TITLE,
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    });
+
+    await useAppStore.getState().createNewTask();
+    await useAppStore.getState().createNewTask();
+
+    expect(mocked.taskCreate).toHaveBeenCalledTimes(2);
   });
 
   it("失敗したらトーストを出し、タスクを増やさない", async () => {

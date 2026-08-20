@@ -40,4 +40,30 @@ describe("reflowStrayMarkdownTables", () => {
   it("空文字列を渡しても例外にならない", () => {
     expect(reflowStrayMarkdownTables("")).toBe("");
   });
+
+  it("fenced code block内のテーブル風の行+空行は連結せずそのままにする", () => {
+    const input =
+      "```\n| aa | bb |\n\n| --- | --- |\n\n| 1 | 2 |\n```\n";
+
+    expect(reflowStrayMarkdownTables(input)).toBe(input);
+  });
+
+  it("fenced code blockの前後にある本物のテーブルは連結する(往復しても不変)", () => {
+    const input =
+      "| aa | bb |\n\n| --- | --- |\n\n| 1 | 2 |\n\n```\n| x | y |\n\n| --- | --- |\n```\n";
+
+    const expected =
+      "| aa | bb |\n| --- | --- |\n| 1 | 2 |\n\n```\n| x | y |\n\n| --- | --- |\n```\n";
+
+    const once = reflowStrayMarkdownTables(input);
+    expect(once).toBe(expected);
+    // 往復しても不変(フェンス内は触らないので再適用しても変化しない)
+    expect(reflowStrayMarkdownTables(once)).toBe(once);
+  });
+
+  it("言語指定付きのフェンス(```ts など)も開閉として認識する", () => {
+    const input = "```ts\n| a | b |\n\n| --- | --- |\n```\n";
+
+    expect(reflowStrayMarkdownTables(input)).toBe(input);
+  });
 });

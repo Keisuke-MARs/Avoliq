@@ -29,13 +29,25 @@ function isSeparatorRowShape(line: string): boolean {
   return line.includes("|") && SEPARATOR_ROW_RE.test(line);
 }
 
+// fenced code block(```で始まる行)の開始行判定。言語指定(```ts 等)も含めて先頭が```なら開始/終了とみなす。
+const FENCE_RE = /^\s*```/;
+
 export function reflowStrayMarkdownTables(markdown: string): string {
   const lines = markdown.split("\n");
   const result: string[] = [];
   let i = 0;
+  // ```の開閉状態。フェンス内はコード例そのものなので、パイプ行や空行があっても連結対象にしない
+  let inFence = false;
 
   while (i < lines.length) {
-    if (isNonBlankTableRowShape(lines[i])) {
+    if (FENCE_RE.test(lines[i])) {
+      inFence = !inFence;
+      result.push(lines[i]);
+      i += 1;
+      continue;
+    }
+
+    if (!inFence && isNonBlankTableRowShape(lines[i])) {
       // 単一の空行だけを挟んで「行っぽい」行が続く限り候補グループへ集める
       const group: string[] = [lines[i]];
       let j = i + 1;

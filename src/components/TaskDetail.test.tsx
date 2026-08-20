@@ -123,22 +123,43 @@ describe("TaskDetail", () => {
   });
 
   describe("開いた瞬間の自動フォーカス", () => {
-    it("タイトルが既定名以外(既に中身がある)なら本文エディタへフォーカスする", () => {
+    it("pendingNewTaskIdと一致しないなら本文エディタへフォーカスする", () => {
       render(<TaskDetail />);
       expect(editorFocus).toHaveBeenCalledTimes(1);
     });
 
-    it("タイトルが既定名(⌘Nで作った直後)ならタイトルへ全選択状態でフォーカスする", () => {
+    it("pendingNewTaskIdがselectedTaskIdと一致する(⌘Nで作った直後)ならタイトルへ全選択状態でフォーカスする", () => {
+      useAppStore.setState({
+        pendingNewTaskId: "task-1",
+      });
+      render(<TaskDetail />);
+
+      const input = screen.getByDisplayValue("設計書を書く") as HTMLInputElement;
+      expect(document.activeElement).toBe(input);
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe("設計書を書く".length);
+      expect(editorFocus).not.toHaveBeenCalled();
+    });
+
+    it("判定に使ったpendingNewTaskIdは用済みとしてクリアされる", () => {
+      useAppStore.setState({
+        pendingNewTaskId: "task-1",
+      });
+      render(<TaskDetail />);
+
+      expect(useAppStore.getState().pendingNewTaskId).toBeNull();
+    });
+
+    it("既存タスクがたまたま既定タイトル(新しいタスク)と同名でも、pendingNewTaskIdと不一致なら本文へフォーカスする(タイトル文字列では判定しない)", () => {
       useAppStore.setState({
         tasks: [{ ...task, title: NEW_TASK_TITLE }],
+        pendingNewTaskId: null,
       });
       render(<TaskDetail />);
 
       const input = screen.getByDisplayValue(NEW_TASK_TITLE) as HTMLInputElement;
-      expect(document.activeElement).toBe(input);
-      expect(input.selectionStart).toBe(0);
-      expect(input.selectionEnd).toBe(NEW_TASK_TITLE.length);
-      expect(editorFocus).not.toHaveBeenCalled();
+      expect(document.activeElement).not.toBe(input);
+      expect(editorFocus).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -6,7 +6,7 @@ import { useDebouncedSave } from "../hooks/useDebouncedSave";
 import { usePrefersDark } from "../hooks/usePrefersDark";
 import { registerDetailBridge } from "../lib/detailBridge";
 import { reflowStrayMarkdownTables } from "../lib/markdownTableFix";
-import { NEW_TASK_TITLE, useAppStore } from "../store/appStore";
+import { useAppStore } from "../store/appStore";
 
 /**
  * タスク詳細画面。BlockNoteでNotion風にMarkdownを編集し、500msデバウンスで自動保存する。
@@ -16,6 +16,9 @@ export function TaskDetail() {
   const tasks = useAppStore((state) => state.tasks);
   const statuses = useAppStore((state) => state.statuses);
   const selectedTaskId = useAppStore((state) => state.selectedTaskId);
+  // ⌘Nで直近作成したタスクのid。既存タスクをたまたま既定タイトルと同名にしていても
+  // 誤ってタイトル全選択にならないよう、タイトル文字列ではなくidで「新規作成直後」を判定する
+  const pendingNewTaskId = useAppStore((state) => state.pendingNewTaskId);
   const setView = useAppStore((state) => state.setView);
   const updateTaskContent = useAppStore((state) => state.updateTaskContent);
   const updateTaskTitle = useAppStore((state) => state.updateTaskTitle);
@@ -80,11 +83,19 @@ export function TaskDetail() {
   // 詳細画面を開いた瞬間の自動フォーカス。
   // このコンポーネントはPalette側でタスクIDごとにkey指定され直すため、タスクが変わるたびに
   // 必ず再マウントされる=マウント時1回の判定でよい。
-  // タイトルが既定名(⌘Nで作った直後)のままなら「打てば上書き」できるようタイトルを全選択、
-  // それ以外(カードから開いた/検索から作成した、など既に中身がある場合)は本文から即タイプできるようにする。
+  // 「新規作成直後」の判定はタイトル文字列(NEW_TASK_TITLE)ではなくpendingNewTaskId(id)で行う。
+  // タイトル文字列で判定すると、既存タスクをたまたま既定タイトルと同名にしていた場合にも
+  // 開くたびタイトル全選択になってしまうため。
+  // 一致すれば「打てば上書き」できるようタイトルを全選択、それ以外(カードから開いた/検索から
+  // 作成した、など既に中身がある場合)は本文から即タイプできるようにする。
   useEffect(() => {
     if (task === null) return;
-    if (task.title === NEW_TASK_TITLE) {
+    const isJustCreated = task.id === pendingNewTaskId;
+    // 判定に使ったら用済みなので消す(次にdetailを開いたときに誤って再利用されないように)
+    if (pendingNewTaskId !== null) {
+      useAppStore.setState({ pendingNewTaskId: null });
+    }
+    if (isJustCreated) {
       titleRef.current?.focus();
       titleRef.current?.select();
     } else {

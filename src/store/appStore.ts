@@ -13,6 +13,13 @@ export interface AppState {
   view: View;
   searchQuery: string;
   lastDeletedTaskId: string | null;
+  /**
+   * createNewTask(⌘N)が直近で作成したタスクのid。TaskDetailは
+   * `selectedTaskId === pendingNewTaskId` で「⌘N直後で開いた」かどうかを判定し、
+   * 判定した後(マウント時)にnullへクリアする。タイトル文字列(NEW_TASK_TITLE)による判定だと
+   * 既存タスクをたまたま同名にしていた場合に誤爆するため、idベースに切り替えている。
+   */
+  pendingNewTaskId: string | null;
 
   loadBoards(): Promise<void>;
   /**
@@ -67,6 +74,15 @@ export function isBoardLoading(): boolean {
 }
 
 /**
+ * タスク作成(createNewTask / createTaskFromSearch)の二重実行防止フラグ。
+ * ⌘N連打などで応答待ち中に同じ捕捉tasksスナップショットへ再度作成をかけると、
+ * 後着応答が先に作成済みのタスクを画面から消してしまうため、通信中は後続呼び出しを
+ * 丸ごと拒否する(submittingRefと同じ発想。ストアの外に置くのはテストのリセットに
+ * 巻き込まれないようにするため)。
+ */
+let taskCreating = false;
+
+/**
  * 楽観的更新の失敗時に呼ぶ復旧処理。
  * 古いsnapshot全体で巻き戻すと待機中の他操作まで巻き戻してしまうので、
  * DBの実状態を読み直して合わせる。読み直し自体も失敗したらsnapshotへ戻す。
@@ -99,6 +115,7 @@ export const initialAppState = {
   view: "board" as View,
   searchQuery: "",
   lastDeletedTaskId: null as string | null,
+  pendingNewTaskId: null as string | null,
 };
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -170,7 +187,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   async createTaskFromSearch() {
     if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
-    const { currentBoardId, statuses, searchQuery, tasks } = get();
+    if (taskCreating) return; // 応答待ち中のEnter連打等による二重作成を防ぐ
+    const { currentBoardId, statuses, searchQuery } = get();
     const title = searchQuery.trim();
     const firstStatus = [...statuses].sort((a, b) => a.position - b.position)[0];
     if (currentBoardId === null || firstStatus === undefined || title === "") return;
@@ -178,55 +196,71 @@ export const useAppStore = create<AppState>()((set, get) => ({
     // 応答が返ってきた時点でも同じ切替要求を見ているか確認するため、開始時点のエポックを覚えておく
     const epoch = boardEpoch;
 
+    taskCreating = true;
     // IDはRust側で採番するUUIDなので、ここだけは楽観的更新ではなくAPI先行で作る
     try {
       const created = await api.taskCreate(currentBoardId, firstStatus.id, title);
       // 待っている間にボードが切り替えられていたら、作成自体はDBに済んでいるので
       // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
       if (epoch !== boardEpoch) return;
-      // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす
-      const shifted = tasks.map((t) =>
-        t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
-      );
-      set({
-        tasks: [...shifted, created],
-        searchQuery: "",
-        selectedTaskId: created.id,
-        view: "detail",
+      // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす。
+      // 開始時点で捕捉したtasksスナップショットではなく、反映時点の最新stateに対して適用する
+      // (応答待ち中に他の操作でtasksが進んでいても、その変化を消さずに取り込むため)
+      set((s) => {
+        const shifted = s.tasks.map((t) =>
+          t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
+        );
+        return {
+          tasks: [...shifted, created],
+          searchQuery: "",
+          selectedTaskId: created.id,
+          view: "detail",
+        };
       });
     } catch (e) {
       if (epoch !== boardEpoch) return;
       toast.error(`タスクの作成に失敗しました: ${String(e)}`);
+    } finally {
+      taskCreating = false;
     }
   },
 
   async createNewTask() {
     if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
-    const { currentBoardId, statuses, tasks } = get();
+    if (taskCreating) return; // 応答待ち中の⌘N連打による二重作成を防ぐ
+    const { currentBoardId, statuses } = get();
     const firstStatus = [...statuses].sort((a, b) => a.position - b.position)[0];
     if (currentBoardId === null || firstStatus === undefined) return;
 
     // 応答が返ってきた時点でも同じ切替要求を見ているか確認するため、開始時点のエポックを覚えておく
     const epoch = boardEpoch;
 
+    taskCreating = true;
     // IDはRust側で採番するUUIDなので、ここだけは楽観的更新ではなくAPI先行で作る
     try {
       const created = await api.taskCreate(currentBoardId, firstStatus.id, NEW_TASK_TITLE);
       // 待っている間にボードが切り替えられていたら、作成自体はDBに済んでいるので
       // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
       if (epoch !== boardEpoch) return;
-      // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす
-      const shifted = tasks.map((t) =>
-        t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
-      );
-      set({
-        tasks: [...shifted, created],
-        selectedTaskId: created.id,
-        view: "detail",
+      // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす。
+      // 開始時点で捕捉したtasksスナップショットではなく、反映時点の最新stateに対して適用する
+      set((s) => {
+        const shifted = s.tasks.map((t) =>
+          t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
+        );
+        return {
+          tasks: [...shifted, created],
+          selectedTaskId: created.id,
+          // TaskDetail側の初回フォーカス判定用。タイトル文字列ではなくIDで判定するための目印
+          pendingNewTaskId: created.id,
+          view: "detail",
+        };
       });
     } catch (e) {
       if (epoch !== boardEpoch) return;
       toast.error(`タスクの作成に失敗しました: ${String(e)}`);
+    } finally {
+      taskCreating = false;
     }
   },
 
