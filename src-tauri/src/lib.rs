@@ -1,16 +1,47 @@
+mod commands;
 mod db;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use std::sync::Mutex;
+
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            commands::boards_list,
+            commands::board_create,
+            commands::board_rename,
+            commands::board_delete,
+            commands::statuses_list,
+            commands::status_create,
+            commands::status_update,
+            commands::status_delete,
+            commands::status_reorder,
+            commands::tasks_list,
+            commands::task_create,
+            commands::task_update,
+            commands::task_move,
+            commands::task_delete,
+            commands::task_restore,
+            commands::setting_get,
+            commands::setting_set,
+        ])
+        .setup(|app| {
+            // ~/Library/Application Support/smartTask/smart-task.db
+            // app_data_dir() だとバンドル識別子のディレクトリになるので data_dir() を使う
+            let db_path = app
+                .path()
+                .data_dir()?
+                .join("smartTask")
+                .join("smart-task.db");
+            let mut conn = db::open_at(&db_path).map_err(|e| e.to_string())?;
+            db::repo::seed_if_empty(&mut conn).map_err(|e| e.to_string())?;
+            app.manage(commands::DbState(Mutex::new(conn)));
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
