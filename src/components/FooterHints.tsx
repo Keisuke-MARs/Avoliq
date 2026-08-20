@@ -4,7 +4,7 @@ type Hint = readonly [key: string, label: string];
 
 /**
  * viewごとに出すキーボードヒント。設計書のキーボード操作仕様と1対1で対応させる。
- * boardの並びは実装コントラクトのキーマップ（⌘↑↓並び替え・⌘Z復元・⌘N検索バーへ を含む）に揃えてある。
+ * boardの並びは実装コントラクトのキーマップ（⌘↑↓並び替え・⌘Z復元・⌘N新規作成・⌘P検索 を含む）に揃えてある。
  */
 const HINTS: Record<View, readonly Hint[]> = {
   board: [
@@ -14,7 +14,8 @@ const HINTS: Record<View, readonly Hint[]> = {
     ["⌘↑↓", "並び替え"],
     ["⌘⌫", "削除"],
     ["⌘Z", "元に戻す"],
-    ["⌘N", "検索"],
+    ["⌘N", "新規作成"],
+    ["⌘P", "検索"],
     ["⌘B", "ボード切替"],
     ["⌘,", "設定"],
     ["Esc", "閉じる"],
@@ -22,6 +23,8 @@ const HINTS: Record<View, readonly Hint[]> = {
   detail: [
     ["⌘←→", "ステータス"],
     ["⌘T", "タイトル"],
+    ["⌘N", "新規作成"],
+    ["⌘P", "検索"],
     ["Esc", "ボードに戻る"],
   ],
   switcher: [
