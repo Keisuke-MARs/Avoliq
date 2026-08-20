@@ -1,14 +1,21 @@
+import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { statusUpdate } from "../lib/api";
+import {
+  statusCreate,
+  statusDelete,
+  statusReorder,
+  statusUpdate,
+} from "../lib/api";
 import { STATUS_COLORS } from "../lib/statusPalette";
 import { useAppStore } from "../store/appStore";
+import { ConfirmDialog } from "./ConfirmDialog";
 
-type Mode = "list" | "rename" | "color";
+type Mode = "list" | "rename" | "color" | "create" | "confirm-delete";
 
 /**
  * ボード設定のステータス管理。
- * ↑↓選択 / Enter改名 / C色変更
+ * ↑↓選択 / Enter改名 / C色変更 / N追加 / ⌘↑↓並び替え / ⌘⌫削除
  */
 export function StatusSettings() {
   const statuses = useAppStore((state) => state.statuses);
@@ -24,7 +31,7 @@ export function StatusSettings() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (mode === "rename") inputRef.current?.focus();
+    if (mode === "rename" || mode === "create") inputRef.current?.focus();
     else if (mode === "color") colorRef.current?.focus();
     else containerRef.current?.focus();
   }, [mode]);
@@ -68,11 +75,92 @@ export function StatusSettings() {
     setMode("list");
   };
 
+  const commitCreate = async () => {
+    const name = draft.trim();
+    if (currentBoardId === null || name === "") {
+      setMode("list");
+      return;
+    }
+    try {
+      // 色はプリセット先頭(グレー)を初期値にし、あとからCキーで変更してもらう
+      await statusCreate(currentBoardId, name, STATUS_COLORS[0].value);
+      await reload();
+      setIndex(statuses.length);
+    } catch (error) {
+      toast.error("ステータスを追加できませんでした", {
+        description: String(error),
+      });
+    }
+    setMode("list");
+  };
+
+  const reorder = async (direction: "up" | "down") => {
+    if (target === null) return;
+    const nextIndex = direction === "up" ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= statuses.length) return;
+    try {
+      await statusReorder(target.id, nextIndex);
+      await reload();
+      setIndex(nextIndex);
+    } catch (error) {
+      toast.error("並び順を変更できませんでした", {
+        description: String(error),
+      });
+    }
+  };
+
+  const commitDelete = async () => {
+    if (target === null) {
+      setMode("list");
+      return;
+    }
+    try {
+      await statusDelete(target.id);
+      await reload();
+      setIndex(0);
+    } catch (error) {
+      toast.error("ステータスを削除できませんでした", {
+        description: String(error),
+      });
+    }
+    setMode("list");
+  };
+
   // ここで処理したキーは window 側の useKeyboard フォールバックへ伝播させない。
   // BoardSwitcher と同じ理由（伝播したままだと view 変更直後に window 側の
   // ハンドラが最新の view を見て二重発火する）で、view を変えない分岐
   // （矢印移動・改名/色選択モードへの遷移）も含めて統一的に stopPropagation する。
   const handleListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.metaKey && event.key === "ArrowDown") {
+      event.preventDefault();
+      event.stopPropagation();
+      void reorder("down");
+      return;
+    }
+    if (event.metaKey && event.key === "ArrowUp") {
+      event.preventDefault();
+      event.stopPropagation();
+      void reorder("up");
+      return;
+    }
+    if (event.metaKey && event.key === "Backspace") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (target === null) return;
+      if (statuses.length <= 1) {
+        toast.error("最後のステータスは削除できません");
+        return;
+      }
+      setMode("confirm-delete");
+      return;
+    }
+    if (event.key === "n" || event.key === "N") {
+      event.preventDefault();
+      event.stopPropagation();
+      setDraft("");
+      setMode("create");
+      return;
+    }
     if (event.key === "ArrowDown" && !event.metaKey) {
       event.preventDefault();
       event.stopPropagation();
@@ -133,7 +221,8 @@ export function StatusSettings() {
     if (event.key === "Enter") {
       event.preventDefault();
       event.stopPropagation();
-      void commitRename();
+      if (mode === "create") void commitCreate();
+      else void commitRename();
       return;
     }
     if (event.key === "Escape") {
@@ -144,7 +233,7 @@ export function StatusSettings() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <div
         ref={containerRef}
         tabIndex={-1}
@@ -183,6 +272,33 @@ export function StatusSettings() {
           </div>
         ))}
       </div>
+
+      <div className="flex items-center gap-3 border-t border-black/5 px-4 py-2 text-sm text-neutral-500">
+        <Plus size={14} />
+        {mode === "create" ? (
+          <input
+            ref={inputRef}
+            aria-label="新しいステータス名"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleInputKeyDown}
+            placeholder="ステータス名を入力"
+            className="flex-1 bg-transparent text-neutral-900 outline-none placeholder:text-neutral-400"
+          />
+        ) : (
+          <span>新規ステータス (N)</span>
+        )}
+      </div>
+
+      {mode === "confirm-delete" && target !== null && (
+        <ConfirmDialog
+          title={`「${target.name}」を削除しますか？`}
+          description={`このステータスのタスクは「${statuses[0]?.name ?? ""}」へ移動します。元に戻せません。`}
+          confirmLabel="削除する"
+          onConfirm={() => void commitDelete()}
+          onCancel={() => setMode("list")}
+        />
+      )}
 
       {mode === "color" && (
         <div

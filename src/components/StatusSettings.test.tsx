@@ -100,4 +100,58 @@ describe("StatusSettings", () => {
 
     expect(api.statusUpdate).toHaveBeenCalledWith("st-1", null, "#007AFF");
   });
+
+  it("Nキーで追加入力に入り、Enterで末尾にステータスを追加する", async () => {
+    vi.mocked(api.statusCreate).mockResolvedValue({
+      id: "st-3",
+      boardId: "b1",
+      name: "保留",
+      color: "#8E8E93",
+      position: 2,
+    });
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("n");
+    const input = screen.getByLabelText("新しいステータス名");
+    await user.type(input, "保留{Enter}");
+
+    expect(api.statusCreate).toHaveBeenCalledWith("b1", "保留", "#8E8E93");
+  });
+
+  it("⌘↓で並び順が1つ下がる", async () => {
+    vi.mocked(api.statusReorder).mockResolvedValue(statuses);
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+    expect(api.statusReorder).toHaveBeenCalledWith("st-1", 1);
+  });
+
+  it("⌘⌫で確認ダイアログを出し、タスクの移動先を説明する", async () => {
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "このステータスのタスクは「未着手」へ移動します。元に戻せません。",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("最後の1つのステータスは削除できない", async () => {
+    useAppStore.setState({ statuses: [statuses[0]] });
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(api.statusDelete).not.toHaveBeenCalled();
+  });
 });

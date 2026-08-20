@@ -397,7 +397,7 @@ describe("Palette: Escとビュー切替", () => {
   it("⌘,で設定ビューへ移り、Escで戻る", async () => {
     const user = await renderPalette();
     await user.keyboard("{Meta>},{/Meta}");
-    expect(screen.getByTestId("settings-placeholder")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "設定タブ" })).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
     expect(screen.getByTestId("board")).toBeInTheDocument();

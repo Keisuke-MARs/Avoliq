@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { Board } from "./Board";
+import { BoardSettings } from "./BoardSettings";
 import { BoardSwitcher } from "./BoardSwitcher";
 import { FooterHints } from "./FooterHints";
 import { SearchBar } from "./SearchBar";
@@ -8,15 +9,6 @@ import { TaskDetail } from "./TaskDetail";
 import { useFlushOnHide } from "@/hooks/useFlushOnHide";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useAppStore } from "@/store/appStore";
-
-/** 計画書3で本実装されるビューの仮表示 */
-function ViewPlaceholder({ testId, label }: { testId: string; label: string }) {
-  return (
-    <div data-testid={testId} className="flex-1 px-4 py-6 text-[13px] text-neutral-500">
-      {label}（Escで盤面へ戻ります）
-    </div>
-  );
-}
 
 export function Palette() {
   const view = useAppStore((s) => s.view);
@@ -45,9 +37,7 @@ export function Palette() {
       {view === "board" && <Board />}
       {view === "detail" && <TaskDetail key={selectedTaskId ?? "none"} />}
       {view === "switcher" && <BoardSwitcher />}
-      {view === "settings" && (
-        <ViewPlaceholder testId="settings-placeholder" label="ボード設定は計画書3で実装します" />
-      )}
+      {view === "settings" && <BoardSettings />}
 
       <FooterHints view={view} />
 
