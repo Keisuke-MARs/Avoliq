@@ -63,8 +63,12 @@ pub fn run() {
             // ウィンドウをNSPanel化する
             panel::init_panel(app)?;
 
-            // settingsのhotkeyキー（既定 Alt+Space）でグローバルショートカットを登録する
-            panel::register_hotkey(app.handle())?;
+            // settingsのhotkeyキー（既定 Alt+Space）でグローバルショートカットを登録する。
+            // 失敗してもemit/settings記録は済んでいる（フロントが拾って表示する）ので、
+            // 起動自体は止めない。
+            if let Err(e) = panel::register_hotkey(app.handle()) {
+                eprintln!("ホットキー登録に失敗しました: {e}");
+            }
             // メニューバー常駐アイコン
             panel::init_tray(app)?;
 

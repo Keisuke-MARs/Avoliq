@@ -194,6 +194,13 @@ pub fn task_create(
     let id = new_id();
 
     let tx = conn.transaction()?;
+    // 指定ステータスが指定ボードに属しているか検証する（別ボードのステータスIDを渡された事故を防ぐ）
+    let status = status_by_id(&tx, status_id)?;
+    if status.board_id != board_id {
+        return Err(RepoError::Rule(
+            "ステータスが指定のボードに属していません".to_string(),
+        ));
+    }
     tx.execute(
         "UPDATE tasks SET position = position + 1
          WHERE status_id = ?1 AND deleted_at IS NULL",
@@ -393,6 +400,13 @@ pub fn task_move(
     let from_status_id = current.status_id.clone();
 
     let tx = conn.transaction()?;
+    // 移動先ステータスがタスクと同じボードに属しているか検証する（ボード跨ぎ移動を拒否）
+    let target_status = status_by_id(&tx, status_id)?;
+    if target_status.board_id != current.board_id {
+        return Err(RepoError::Rule(
+            "ステータスが指定のボードに属していません".to_string(),
+        ));
+    }
     let mut ids = lane_ids_in_order(&tx, status_id, id)?;
     // 0..len の範囲に丸める（len を指定すると末尾になる）
     let insert_at = new_index.clamp(0, ids.len() as i64) as usize;
@@ -766,6 +780,23 @@ mod tests {
     }
 
     #[test]
+    fn 別ボードのステータスへタスクを作ろうとするとエラーになる() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        let board_a = board_create(&mut conn, "A").expect("ボードを作れること");
+        let board_b = board_create(&mut conn, "B").expect("ボードを作れること");
+        let statuses_b = statuses_list(&mut conn, &board_b.id).expect("一覧を取れること");
+
+        let result = task_create(&mut conn, &board_a.id, &statuses_b[0].id, "不正な作成");
+
+        assert!(matches!(result, Err(RepoError::Rule(_))));
+        assert_eq!(
+            tasks_list(&mut conn, &board_a.id).expect("一覧").len(),
+            0,
+            "失敗したので作られていないこと"
+        );
+    }
+
+    #[test]
     fn レーンが違えばpositionは独立して0から始まる() {
         let (mut conn, board_id) = setup_board();
         let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
@@ -863,6 +894,27 @@ mod tests {
             .find(|t| t.title == "A")
             .expect("A が残っていること");
         assert_eq!(remaining.position, 0, "移動元レーンが0から詰め直される");
+    }
+
+    #[test]
+    fn 別ボードのステータスへタスクを移そうとするとエラーになる() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        let board_a = board_create(&mut conn, "A").expect("ボードを作れること");
+        let board_b = board_create(&mut conn, "B").expect("ボードを作れること");
+        let statuses_a = statuses_list(&mut conn, &board_a.id).expect("一覧を取れること");
+        let statuses_b = statuses_list(&mut conn, &board_b.id).expect("一覧を取れること");
+        let task = task_create(&mut conn, &board_a.id, &statuses_a[0].id, "対象")
+            .expect("タスクを作れること");
+
+        let result = task_move(&mut conn, &task.id, &statuses_b[0].id, 0);
+
+        assert!(matches!(result, Err(RepoError::Rule(_))));
+        let unchanged = tasks_list(&mut conn, &board_a.id)
+            .expect("一覧を取れること")
+            .into_iter()
+            .find(|t| t.id == task.id)
+            .expect("タスクが残っていること");
+        assert_eq!(unchanged.status_id, statuses_a[0].id, "失敗したので移動していないこと");
     }
 
     #[test]
