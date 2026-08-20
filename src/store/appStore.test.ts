@@ -201,7 +201,7 @@ describe("appStore: createTaskFromSearch", () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it("応答が届く前に別ボードへ切り替えていたら、作成結果を反映しない", async () => {
+  it("応答が届く前に別ボードへの切替要求が先行していたら、作成結果を反映しない", async () => {
     const created: Task = {
       id: "t-new",
       boardId: "board-1",
@@ -212,9 +212,12 @@ describe("appStore: createTaskFromSearch", () => {
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
     };
-    // 作成自体はDBに済むが、応答が返ってくる前に⌘1-9等で別ボードへ切り替わったことを再現する
+    let switchPromise: Promise<void> = Promise.resolve();
+    // 作成自体はDBに済むが、応答が返ってくる前に⌘1-9等で本物の切替要求(selectBoard)が
+    // 入ったことを再現する。エポックはselectBoard呼び出しの時点(awaitの前)で同期的に進むので、
+    // ここでのcreated反映はエポック不一致として破棄されるはず。
     mocked.taskCreate.mockImplementation(async () => {
-      useAppStore.setState({ currentBoardId: "board-2" });
+      switchPromise = useAppStore.getState().selectBoard("board-2");
       return created;
     });
 
@@ -222,10 +225,11 @@ describe("appStore: createTaskFromSearch", () => {
     await useAppStore.getState().createTaskFromSearch();
 
     const s = useAppStore.getState();
-    expect(s.tasks).toHaveLength(6);
     expect(s.tasks.some((t) => t.id === "t-new")).toBe(false);
     expect(s.selectedTaskId).not.toBe("t-new");
     expect(s.view).not.toBe("detail");
+
+    await switchPromise;
   });
 });
 
@@ -316,25 +320,37 @@ describe("appStore: moveSelectedTask", () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it("読み直し中に別ボードへ切り替えていたら、その結果を反映しない", async () => {
+  it("読み直し中に別ボードへの切替要求が先行していたら、その結果を反映しない", async () => {
     mocked.taskMove.mockRejectedValue("DB error");
     const freshFromDb = tasks.map((t) =>
       t.id === "t-b" ? { ...t, title: "DBに残っている資料をまとめる" } : t,
     );
-    // 読み直し(tasksList)の応答が返ってくる前に⌘1-9等で別ボードへ切り替わったことを再現する
+    let switchPromise: Promise<void> = Promise.resolve();
+    let triggered = false;
+    // 読み直し(recoverTasks)のtasksList応答を待っている間に、⌘1-9等で本物の切替要求
+    // (selectBoard)が入ったことを再現する。selectBoard内部でも同じtasksListモックが
+    // 呼ばれるので、無限に再帰しないよう最初の1回だけ切替を発火させる。
     mocked.tasksList.mockImplementation(async () => {
-      useAppStore.setState({ currentBoardId: "board-2" });
-      return freshFromDb;
+      if (!triggered) {
+        triggered = true;
+        switchPromise = useAppStore.getState().selectBoard("board-2");
+        return freshFromDb;
+      }
+      return tasks;
     });
     useAppStore.getState().setSelectedTask("t-b");
 
     await useAppStore.getState().moveSelectedTask("right");
+    await switchPromise;
 
     const s = useAppStore.getState();
+    // 読み直しの結果(freshFromDb)は切替要求より古い応答としてエポック不一致で破棄される
     expect(s.tasks.find((t) => t.id === "t-b")?.title).not.toBe(
       "DBに残っている資料をまとめる",
     );
-    expect(toast.error).toHaveBeenCalled();
+    expect(s.currentBoardId).toBe("board-2");
+    // 切替要求より古い失敗応答は、トーストも含めてエポック不一致として抑止される
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
 
@@ -475,6 +491,53 @@ describe("appStore: deleteSelectedTask / undoDelete", () => {
     await useAppStore.getState().undoDelete();
     expect(useAppStore.getState().tasks).toHaveLength(5);
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("削除後にボードを切り替えたら、⌘Zは別ボードにタスクを復活させない(undoはボードローカル)", async () => {
+    mocked.taskDelete.mockResolvedValue(tasks[0]);
+    useAppStore.getState().setSelectedTask("t-a");
+    await useAppStore.getState().deleteSelectedTask();
+    expect(useAppStore.getState().lastDeletedTaskId).toBe("t-a");
+
+    // selectBoardは要求時点(awaitより前)でlastDeletedTaskIdを同期的にクリアする
+    mocked.statusesList.mockResolvedValue([]);
+    mocked.tasksList.mockResolvedValue([]);
+    await useAppStore.getState().selectBoard("board-2");
+    expect(useAppStore.getState().lastDeletedTaskId).toBeNull();
+
+    await useAppStore.getState().undoDelete();
+
+    expect(mocked.taskRestore).not.toHaveBeenCalled();
+    expect(useAppStore.getState().tasks.some((t) => t.id === "t-a")).toBe(false);
+  });
+
+  it("削除に失敗し、復旧の読み直し中に別ボードへの切替要求が先行していたら、selectedTaskIdを汚染しない", async () => {
+    mocked.taskDelete.mockRejectedValue("DB error");
+    let switchPromise: Promise<void> = Promise.resolve();
+    let triggered = false;
+    // 復旧(recoverTasks)のtasksList応答を待っている間に、⌘1-9等で本物の切替要求
+    // (selectBoard)が入ったことを再現する。同じtasksListモックがselectBoard内部からも
+    // 呼ばれるので、無限に再帰しないよう最初の1回だけ切替を発火させる。
+    mocked.tasksList.mockImplementation(async () => {
+      if (!triggered) {
+        triggered = true;
+        switchPromise = useAppStore.getState().selectBoard("board-2");
+        return tasks;
+      }
+      return [];
+    });
+    mocked.statusesList.mockResolvedValue([]);
+    useAppStore.getState().setSelectedTask("t-a");
+
+    await useAppStore.getState().deleteSelectedTask();
+    await switchPromise;
+
+    const s = useAppStore.getState();
+    // 失敗時のロールバック(selectedTaskId: "t-a"への巻き戻し)はエポック不一致で破棄され、
+    // board-2切替後の状態(selectedTaskId: null)を汚さない
+    expect(s.selectedTaskId).toBeNull();
+    expect(s.currentBoardId).toBe("board-2");
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
 

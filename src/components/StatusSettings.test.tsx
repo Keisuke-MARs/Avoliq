@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Status } from "../types";
@@ -11,6 +11,10 @@ vi.mock("../lib/api", () => ({
   statusUpdate: vi.fn(),
   statusDelete: vi.fn(),
   statusReorder: vi.fn(),
+  // 本物のselectBoard(appStoreのボード切替エポックを進める実装)を回帰テストで
+  // 直接呼ぶために必要。StatusSettings自体はこれらを使わない。
+  statusesList: vi.fn(),
+  tasksList: vi.fn(),
 }));
 
 const statuses: Status[] = [
@@ -31,6 +35,9 @@ const statuses: Status[] = [
 ];
 
 const selectBoard = vi.fn(async () => undefined);
+// 本物のselectBoard実装(呼ぶとappStore内部のボード切替エポックが進む)を、
+// テストがselectBoardスパイで上書きする前に確保しておく。
+const realSelectBoard = useAppStore.getState().selectBoard;
 
 describe("StatusSettings", () => {
   beforeEach(() => {
@@ -38,6 +45,8 @@ describe("StatusSettings", () => {
     vi.mocked(api.statusCreate).mockReset();
     vi.mocked(api.statusDelete).mockReset();
     vi.mocked(api.statusReorder).mockReset();
+    vi.mocked(api.statusesList).mockReset();
+    vi.mocked(api.tasksList).mockReset();
     selectBoard.mockClear();
     useAppStore.setState({
       boards: [{ id: "b1", name: "メイン", position: 0 }],
@@ -159,19 +168,38 @@ describe("StatusSettings", () => {
     ).toBeInTheDocument();
   });
 
-  it("応答が届く前に別ボードへ切り替えていたら、ボードを読み直さない", async () => {
-    // statusUpdate の応答が返ってくる前に⌘1-9等で別ボードへ切り替わったことを再現する
-    vi.mocked(api.statusUpdate).mockImplementation(async () => {
-      useAppStore.setState({ currentBoardId: "b2" });
-      return { ...statuses[0], name: "バックログ" };
+  it("ステータス更新応答より後に切替要求だけが先行していたら、ボードを読み直さない", async () => {
+    // currentBoardIdはselectBoardの読込完了後にしか更新されないため、旧方式(currentBoardId比較)
+    // では「切替要求中(未完了)」の古い応答を検知できない。ここではstatusUpdateの応答を
+    // 手元で止め、本物のselectBoard(エポックを進める実装)を先に割り込ませてから応答を返す。
+    let resolveUpdate: (value: Status) => void = () => {};
+    const updatePromise = new Promise<Status>((resolve) => {
+      resolveUpdate = resolve;
     });
+    vi.mocked(api.statusUpdate).mockReturnValue(updatePromise);
+    vi.mocked(api.statusesList).mockResolvedValue([]);
+    vi.mocked(api.tasksList).mockResolvedValue([]);
+
     const user = userEvent.setup();
     render(<StatusSettings />);
 
     await user.keyboard("{Enter}");
     const input = screen.getByLabelText("ステータス名");
     await user.clear(input);
-    await user.type(input, "バックログ{Enter}");
+    await user.type(input, "バックログ");
+    // Enterでcommit処理を起動する。この時点でepochが捕捉され、statusUpdateの応答待ちに入る
+    await user.keyboard("{Enter}");
+
+    // ここで⌘1-9等による本物の切替要求(selectBoard)を割り込ませる。エポックは
+    // selectBoard呼び出しの時点(awaitより前)で同期的に進む
+    const switchPromise = realSelectBoard("b2");
+    // その後にstatusUpdateの応答を返す。reload()に到達するが、
+    // 捕捉していたエポックは既に古いのでselectBoard(スパイ)は呼ばれないはず
+    resolveUpdate({ ...statuses[0], name: "バックログ" });
+    await switchPromise;
+    await waitFor(() => {
+      expect(screen.queryByLabelText("ステータス名")).not.toBeInTheDocument();
+    });
 
     expect(api.statusUpdate).toHaveBeenCalledWith("st-1", "バックログ", null);
     expect(selectBoard).not.toHaveBeenCalled();

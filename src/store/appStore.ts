@@ -29,30 +29,37 @@ export interface AppState {
 }
 
 /**
- * selectBoard の呼び出し世代カウンタ。連続で呼ばれたときに古い呼び出しの応答が
- * 後から返ってきても新しい呼び出しの結果を上書きしないよう、呼び出しごとに払い出す。
+ * ボード切替の世代(エポック)。selectBoard の要求と同時に(awaitの前に)同期的に進める。
+ * 非同期応答の反映は「要求時点のエポック === 現在のエポック」のときだけ許可する。
+ * これにより、切替要求より古い応答(完了済み/未完了を問わず)はすべて破棄される。
  * ストアの外に置くのは、テストの set/getState リセットに巻き込まれないようにするため。
  */
-let selectBoardGeneration = 0;
+let boardEpoch = 0;
+
+/** 現在のボード切替エポックを取得する。要求開始時にこれを捕捉し、応答後に再確認する。 */
+export function getBoardEpoch(): number {
+  return boardEpoch;
+}
 
 /**
  * 楽観的更新の失敗時に呼ぶ復旧処理。
  * 古いsnapshot全体で巻き戻すと待機中の他操作まで巻き戻してしまうので、
  * DBの実状態を読み直して合わせる。読み直し自体も失敗したらsnapshotへ戻す。
+ * epoch は呼び出し開始時点のボード世代。読み直している間にボードが切り替わっていたら
+ * (エポックが進んでいたら)いま表示中のボードとは無関係な応答なので反映しない。
  */
-async function recoverTasks(boardId: string | null, snapshot: Task[]): Promise<void> {
+async function recoverTasks(boardId: string | null, snapshot: Task[], epoch: number): Promise<void> {
   if (boardId === null) {
+    if (epoch !== boardEpoch) return;
     useAppStore.setState({ tasks: snapshot });
     return;
   }
   try {
     const fresh = await api.tasksList(boardId);
-    // 読み直している間にボードが切り替わっていたら、いま表示中のボードとは
-    // 無関係な応答なので反映しない(別ボードの内容が混入するのを防ぐ)
-    if (useAppStore.getState().currentBoardId !== boardId) return;
+    if (epoch !== boardEpoch) return;
     useAppStore.setState({ tasks: fresh });
   } catch {
-    if (useAppStore.getState().currentBoardId !== boardId) return;
+    if (epoch !== boardEpoch) return;
     useAppStore.setState({ tasks: snapshot });
   }
 }
@@ -87,14 +94,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async selectBoard(boardId) {
-    // 連続で呼ばれたとき、古い呼び出しの応答が後から返ってきても上書きしないようにする
-    const myGeneration = ++selectBoardGeneration;
+    // ボード切替の世代を要求時点(awaitより前)で同期的に進める。
+    // これ以降に届く「この呼び出しより古い」非同期応答はすべてエポック不一致として破棄される。
+    boardEpoch += 1;
+    const epoch = boardEpoch;
+    // 削除のundoはボードローカルな操作とする。切替を要求した時点で同期的にクリアし、
+    // 別ボードで削除したタスクが⌘Zで新しいボードに復活しないようにする。
+    set({ lastDeletedTaskId: null });
     try {
       const [statuses, tasks] = await Promise.all([
         api.statusesList(boardId),
         api.tasksList(boardId),
       ]);
-      if (myGeneration !== selectBoardGeneration) return; // 追い越されたので破棄する
+      if (epoch !== boardEpoch) return; // 追い越されたので破棄する
       set({
         currentBoardId: boardId,
         statuses,
@@ -104,7 +116,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         view: "board",
       });
     } catch (e) {
-      if (myGeneration !== selectBoardGeneration) return; // 追い越されたので破棄する
+      if (epoch !== boardEpoch) return; // 追い越されたので破棄する
       toast.error(`ボードの読み込みに失敗しました: ${String(e)}`);
     }
   },
@@ -131,15 +143,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const firstStatus = [...statuses].sort((a, b) => a.position - b.position)[0];
     if (currentBoardId === null || firstStatus === undefined || title === "") return;
 
-    // 応答が返ってきた時点でも同じボードを見ているか確認するため、開始時点のボードを覚えておく
-    const boardId = currentBoardId;
+    // 応答が返ってきた時点でも同じ切替要求を見ているか確認するため、開始時点のエポックを覚えておく
+    const epoch = boardEpoch;
 
     // IDはRust側で採番するUUIDなので、ここだけは楽観的更新ではなくAPI先行で作る
     try {
       const created = await api.taskCreate(currentBoardId, firstStatus.id, title);
-      // 待っている間にボードが切り替わっていたら、作成自体はDBに済んでいるので
+      // 待っている間にボードが切り替えられていたら、作成自体はDBに済んでいるので
       // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
-      if (get().currentBoardId !== boardId) return;
+      if (epoch !== boardEpoch) return;
       // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす
       const shifted = tasks.map((t) =>
         t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
@@ -151,7 +163,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         view: "detail",
       });
     } catch (e) {
-      if (get().currentBoardId !== boardId) return;
+      if (epoch !== boardEpoch) return;
       toast.error(`タスクの作成に失敗しました: ${String(e)}`);
     }
   },
@@ -169,6 +181,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (target === undefined) return;
 
     const snapshot = tasks;
+    const epoch = boardEpoch;
     // 楽観的更新: 移動先レーンの先頭へ差し込み、前後のレーンを詰め直す
     const optimistic = tasks.map((t) => {
       if (t.id === task.id) return { ...t, statusId: target.id, position: 0 };
@@ -183,7 +196,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       await api.taskMove(task.id, target.id, 0);
     } catch (e) {
-      await recoverTasks(currentBoardId, snapshot);
+      await recoverTasks(currentBoardId, snapshot, epoch);
+      if (epoch !== boardEpoch) return;
       toast.error(`ステータスの変更に失敗しました: ${String(e)}`);
     }
   },
@@ -204,6 +218,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     const neighbor = lane[newRow];
     const snapshot = tasks;
+    const epoch = boardEpoch;
     // 楽観的更新: 隣とpositionを入れ替える
     const optimistic = tasks.map((t) => {
       if (t.id === task.id) return { ...t, position: neighbor.position };
@@ -215,7 +230,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       await api.taskMove(task.id, task.statusId, newRow);
     } catch (e) {
-      await recoverTasks(currentBoardId, snapshot);
+      await recoverTasks(currentBoardId, snapshot, epoch);
+      if (epoch !== boardEpoch) return;
       toast.error(`並び順の変更に失敗しました: ${String(e)}`);
     }
   },
@@ -231,6 +247,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const nextSelected = selectionAfterDelete(lanes, selectedTaskId);
 
     const snapshot = tasks;
+    const epoch = boardEpoch;
     set({
       tasks: tasks.filter((t) => t.id !== selectedTaskId),
       selectedTaskId: nextSelected,
@@ -240,7 +257,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       await api.taskDelete(target.id);
     } catch (e) {
-      await recoverTasks(currentBoardId, snapshot);
+      await recoverTasks(currentBoardId, snapshot, epoch);
+      if (epoch !== boardEpoch) return;
       set({ selectedTaskId: target.id, lastDeletedTaskId: null });
       toast.error(`タスクの削除に失敗しました: ${String(e)}`);
     }
@@ -249,37 +267,46 @@ export const useAppStore = create<AppState>()((set, get) => ({
   async undoDelete() {
     const { lastDeletedTaskId } = get();
     if (lastDeletedTaskId === null) return;
+    // undoはボードローカルな操作。selectBoardが要求時点でlastDeletedTaskIdを同期的に
+    // クリアするので、切替要求後にここへ来ることはないが、応答の反映は念のためエポックでも守る。
+    const epoch = boardEpoch;
     // 復元後のpositionはRust側の状態に依存するので、レスポンスをそのまま採用する
     try {
       const restored = await api.taskRestore(lastDeletedTaskId);
+      if (epoch !== boardEpoch) return;
       set((s) => ({
         tasks: [...s.tasks.filter((t) => t.id !== restored.id), restored],
         selectedTaskId: restored.id,
         lastDeletedTaskId: null,
       }));
     } catch (e) {
+      if (epoch !== boardEpoch) return;
       toast.error(`タスクの復元に失敗しました: ${String(e)}`);
     }
   },
 
   async updateTaskContent(id, contentMd) {
     const { tasks: snapshot, currentBoardId } = get();
+    const epoch = boardEpoch;
     set({ tasks: snapshot.map((t) => (t.id === id ? { ...t, contentMd } : t)) });
     try {
       await api.taskUpdate(id, null, contentMd);
     } catch (e) {
-      await recoverTasks(currentBoardId, snapshot);
+      await recoverTasks(currentBoardId, snapshot, epoch);
+      if (epoch !== boardEpoch) return;
       toast.error(`本文の保存に失敗しました: ${String(e)}`);
     }
   },
 
   async updateTaskTitle(id, title) {
     const { tasks: snapshot, currentBoardId } = get();
+    const epoch = boardEpoch;
     set({ tasks: snapshot.map((t) => (t.id === id ? { ...t, title } : t)) });
     try {
       await api.taskUpdate(id, title, null);
     } catch (e) {
-      await recoverTasks(currentBoardId, snapshot);
+      await recoverTasks(currentBoardId, snapshot, epoch);
+      if (epoch !== boardEpoch) return;
       toast.error(`タイトルの保存に失敗しました: ${String(e)}`);
     }
   },

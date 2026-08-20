@@ -8,7 +8,7 @@ import {
   statusUpdate,
 } from "../lib/api";
 import { STATUS_COLORS } from "../lib/statusPalette";
-import { useAppStore } from "../store/appStore";
+import { getBoardEpoch, useAppStore } from "../store/appStore";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 type Mode = "list" | "rename" | "color" | "create" | "confirm-delete";
@@ -40,13 +40,15 @@ export function StatusSettings() {
 
   /**
    * 変更後にボードを読み直してstatuses/tasksを最新化する。
-   * API応答を待っている間に別ボードへ切り替えられている可能性があるので、
-   * 呼び出し開始時点のボードをまだ表示しているときだけ読み直す
-   * (そうでなければ黙って何もしない。別ボードの内容が混入するのを防ぐ)
+   * epoch は呼び出し元(commit系関数やreorder)がAPI呼び出しより前に捕捉したボード切替エポック。
+   * API応答を待っている間に⌘1-9等でボード切替が「要求」されただけでもエポックは進むので、
+   * ここで再確認して進んでいたら selectBoard を呼ばずに黙って何もしない
+   * (currentBoardIdはselectBoardの読込完了後にしか更新されないため、
+   * currentBoardId比較では切替要求中の古い応答を検知できない)
    */
-  const reload = async () => {
+  const reload = async (epoch: number) => {
     if (currentBoardId === null) return;
-    if (useAppStore.getState().currentBoardId !== currentBoardId) return;
+    if (getBoardEpoch() !== epoch) return;
     await selectBoard(currentBoardId);
   };
 
@@ -56,9 +58,10 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    const epoch = getBoardEpoch();
     try {
       await statusUpdate(target.id, name, null);
-      await reload();
+      await reload(epoch);
     } catch (error) {
       toast.error("ステータス名を変更できませんでした", {
         description: String(error),
@@ -73,9 +76,10 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    const epoch = getBoardEpoch();
     try {
       await statusUpdate(target.id, null, color);
-      await reload();
+      await reload(epoch);
     } catch (error) {
       toast.error("色を変更できませんでした", { description: String(error) });
     }
@@ -88,11 +92,12 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    const epoch = getBoardEpoch();
     try {
       // 色はプリセット先頭(グレー)を初期値にし、あとからCキーで変更してもらう
       await statusCreate(currentBoardId, name, STATUS_COLORS[0].value);
-      await reload();
-      setIndex(statuses.length);
+      await reload(epoch);
+      if (getBoardEpoch() === epoch) setIndex(statuses.length);
     } catch (error) {
       toast.error("ステータスを追加できませんでした", {
         description: String(error),
@@ -105,10 +110,11 @@ export function StatusSettings() {
     if (target === null) return;
     const nextIndex = direction === "up" ? index - 1 : index + 1;
     if (nextIndex < 0 || nextIndex >= statuses.length) return;
+    const epoch = getBoardEpoch();
     try {
       await statusReorder(target.id, nextIndex);
-      await reload();
-      setIndex(nextIndex);
+      await reload(epoch);
+      if (getBoardEpoch() === epoch) setIndex(nextIndex);
     } catch (error) {
       toast.error("並び順を変更できませんでした", {
         description: String(error),
@@ -121,10 +127,11 @@ export function StatusSettings() {
       setMode("list");
       return;
     }
+    const epoch = getBoardEpoch();
     try {
       await statusDelete(target.id);
-      await reload();
-      setIndex(0);
+      await reload(epoch);
+      if (getBoardEpoch() === epoch) setIndex(0);
     } catch (error) {
       toast.error("ステータスを削除できませんでした", {
         description: String(error),
