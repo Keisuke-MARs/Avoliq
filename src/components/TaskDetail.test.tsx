@@ -2,10 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Board, Status, Task } from "../types";
-import { useAppStore } from "../store/appStore";
+import { NEW_TASK_TITLE, useAppStore } from "../store/appStore";
 import { TaskDetail } from "./TaskDetail";
 
 // BlockNoteはjsdomで動かないためモックする(実挙動はTask 4の手動確認でカバーする)
+const editorFocus = vi.fn();
+
 vi.mock("@blocknote/react", () => ({
   useCreateBlockNote: () => ({
     document: [],
@@ -14,6 +16,7 @@ vi.mock("@blocknote/react", () => ({
     ],
     blocksToMarkdownLossy: () => "本文",
     replaceBlocks: () => undefined,
+    focus: editorFocus,
   }),
 }));
 
@@ -58,6 +61,7 @@ describe("TaskDetail", () => {
   beforeEach(() => {
     updateTaskTitle.mockClear();
     moveSelectedTask.mockClear();
+    editorFocus.mockClear();
     useAppStore.setState({
       boards: [board],
       currentBoardId: "board-1",
@@ -116,5 +120,51 @@ describe("TaskDetail", () => {
     );
 
     expect(moveSelectedTask).toHaveBeenCalledWith("right");
+  });
+
+  describe("開いた瞬間の自動フォーカス", () => {
+    it("タイトルが既定名以外(既に中身がある)なら本文エディタへフォーカスする", () => {
+      render(<TaskDetail />);
+      expect(editorFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it("タイトルが既定名(⌘Nで作った直後)ならタイトルへ全選択状態でフォーカスする", () => {
+      useAppStore.setState({
+        tasks: [{ ...task, title: NEW_TASK_TITLE }],
+      });
+      render(<TaskDetail />);
+
+      const input = screen.getByDisplayValue(NEW_TASK_TITLE) as HTMLInputElement;
+      expect(document.activeElement).toBe(input);
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe(NEW_TASK_TITLE.length);
+      expect(editorFocus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("タイトル入力でのEnter/Tab", () => {
+    it("Enterで本文エディタへフォーカスが移る", async () => {
+      const user = userEvent.setup();
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く");
+      input.focus();
+      await user.keyboard("{Enter}");
+
+      expect(editorFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it("Tabで本文エディタへフォーカスが移る", async () => {
+      const user = userEvent.setup();
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く");
+      input.focus();
+      await user.keyboard("{Tab}");
+
+      expect(editorFocus).toHaveBeenCalledTimes(1);
+    });
   });
 });

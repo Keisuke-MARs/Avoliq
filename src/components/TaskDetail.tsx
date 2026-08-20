@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDebouncedSave } from "../hooks/useDebouncedSave";
 import { usePrefersDark } from "../hooks/usePrefersDark";
 import { registerDetailBridge } from "../lib/detailBridge";
-import { useAppStore } from "../store/appStore";
+import { NEW_TASK_TITLE, useAppStore } from "../store/appStore";
 
 /**
  * タスク詳細画面。BlockNoteでNotion風にMarkdownを編集し、500msデバウンスで自動保存する。
@@ -71,6 +71,23 @@ export function TaskDetail() {
     // contentMdは保存のたびに変わるが、再流し込みするとカーソルが飛ぶのでidだけを見る
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, task?.id]);
+
+  // 詳細画面を開いた瞬間の自動フォーカス。
+  // このコンポーネントはPalette側でタスクIDごとにkey指定され直すため、タスクが変わるたびに
+  // 必ず再マウントされる=マウント時1回の判定でよい。
+  // タイトルが既定名(⌘Nで作った直後)のままなら「打てば上書き」できるようタイトルを全選択、
+  // それ以外(カードから開いた/検索から作成した、など既に中身がある場合)は本文から即タイプできるようにする。
+  useEffect(() => {
+    if (task === null) return;
+    if (task.title === NEW_TASK_TITLE) {
+      titleRef.current?.focus();
+      titleRef.current?.select();
+    } else {
+      editor.focus();
+    }
+    // マウント時のみ判定すればよいため依存配列は空でよい
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleEditorChange = useCallback(() => {
     if (loadingRef.current) return;
@@ -140,6 +157,13 @@ export function TaskDetail() {
         onChange={(event) => {
           setTitle(event.target.value);
           titleSave.schedule(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          // Enter/Tabで本文へ入力を続けられるようにする(⌘Tで再度タイトルへ往復できる)
+          if (event.key === "Enter" || (event.key === "Tab" && !event.shiftKey)) {
+            event.preventDefault();
+            editor.focus();
+          }
         }}
         aria-label="タスクのタイトル"
         placeholder="タイトルを入力"
