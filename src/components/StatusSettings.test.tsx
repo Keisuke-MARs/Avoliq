@@ -159,6 +159,24 @@ describe("StatusSettings", () => {
     ).toBeInTheDocument();
   });
 
+  it("応答が届く前に別ボードへ切り替えていたら、ボードを読み直さない", async () => {
+    // statusUpdate の応答が返ってくる前に⌘1-9等で別ボードへ切り替わったことを再現する
+    vi.mocked(api.statusUpdate).mockImplementation(async () => {
+      useAppStore.setState({ currentBoardId: "b2" });
+      return { ...statuses[0], name: "バックログ" };
+    });
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("{Enter}");
+    const input = screen.getByLabelText("ステータス名");
+    await user.clear(input);
+    await user.type(input, "バックログ{Enter}");
+
+    expect(api.statusUpdate).toHaveBeenCalledWith("st-1", "バックログ", null);
+    expect(selectBoard).not.toHaveBeenCalled();
+  });
+
   it("最後の1つのステータスは削除できない", async () => {
     useAppStore.setState({ statuses: [statuses[0]] });
     const user = userEvent.setup();

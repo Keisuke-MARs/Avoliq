@@ -38,9 +38,16 @@ export function StatusSettings() {
 
   const target = statuses[index] ?? null;
 
-  /** 変更後にボードを読み直してstatuses/tasksを最新化する */
+  /**
+   * 変更後にボードを読み直してstatuses/tasksを最新化する。
+   * API応答を待っている間に別ボードへ切り替えられている可能性があるので、
+   * 呼び出し開始時点のボードをまだ表示しているときだけ読み直す
+   * (そうでなければ黙って何もしない。別ボードの内容が混入するのを防ぐ)
+   */
   const reload = async () => {
-    if (currentBoardId !== null) await selectBoard(currentBoardId);
+    if (currentBoardId === null) return;
+    if (useAppStore.getState().currentBoardId !== currentBoardId) return;
+    await selectBoard(currentBoardId);
   };
 
   const commitRename = async () => {

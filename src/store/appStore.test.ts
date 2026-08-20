@@ -200,6 +200,33 @@ describe("appStore: createTaskFromSearch", () => {
     expect(useAppStore.getState().view).toBe("board");
     expect(toast.error).toHaveBeenCalled();
   });
+
+  it("応答が届く前に別ボードへ切り替えていたら、作成結果を反映しない", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "新しいタスク",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+    };
+    // 作成自体はDBに済むが、応答が返ってくる前に⌘1-9等で別ボードへ切り替わったことを再現する
+    mocked.taskCreate.mockImplementation(async () => {
+      useAppStore.setState({ currentBoardId: "board-2" });
+      return created;
+    });
+
+    useAppStore.getState().setSearchQuery("新しいタスク");
+    await useAppStore.getState().createTaskFromSearch();
+
+    const s = useAppStore.getState();
+    expect(s.tasks).toHaveLength(6);
+    expect(s.tasks.some((t) => t.id === "t-new")).toBe(false);
+    expect(s.selectedTaskId).not.toBe("t-new");
+    expect(s.view).not.toBe("detail");
+  });
 });
 
 describe("appStore: moveSelectedTask", () => {
@@ -286,6 +313,27 @@ describe("appStore: moveSelectedTask", () => {
     const s = useAppStore.getState();
     expect(s.tasks.find((t) => t.id === "t-b")?.statusId).toBe("st-todo");
     expect(s.tasks.find((t) => t.id === "t-b")?.position).toBe(1);
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("読み直し中に別ボードへ切り替えていたら、その結果を反映しない", async () => {
+    mocked.taskMove.mockRejectedValue("DB error");
+    const freshFromDb = tasks.map((t) =>
+      t.id === "t-b" ? { ...t, title: "DBに残っている資料をまとめる" } : t,
+    );
+    // 読み直し(tasksList)の応答が返ってくる前に⌘1-9等で別ボードへ切り替わったことを再現する
+    mocked.tasksList.mockImplementation(async () => {
+      useAppStore.setState({ currentBoardId: "board-2" });
+      return freshFromDb;
+    });
+    useAppStore.getState().setSelectedTask("t-b");
+
+    await useAppStore.getState().moveSelectedTask("right");
+
+    const s = useAppStore.getState();
+    expect(s.tasks.find((t) => t.id === "t-b")?.title).not.toBe(
+      "DBに残っている資料をまとめる",
+    );
     expect(toast.error).toHaveBeenCalled();
   });
 });

@@ -47,8 +47,12 @@ async function recoverTasks(boardId: string | null, snapshot: Task[]): Promise<v
   }
   try {
     const fresh = await api.tasksList(boardId);
+    // 読み直している間にボードが切り替わっていたら、いま表示中のボードとは
+    // 無関係な応答なので反映しない(別ボードの内容が混入するのを防ぐ)
+    if (useAppStore.getState().currentBoardId !== boardId) return;
     useAppStore.setState({ tasks: fresh });
   } catch {
+    if (useAppStore.getState().currentBoardId !== boardId) return;
     useAppStore.setState({ tasks: snapshot });
   }
 }
@@ -127,9 +131,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const firstStatus = [...statuses].sort((a, b) => a.position - b.position)[0];
     if (currentBoardId === null || firstStatus === undefined || title === "") return;
 
+    // 応答が返ってきた時点でも同じボードを見ているか確認するため、開始時点のボードを覚えておく
+    const boardId = currentBoardId;
+
     // IDはRust側で採番するUUIDなので、ここだけは楽観的更新ではなくAPI先行で作る
     try {
       const created = await api.taskCreate(currentBoardId, firstStatus.id, title);
+      // 待っている間にボードが切り替わっていたら、作成自体はDBに済んでいるので
+      // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
+      if (get().currentBoardId !== boardId) return;
       // Rust側は先頭(position=0)に挿入して同レーンを再採番するので、手元も同じようにずらす
       const shifted = tasks.map((t) =>
         t.statusId === firstStatus.id ? { ...t, position: t.position + 1 } : t,
@@ -141,6 +151,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         view: "detail",
       });
     } catch (e) {
+      if (get().currentBoardId !== boardId) return;
       toast.error(`タスクの作成に失敗しました: ${String(e)}`);
     }
   },
