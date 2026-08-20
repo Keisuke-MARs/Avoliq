@@ -22,6 +22,12 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
   Toaster: () => null,
 }));
+// useFlushOnHideがgetCurrentWindowを呼ぶため、jsdom環境で落ちないようスタブする。
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    onFocusChanged: () => Promise.resolve(() => undefined),
+  }),
+}));
 
 const mocked = vi.mocked(api);
 

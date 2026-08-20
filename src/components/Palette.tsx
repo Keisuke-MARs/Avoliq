@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Board } from "./Board";
 import { SearchBar } from "./SearchBar";
 import { TaskDetail } from "./TaskDetail";
+import { useFlushOnHide } from "@/hooks/useFlushOnHide";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useAppStore } from "@/store/appStore";
 
@@ -32,6 +33,7 @@ export function Palette() {
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
 
   useKeyboard();
+  useFlushOnHide();
 
   useEffect(() => {
     void loadBoards();
