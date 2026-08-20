@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
@@ -35,5 +36,14 @@ export default defineConfig(() => ({
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
+  },
+
+  // Vitest 設定（jsdom + Testing Library）
+  test: {
+    globals: false,
+    environment: "jsdom",
+    setupFiles: ["./setup-vitest.ts"],
+    clearMocks: true,
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 }));
