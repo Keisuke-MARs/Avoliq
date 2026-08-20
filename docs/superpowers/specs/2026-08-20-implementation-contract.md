@@ -150,6 +150,8 @@ CREATE TABLE schema_migrations (
 - `src/lib/boardNav.ts`: カーソル移動・レーン跨ぎの純関数置き場（ストアを太らせない）
 - `src/store/appStore.ts` は `initialAppState` もexport（テストのリセット用。AppStateの形は不変）
 - 検索バーのDOM id: `SEARCH_INPUT_ID = "smarttask-search"`
+- `src/store/appStore.ts` は `NEW_TASK_TITLE = "新しいタスク"` もexport（⌘Nの既定タイトル。
+  TaskDetailはこの値と一致するかで「タイトルへ全選択フォーカス」か「本文へフォーカス」かを出し分ける）
 
 並び順は**整数positionの全件再採番方式**（レーン内タスク数は少ない前提。分数position等は使わない）。
 
@@ -203,6 +205,7 @@ interface AppState {
   setSearchQuery(q: string): void;
   setSelectedTask(id: string | null): void;
   createTaskFromSearch(): Promise<void>;  // searchQueryをタイトルに作成→detailへ
+  createNewTask(): Promise<void>;         // 既定タイトル("新しいタスク")で先頭ステータスに作成→detailへ(⌘N)
   moveSelectedTask(dir: "left" | "right"): Promise<void>;
   reorderSelectedTask(dir: "up" | "down"): Promise<void>;
   deleteSelectedTask(): Promise<void>;
@@ -217,9 +220,17 @@ interface AppState {
 - グローバル: `⌥Space` トグル（Rust側 global-shortcut, settingsのhotkeyキーで変更可能）
 - Esc: detail→board / board→パレット非表示（Rust側 hide）
 - board: 文字→SearchBar / Enter→作成 or 詳細 / ↓→ボードへ / ←→↑↓移動 /
-  ⌘←→ステータス移動 / ⌘↑↓並び替え / ⌘⌫削除 / ⌘Z復元 / ⌘N検索バーへ /
+  ⌘←→ステータス移動 / ⌘↑↓並び替え / ⌘⌫削除 / ⌘Z復元 /
+  ⌘N新規タスク作成(先頭ステータスへ既定タイトルで作成→detailへ) /
+  ⌘P検索バーへフォーカス /
   ⌘1..9ボード切替 / ⌘Bスイッチャー / ⌘,設定
-- detail: ⌘←→ステータス変更 / ⌘Tタイトル / Esc戻る（自動保存済み）
+- detail: ⌘←→ステータス変更 / ⌘Tタイトルへフォーカス /
+  ⌘N新規タスク作成(flushDetail→createNewTask、新タスクの詳細に差し替わる) /
+  ⌘P検索(flushDetail→board遷移→検索バーへフォーカス、1フレーム遅延させて確実にフォーカスする) /
+  Esc戻る（自動保存済み）
+- detail画面を開いた瞬間: タイトルが既定タイトル(`NEW_TASK_TITLE`)のままならタイトルへ全選択フォーカス、
+  それ以外(カードから開いた・検索から作成した等)は本文エディタ(BlockNote)へ自動フォーカス。
+  タイトル入力中にEnter/Tabを押すと本文エディタへフォーカスが移る（⌘Tで再度タイトルへ戻れる）
 
 ## UI原則
 
