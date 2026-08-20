@@ -123,3 +123,43 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ここから smartTask 固有のスタイル */
+
+/* ウィンドウ自体が透過なので、器の外側は完全に透明にする */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* パレットは文書ではないのでテキスト選択させない */
+  user-select: none;
+  overflow: hidden;
+}
+
+/* パレットの器: 角丸16px・半透明白・backdrop blur・大きめシャドウ */
+.palette-shell {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(250, 250, 252, 0.92);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+}
+
+.palette-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #1c1c1e;
+}
