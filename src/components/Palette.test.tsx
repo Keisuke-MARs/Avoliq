@@ -195,7 +195,9 @@ describe("Palette: 検索と新規作成", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByTestId("detail-placeholder")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
+      ).toBeInTheDocument();
     });
     expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "牛乳を買い足す");
     expect(useAppStore.getState().selectedTaskId).toBe("t-new");
@@ -212,7 +214,9 @@ describe("Palette: 検索と新規作成", () => {
   it("カード選択中のEnterは詳細を開く", async () => {
     const user = await renderPalette();
     await user.keyboard("{ArrowDown}{Enter}");
-    expect(screen.getByTestId("detail-placeholder")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
+    ).toBeInTheDocument();
     expect(mocked.taskCreate).not.toHaveBeenCalled();
   });
 
@@ -363,7 +367,9 @@ describe("Palette: Escとビュー切替", () => {
   it("詳細ビューでEscを押すと盤面へ戻り、パレットは閉じない", async () => {
     const user = await renderPalette();
     await user.keyboard("{ArrowDown}{Enter}");
-    expect(screen.getByTestId("detail-placeholder")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
+    ).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
     expect(screen.getByTestId("board")).toBeInTheDocument();

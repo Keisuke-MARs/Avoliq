@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { Board } from "./Board";
 import { SearchBar } from "./SearchBar";
+import { TaskDetail } from "./TaskDetail";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useAppStore } from "@/store/appStore";
 
@@ -28,6 +29,7 @@ function ViewPlaceholder({ testId, label }: { testId: string; label: string }) {
 export function Palette() {
   const view = useAppStore((s) => s.view);
   const loadBoards = useAppStore((s) => s.loadBoards);
+  const selectedTaskId = useAppStore((s) => s.selectedTaskId);
 
   useKeyboard();
 
@@ -48,9 +50,7 @@ export function Palette() {
       <SearchBar />
 
       {view === "board" && <Board />}
-      {view === "detail" && (
-        <ViewPlaceholder testId="detail-placeholder" label="詳細画面は計画書3で実装します" />
-      )}
+      {view === "detail" && <TaskDetail key={selectedTaskId ?? "none"} />}
       {view === "switcher" && (
         <ViewPlaceholder
           testId="switcher-placeholder"

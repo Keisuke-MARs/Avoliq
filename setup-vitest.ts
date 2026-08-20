@@ -6,6 +6,20 @@ import { cleanup } from "@testing-library/react";
 // jsdom は scrollIntoView を実装していないため、呼ばれても落ちないようスタブする。
 Element.prototype.scrollIntoView = vi.fn();
 
+// jsdom は matchMedia を実装していないため、usePrefersDark 等が呼んでも落ちないようスタブする。
+window.matchMedia =
+  window.matchMedia ??
+  vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+
 afterEach(async () => {
   cleanup();
   // zustand ストアはモジュール単位のシングルトンなので、テストごとに初期状態へ戻す。
