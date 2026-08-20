@@ -46,12 +46,23 @@ export function ConfirmDialog({
       onKeyDown={handleKeyDown}
       className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 p-6 outline-none backdrop-blur-[2px]"
     >
-      <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+      <div
+        className="w-full max-w-sm rounded-xl p-5 shadow-xl"
+        style={{ backgroundColor: "var(--st-palette-bg)" }}
+      >
         <div className="flex items-start gap-3">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#FF3B30]" />
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-neutral-600">
+            <h2
+              className="text-sm font-semibold"
+              style={{ color: "var(--st-text-primary)" }}
+            >
+              {title}
+            </h2>
+            <p
+              className="mt-1 text-xs leading-relaxed"
+              style={{ color: "var(--st-text-secondary)" }}
+            >
               {description}
             </p>
           </div>
@@ -61,7 +72,8 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-neutral-600 transition-colors hover:bg-black/5"
+            className="st-btn-ghost rounded-md px-3 py-1.5 transition-colors"
+            style={{ color: "var(--st-text-secondary)" }}
           >
             キャンセル (Esc)
           </button>

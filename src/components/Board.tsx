@@ -1,3 +1,4 @@
+import { Inbox } from "lucide-react";
 import { Lane } from "./Lane";
 import { useAppStore } from "@/store/appStore";
 import { buildLanes, filterTasks } from "@/lib/boardNav";
@@ -11,6 +12,28 @@ export function Board() {
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
 
   const lanes = buildLanes(statuses, filterTasks(tasks, searchQuery));
+
+  // ボードにタスクが1件も無いとき(検索絞り込みではなく本当に空のとき)の空状態
+  if (tasks.length === 0) {
+    return (
+      <div
+        data-testid="board"
+        className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center"
+      >
+        <Inbox
+          size={28}
+          strokeWidth={1.5}
+          style={{ color: "var(--st-text-tertiary)" }}
+        />
+        <p className="text-sm" style={{ color: "var(--st-text-secondary)" }}>
+          タスクはまだありません
+        </p>
+        <p className="text-xs" style={{ color: "var(--st-text-tertiary)" }}>
+          タスク名を入力して Enter で作成できます
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div data-testid="board" className="flex flex-1 gap-3 overflow-hidden px-3 py-3">

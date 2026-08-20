@@ -86,7 +86,7 @@ export function TaskDetail() {
 
   if (task === null) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-neutral-500">
+      <div className="flex h-full items-center justify-center text-sm st-text-2">
         タスクが選択されていません
       </div>
     );
@@ -99,7 +99,7 @@ export function TaskDetail() {
           type="button"
           aria-label="ボードに戻る (Esc)"
           onClick={handleBack}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-neutral-600 transition-colors hover:bg-black/5"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-sm st-text-2 transition-colors st-btn-ghost"
         >
           <ArrowLeft size={16} />
           <span>ボード</span>
@@ -110,7 +110,7 @@ export function TaskDetail() {
             type="button"
             aria-label="前のステータスへ (⌘←)"
             onClick={() => void moveSelectedTask("left")}
-            className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-black/5"
+            className="rounded-md p-1 st-text-2 transition-colors st-btn-ghost"
           >
             <ChevronLeft size={16} />
           </button>
@@ -127,7 +127,7 @@ export function TaskDetail() {
             type="button"
             aria-label="次のステータスへ (⌘→)"
             onClick={() => void moveSelectedTask("right")}
-            className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-black/5"
+            className="rounded-md p-1 st-text-2 transition-colors st-btn-ghost"
           >
             <ChevronRight size={16} />
           </button>
@@ -143,7 +143,7 @@ export function TaskDetail() {
         }}
         aria-label="タスクのタイトル"
         placeholder="タイトルを入力"
-        className="mx-4 mb-2 bg-transparent text-xl font-semibold text-neutral-900 outline-none placeholder:text-neutral-400"
+        className="mx-4 mb-2 bg-transparent text-xl font-semibold st-text-1 outline-none st-input"
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">

@@ -144,30 +144,174 @@ body {
   overflow: hidden;
 }
 
-/* パレットの器: 角丸16px・半透明白・backdrop blur・大きめシャドウ */
-.palette-shell {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ============ smartTask デザイントークン ============ */
+:root {
+  --st-palette-bg: rgba(250, 250, 252, 0.92);
+  --st-palette-border: rgba(0, 0, 0, 0.08);
+  --st-text-primary: #1c1c1e;
+  --st-text-secondary: #6e6e73;
+  --st-text-tertiary: #a1a1a6;
+  --st-surface-hover: rgba(0, 0, 0, 0.04);
+  --st-surface-selected: rgba(0, 0, 0, 0.07);
+  --st-card-bg: #ffffff;
+  --st-card-hover-bg: #f5f5f7;
+  --st-shadow: 0 24px 64px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.08);
+  /* Apple純正のイージング(macOSのウィンドウアニメーションに近い) */
+  --st-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --st-palette-bg: rgba(28, 28, 30, 0.9);
+    --st-palette-border: rgba(255, 255, 255, 0.1);
+    --st-text-primary: #f5f5f7;
+    --st-text-secondary: #a1a1a6;
+    --st-text-tertiary: #6e6e73;
+    --st-surface-hover: rgba(255, 255, 255, 0.06);
+    --st-surface-selected: rgba(255, 255, 255, 0.1);
+    --st-card-bg: #2c2c2e;
+    --st-card-hover-bg: #3a3a3c;
+    --st-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* ============ パレットの出現/消失 ============ */
+@keyframes st-palette-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.st-palette {
+  background: var(--st-palette-bg);
+  border: 0.5px solid var(--st-palette-border);
   border-radius: 16px;
-  background: rgba(250, 250, 252, 0.92);
-  backdrop-filter: saturate(180%) blur(24px);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--st-shadow);
+  backdrop-filter: saturate(180%) blur(30px);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  color: var(--st-text-primary);
+  animation: st-palette-in 180ms var(--st-ease) both;
 }
 
-.palette-title {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: #1c1c1e;
+/* ============ ドリルイン遷移(ボード⇄詳細など) ============ */
+@keyframes st-drill-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
-/* 器を縦並びにしてエラーメッセージをタイトルの下に置く */
-.palette-shell {
-  flex-direction: column;
-  gap: 8px;
+@keyframes st-drill-back {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.st-view-forward {
+  animation: st-drill-in 200ms var(--st-ease) both;
+}
+
+.st-view-back {
+  animation: st-drill-back 200ms var(--st-ease) both;
+}
+
+/* ============ カードのマイクロインタラクション ============
+   選択カードの背景色はステータス色をインラインstyleで塗る(承認済み仕様)ため、
+   ここでは背景の既定値・ホバー・浮きだけを受け持つ */
+.st-card {
+  background-color: var(--st-card-bg);
+  transition:
+    background-color 120ms var(--st-ease),
+    color 120ms var(--st-ease),
+    transform 120ms var(--st-ease),
+    box-shadow 120ms var(--st-ease);
+}
+
+.st-card[data-selected="true"] {
+  transform: translateY(-1px);
+}
+
+.st-card:hover:not([data-selected="true"]) {
+  background-color: var(--st-card-hover-bg);
+}
+
+/* 検索バーのプレースホルダー(ダークモードでも可読に) */
+.st-search-input::placeholder {
+  color: var(--st-text-tertiary);
+}
+
+/* ============ トークンのユーティリティクラス ============
+   Tailwindのneutral系ハードコードはダークモードで破綻するため、こちらを使う */
+.st-text-1 {
+  color: var(--st-text-primary);
+}
+.st-text-2 {
+  color: var(--st-text-secondary);
+}
+.st-text-3 {
+  color: var(--st-text-tertiary);
+}
+.st-row-selected {
+  background-color: var(--st-surface-selected);
+}
+.st-border {
+  border-color: var(--st-palette-border);
+}
+.st-chip {
+  background-color: var(--st-surface-hover);
+}
+.st-input::placeholder {
+  color: var(--st-text-tertiary);
+}
+/* トグルスイッチOFF時のトラック(AppleのsystemGray相当。両モード共通) */
+.st-toggle-off {
+  background-color: rgba(120, 120, 128, 0.32);
+}
+
+/* ホバーで薄く反応する汎用ボタン */
+.st-btn-ghost:hover {
+  background-color: var(--st-surface-hover);
+}
+
+/* BlockNoteの配色をパレットに合わせる */
+.bn-root[data-color-scheme="dark"] {
+  --bn-colors-editor-background: transparent;
+  --bn-colors-editor-text: #f5f5f7;
+  --bn-colors-menu-background: #2c2c2e;
+  --bn-colors-menu-text: #f5f5f7;
+  --bn-colors-border: rgba(255, 255, 255, 0.12);
+}
+
+.bn-root[data-color-scheme="light"] {
+  --bn-colors-editor-background: transparent;
+  --bn-colors-editor-text: #1c1c1e;
+  --bn-colors-border: rgba(0, 0, 0, 0.08);
+}
+
+/* OSの視差効果を減らす設定を尊重する */
+@media (prefers-reduced-motion: reduce) {
+  .st-palette,
+  .st-view-forward,
+  .st-view-back {
+    animation: none;
+  }
+  .st-card {
+    transition: none;
+  }
 }
 
 /* BlockNoteのフォントをアプリ全体と揃える(設計書のUI原則: -apple-system固定) */

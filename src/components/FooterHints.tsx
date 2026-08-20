@@ -49,11 +49,21 @@ export function FooterHints({ view }: { view: View }) {
   return (
     <footer
       data-testid="keyboard-hints"
-      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-black/5 px-4 py-2 text-[11px] text-neutral-500"
+      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-2 text-[11px]"
+      style={{
+        borderColor: "var(--st-palette-border)",
+        color: "var(--st-text-secondary)",
+      }}
     >
       {HINTS[view].map(([key, label]) => (
         <span key={key} className="flex items-center gap-1">
-          <kbd className="rounded border border-black/10 bg-black/[0.03] px-1.5 py-0.5 font-medium">
+          <kbd
+            className="rounded border px-1.5 py-0.5 font-medium"
+            style={{
+              borderColor: "var(--st-palette-border)",
+              backgroundColor: "var(--st-surface-hover)",
+            }}
+          >
             {key}
           </kbd>
           <span>{label}</span>

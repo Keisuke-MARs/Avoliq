@@ -7,8 +7,15 @@ export function SearchBar() {
   const setSearchQuery = useAppStore((s) => s.setSearchQuery);
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-black/5 px-4">
-      <Search size={18} className="shrink-0 text-neutral-400" />
+    <div
+      className="flex h-14 shrink-0 items-center gap-2.5 border-b px-4"
+      style={{ borderColor: "var(--st-palette-border)" }}
+    >
+      <Search
+        size={18}
+        className="shrink-0"
+        style={{ color: "var(--st-text-tertiary)" }}
+      />
       <input
         id={SEARCH_INPUT_ID}
         data-testid="search-input"
@@ -20,7 +27,8 @@ export function SearchBar() {
         placeholder="タスクを検索、または入力して新規作成"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full bg-transparent text-[17px] text-neutral-900 outline-none placeholder:text-neutral-400"
+        className="st-search-input w-full bg-transparent text-[17px] outline-none"
+        style={{ color: "var(--st-text-primary)" }}
       />
     </div>
   );

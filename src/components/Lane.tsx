@@ -22,15 +22,32 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
           名前やposition順でアイコンを出し分けるとカスタムステータスで破綻するため。
         */}
         <Circle size={10} stroke={status.color} fill={status.color} strokeWidth={2} />
-        <span className="text-[12px] font-semibold text-neutral-700">{status.name}</span>
+        <span
+          className="text-[12px] font-semibold"
+          style={{ color: "var(--st-text-secondary)" }}
+        >
+          {status.name}
+        </span>
         <span
           data-testid="lane-count"
-          className="ml-auto text-[11px] tabular-nums text-neutral-400"
+          className="ml-auto text-[11px] tabular-nums"
+          style={{ color: "var(--st-text-tertiary)" }}
         >
           {tasks.length}
         </span>
       </header>
       <div className="flex-1 space-y-1.5 overflow-y-auto pb-1">
+        {tasks.length === 0 && (
+          <div
+            className="rounded-lg border border-dashed px-3 py-4 text-center text-xs"
+            style={{
+              borderColor: "var(--st-palette-border)",
+              color: "var(--st-text-tertiary)",
+            }}
+          >
+            なし
+          </div>
+        )}
         {tasks.map((task) => (
           <TaskCard
             key={task.id}

@@ -201,16 +201,8 @@ export function useKeyboard(): void {
         handleDetailKey(e);
         return;
       }
-      if (state.view === "switcher") {
-        return;
-      }
-      if (state.view === "settings") {
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        state.setView("board");
-      }
+      // switcher / settings は各コンポーネント側のハンドラが全キーを処理する
+      // (stopPropagationでここへは届かない前提。届いても二重処理しない)
     }
 
     window.addEventListener("keydown", onKeyDown);
