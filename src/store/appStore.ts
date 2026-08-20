@@ -28,6 +28,31 @@ export interface AppState {
   updateTaskTitle(id: string, title: string): Promise<void>;
 }
 
+/**
+ * selectBoard の呼び出し世代カウンタ。連続で呼ばれたときに古い呼び出しの応答が
+ * 後から返ってきても新しい呼び出しの結果を上書きしないよう、呼び出しごとに払い出す。
+ * ストアの外に置くのは、テストの set/getState リセットに巻き込まれないようにするため。
+ */
+let selectBoardGeneration = 0;
+
+/**
+ * 楽観的更新の失敗時に呼ぶ復旧処理。
+ * 古いsnapshot全体で巻き戻すと待機中の他操作まで巻き戻してしまうので、
+ * DBの実状態を読み直して合わせる。読み直し自体も失敗したらsnapshotへ戻す。
+ */
+async function recoverTasks(boardId: string | null, snapshot: Task[]): Promise<void> {
+  if (boardId === null) {
+    useAppStore.setState({ tasks: snapshot });
+    return;
+  }
+  try {
+    const fresh = await api.tasksList(boardId);
+    useAppStore.setState({ tasks: fresh });
+  } catch {
+    useAppStore.setState({ tasks: snapshot });
+  }
+}
+
 /** データ部分だけの初期値。テストのリセットにも使う。 */
 export const initialAppState = {
   boards: [] as Board[],
@@ -58,11 +83,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async selectBoard(boardId) {
+    // 連続で呼ばれたとき、古い呼び出しの応答が後から返ってきても上書きしないようにする
+    const myGeneration = ++selectBoardGeneration;
     try {
       const [statuses, tasks] = await Promise.all([
         api.statusesList(boardId),
         api.tasksList(boardId),
       ]);
+      if (myGeneration !== selectBoardGeneration) return; // 追い越されたので破棄する
       set({
         currentBoardId: boardId,
         statuses,
@@ -72,6 +100,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         view: "board",
       });
     } catch (e) {
+      if (myGeneration !== selectBoardGeneration) return; // 追い越されたので破棄する
       toast.error(`ボードの読み込みに失敗しました: ${String(e)}`);
     }
   },
@@ -117,7 +146,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async moveSelectedTask(dir) {
-    const { tasks, statuses, selectedTaskId } = get();
+    const { tasks, statuses, selectedTaskId, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const task = tasks.find((t) => t.id === selectedTaskId);
     if (task === undefined) return;
@@ -143,13 +172,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       await api.taskMove(task.id, target.id, 0);
     } catch (e) {
-      set({ tasks: snapshot });
+      await recoverTasks(currentBoardId, snapshot);
       toast.error(`ステータスの変更に失敗しました: ${String(e)}`);
     }
   },
 
   async reorderSelectedTask(dir) {
-    const { tasks, selectedTaskId } = get();
+    const { tasks, selectedTaskId, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const task = tasks.find((t) => t.id === selectedTaskId);
     if (task === undefined) return;
@@ -175,13 +204,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       await api.taskMove(task.id, task.statusId, newRow);
     } catch (e) {
-      set({ tasks: snapshot });
+      await recoverTasks(currentBoardId, snapshot);
       toast.error(`並び順の変更に失敗しました: ${String(e)}`);
     }
   },
 
   async deleteSelectedTask() {
-    const { tasks, statuses, selectedTaskId, searchQuery } = get();
+    const { tasks, statuses, selectedTaskId, searchQuery, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const target = tasks.find((t) => t.id === selectedTaskId);
     if (target === undefined) return;
@@ -200,7 +229,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       await api.taskDelete(target.id);
     } catch (e) {
-      set({ tasks: snapshot, selectedTaskId: target.id, lastDeletedTaskId: null });
+      await recoverTasks(currentBoardId, snapshot);
+      set({ selectedTaskId: target.id, lastDeletedTaskId: null });
       toast.error(`タスクの削除に失敗しました: ${String(e)}`);
     }
   },
@@ -222,23 +252,23 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async updateTaskContent(id, contentMd) {
-    const snapshot = get().tasks;
+    const { tasks: snapshot, currentBoardId } = get();
     set({ tasks: snapshot.map((t) => (t.id === id ? { ...t, contentMd } : t)) });
     try {
       await api.taskUpdate(id, null, contentMd);
     } catch (e) {
-      set({ tasks: snapshot });
+      await recoverTasks(currentBoardId, snapshot);
       toast.error(`本文の保存に失敗しました: ${String(e)}`);
     }
   },
 
   async updateTaskTitle(id, title) {
-    const snapshot = get().tasks;
+    const { tasks: snapshot, currentBoardId } = get();
     set({ tasks: snapshot.map((t) => (t.id === id ? { ...t, title } : t)) });
     try {
       await api.taskUpdate(id, title, null);
     } catch (e) {
-      set({ tasks: snapshot });
+      await recoverTasks(currentBoardId, snapshot);
       toast.error(`タイトルの保存に失敗しました: ${String(e)}`);
     }
   },

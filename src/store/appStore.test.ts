@@ -3,7 +3,7 @@ import * as api from "@/lib/api";
 import { toast } from "sonner";
 import { useAppStore } from "./appStore";
 import { board, board2, statuses, tasks } from "@/test/fixtures";
-import type { Task } from "@/types";
+import type { Status, Task } from "@/types";
 
 vi.mock("@/lib/api", () => ({
   boardsList: vi.fn(),
@@ -79,6 +79,40 @@ describe("appStore: selectBoard", () => {
     expect(s.searchQuery).toBe("");
     expect(s.selectedTaskId).toBeNull();
     expect(s.view).toBe("board");
+  });
+
+  it("2回連続で呼んでも、1回目の応答が遅延して後から届いたら2回目の結果を残す", async () => {
+    await loadFixtureBoard();
+
+    // 1回目(board-2)を遅延させ、2回目(board-1リロード)を先に完了させる
+    let resolveFirstStatuses: (value: Status[]) => void = () => {};
+    let resolveFirstTasks: (value: Task[]) => void = () => {};
+    const firstStatuses = new Promise<Status[]>((resolve) => {
+      resolveFirstStatuses = resolve;
+    });
+    const firstTasks = new Promise<Task[]>((resolve) => {
+      resolveFirstTasks = resolve;
+    });
+    mocked.statusesList.mockReturnValueOnce(firstStatuses);
+    mocked.tasksList.mockReturnValueOnce(firstTasks);
+    const firstCall = useAppStore.getState().selectBoard("board-2");
+
+    const secondStatuses = [statuses[0]];
+    const secondTasks = [tasks[0]];
+    mocked.statusesList.mockResolvedValueOnce(secondStatuses);
+    mocked.tasksList.mockResolvedValueOnce(secondTasks);
+    const secondCall = useAppStore.getState().selectBoard("board-1");
+    await secondCall;
+
+    // ここで1回目の応答が今さら届く
+    resolveFirstStatuses([]);
+    resolveFirstTasks([]);
+    await firstCall;
+
+    const s = useAppStore.getState();
+    expect(s.currentBoardId).toBe("board-1");
+    expect(s.statuses).toEqual(secondStatuses);
+    expect(s.tasks).toEqual(secondTasks);
   });
 });
 
@@ -221,9 +255,32 @@ describe("appStore: moveSelectedTask", () => {
     expect(mocked.taskMove).not.toHaveBeenCalled();
   });
 
-  it("失敗したら元の状態へロールバックしトーストを出す", async () => {
+  it("失敗したらDBの実状態を読み直して合わせる", async () => {
     mocked.taskMove.mockRejectedValue("DB error");
+    // DB側の実状態(モックのtasksList)をsnapshotとは判別できる値にしておき、
+    // 読み直し経由で反映されたことを確認する
+    const freshFromDb = tasks.map((t) =>
+      t.id === "t-b" ? { ...t, title: "DBに残っている資料をまとめる" } : t,
+    );
+    mocked.tasksList.mockResolvedValueOnce(freshFromDb);
     useAppStore.getState().setSelectedTask("t-b");
+
+    await useAppStore.getState().moveSelectedTask("right");
+
+    expect(mocked.tasksList).toHaveBeenLastCalledWith("board-1");
+    const s = useAppStore.getState();
+    expect(s.tasks).toEqual(freshFromDb);
+    expect(s.tasks.find((t) => t.id === "t-b")?.title).toBe(
+      "DBに残っている資料をまとめる",
+    );
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("読み直しにも失敗したら直前のsnapshotへ戻す", async () => {
+    mocked.taskMove.mockRejectedValue("DB error");
+    mocked.tasksList.mockRejectedValueOnce("DB unreachable");
+    useAppStore.getState().setSelectedTask("t-b");
+
     await useAppStore.getState().moveSelectedTask("right");
 
     const s = useAppStore.getState();
@@ -277,11 +334,19 @@ describe("appStore: reorderSelectedTask", () => {
     expect(mocked.taskMove).toHaveBeenCalledWith("t-c", "st-todo", 1);
   });
 
-  it("失敗したら元の並びへロールバックしトーストを出す", async () => {
+  it("失敗したらDBの実状態を読み直して合わせる", async () => {
     mocked.taskMove.mockRejectedValue("DB error");
+    const freshFromDb = tasks.map((t) =>
+      t.id === "t-b" ? { ...t, title: "DBに残っている資料をまとめる" } : t,
+    );
+    mocked.tasksList.mockResolvedValueOnce(freshFromDb);
     useAppStore.getState().setSelectedTask("t-b");
+
     await useAppStore.getState().reorderSelectedTask("up");
-    expect(useAppStore.getState().tasks.find((t) => t.id === "t-b")?.position).toBe(1);
+
+    expect(mocked.tasksList).toHaveBeenLastCalledWith("board-1");
+    const s = useAppStore.getState();
+    expect(s.tasks).toEqual(freshFromDb);
     expect(toast.error).toHaveBeenCalled();
   });
 });
@@ -315,13 +380,19 @@ describe("appStore: deleteSelectedTask / undoDelete", () => {
     expect(mocked.taskDelete).not.toHaveBeenCalled();
   });
 
-  it("削除に失敗したらタスクを戻しトーストを出す", async () => {
+  it("削除に失敗したらDBの実状態を読み直して合わせる", async () => {
     mocked.taskDelete.mockRejectedValue("DB error");
+    const freshFromDb = tasks.map((t) =>
+      t.id === "t-a" ? { ...t, title: "DBに残っている牛乳を買う" } : t,
+    );
+    mocked.tasksList.mockResolvedValueOnce(freshFromDb);
     useAppStore.getState().setSelectedTask("t-a");
+
     await useAppStore.getState().deleteSelectedTask();
 
+    expect(mocked.tasksList).toHaveBeenLastCalledWith("board-1");
     const s = useAppStore.getState();
-    expect(s.tasks.map((t) => t.id)).toContain("t-a");
+    expect(s.tasks).toEqual(freshFromDb);
     expect(s.selectedTaskId).toBe("t-a");
     expect(s.lastDeletedTaskId).toBeNull();
     expect(toast.error).toHaveBeenCalled();
@@ -377,10 +448,19 @@ describe("appStore: updateTaskTitle / updateTaskContent", () => {
     expect(useAppStore.getState().tasks.find((t) => t.id === "t-a")?.contentMd).toBe("# メモ");
   });
 
-  it("保存に失敗したらロールバックしトーストを出す", async () => {
+  it("保存に失敗したらDBの実状態を読み直して合わせる", async () => {
     mocked.taskUpdate.mockRejectedValue("DB error");
+    const freshFromDb = tasks.map((t) =>
+      t.id === "t-a" ? { ...t, title: "DBに残っている牛乳を買う" } : t,
+    );
+    mocked.tasksList.mockResolvedValueOnce(freshFromDb);
+
     await useAppStore.getState().updateTaskTitle("t-a", "壊れるタイトル");
-    expect(useAppStore.getState().tasks.find((t) => t.id === "t-a")?.title).toBe("牛乳を買う");
+
+    expect(mocked.tasksList).toHaveBeenLastCalledWith("board-1");
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-a")?.title).toBe(
+      "DBに残っている牛乳を買う",
+    );
     expect(toast.error).toHaveBeenCalled();
   });
 });
