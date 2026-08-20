@@ -14,7 +14,6 @@ pub fn run() {
             // 2つ目のインスタンスが起動されたら、既存のパレットを出すだけにする
             panel::show_panel(app);
         }))
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
