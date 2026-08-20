@@ -45,11 +45,18 @@ export function StatusSettings() {
    * ここで再確認して進んでいたら selectBoard を呼ばずに黙って何もしない
    * (currentBoardIdはselectBoardの読込完了後にしか更新されないため、
    * currentBoardId比較では切替要求中の古い応答を検知できない)
+   *
+   * 戻り値: 中断した(読み直さなかった)場合は null。
+   * 実際にselectBoardを呼んで読込が完了した場合は、その完了時点の getBoardEpoch() を返す。
+   * selectBoard自体が呼び出しのたびにepochを進めるため、呼び出し元が事前に捕捉したepochと
+   * 比較しても必ず不一致になってしまう。呼び出し元はこの戻り値を「読込完了後の最新epoch」として
+   * 再度 getBoardEpoch() と突き合わせ、その間に別の切替が割り込んでいないかを確認すること。
    */
-  const reload = async (epoch: number) => {
-    if (currentBoardId === null) return;
-    if (getBoardEpoch() !== epoch) return;
+  const reload = async (epoch: number): Promise<number | null> => {
+    if (currentBoardId === null) return null;
+    if (getBoardEpoch() !== epoch) return null;
     await selectBoard(currentBoardId);
+    return getBoardEpoch();
   };
 
   const commitRename = async () => {
@@ -96,8 +103,8 @@ export function StatusSettings() {
     try {
       // 色はプリセット先頭(グレー)を初期値にし、あとからCキーで変更してもらう
       await statusCreate(currentBoardId, name, STATUS_COLORS[0].value);
-      await reload(epoch);
-      if (getBoardEpoch() === epoch) setIndex(statuses.length);
+      const after = await reload(epoch);
+      if (after !== null && after === getBoardEpoch()) setIndex(statuses.length);
     } catch (error) {
       toast.error("ステータスを追加できませんでした", {
         description: String(error),
@@ -113,8 +120,8 @@ export function StatusSettings() {
     const epoch = getBoardEpoch();
     try {
       await statusReorder(target.id, nextIndex);
-      await reload(epoch);
-      if (getBoardEpoch() === epoch) setIndex(nextIndex);
+      const after = await reload(epoch);
+      if (after !== null && after === getBoardEpoch()) setIndex(nextIndex);
     } catch (error) {
       toast.error("並び順を変更できませんでした", {
         description: String(error),
@@ -130,8 +137,8 @@ export function StatusSettings() {
     const epoch = getBoardEpoch();
     try {
       await statusDelete(target.id);
-      await reload(epoch);
-      if (getBoardEpoch() === epoch) setIndex(0);
+      const after = await reload(epoch);
+      if (after !== null && after === getBoardEpoch()) setIndex(0);
     } catch (error) {
       toast.error("ステータスを削除できませんでした", {
         description: String(error),

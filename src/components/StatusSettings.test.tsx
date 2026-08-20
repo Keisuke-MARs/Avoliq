@@ -205,6 +205,38 @@ describe("StatusSettings", () => {
     expect(selectBoard).not.toHaveBeenCalled();
   });
 
+  it("ステータス作成後、reload完走後の世代で選択が新規行へ移動する", async () => {
+    // reload()内部で本物のselectBoard(呼ぶたびにボード切替エポックを進める実装)を使い、
+    // commitCreate側が「呼び出し前に捕捉したepoch」ではなく「reload完走後のepoch」で
+    // 判定していることを確認する回帰テスト。
+    useAppStore.setState({ selectBoard: realSelectBoard });
+    const created: Status = {
+      id: "st-3",
+      boardId: "b1",
+      name: "保留",
+      color: "#8E8E93",
+      position: 2,
+    };
+    vi.mocked(api.statusCreate).mockResolvedValue(created);
+    vi.mocked(api.statusesList).mockResolvedValue([...statuses, created]);
+    vi.mocked(api.tasksList).mockResolvedValue([]);
+
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("n");
+    const input = screen.getByLabelText("新しいステータス名");
+    await user.type(input, "保留{Enter}");
+
+    expect(api.statusCreate).toHaveBeenCalledWith("b1", "保留", "#8E8E93");
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: /保留/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
+  });
+
   it("最後の1つのステータスは削除できない", async () => {
     useAppStore.setState({ statuses: [statuses[0]] });
     const user = userEvent.setup();
