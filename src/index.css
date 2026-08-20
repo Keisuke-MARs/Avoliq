@@ -175,3 +175,15 @@ body {
   font-size: 12px;
   color: #ff3b30;
 }
+
+/* BlockNoteのフォントをアプリ全体と揃える(設計書のUI原則: -apple-system固定) */
+.bn-root {
+  --bn-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans",
+    sans-serif;
+  --bn-border-radius: 8px;
+}
+
+.bn-root .bn-editor {
+  /* パレット内なので左右パディングを詰める(BlockNote既定の54pxは広すぎる) */
+  padding-inline: 0;
+}
