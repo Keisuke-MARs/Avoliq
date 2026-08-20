@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDebouncedSave } from "../hooks/useDebouncedSave";
 import { usePrefersDark } from "../hooks/usePrefersDark";
 import { registerDetailBridge } from "../lib/detailBridge";
+import { reflowStrayMarkdownTables } from "../lib/markdownTableFix";
 import { NEW_TASK_TITLE, useAppStore } from "../store/appStore";
 
 /**
@@ -62,7 +63,11 @@ export function TaskDetail() {
   useEffect(() => {
     if (task === null) return;
     loadingRef.current = true;
-    const blocks = editor.tryParseMarkdownToBlocks(task.contentMd);
+    // 手打ちテーブルが空行区切りの段落として保存されていた場合に備え、読込前に連結し直す
+    // (詳しくはreflowStrayMarkdownTablesのコメント参照)
+    const blocks = editor.tryParseMarkdownToBlocks(
+      reflowStrayMarkdownTables(task.contentMd),
+    );
     editor.replaceBlocks(
       editor.document,
       blocks.length > 0 ? blocks : [{ type: "paragraph" }],
