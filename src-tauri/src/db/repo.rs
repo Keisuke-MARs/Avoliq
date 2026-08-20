@@ -336,6 +336,24 @@ pub fn status_delete(conn: &mut Connection, id: &str) -> Result<()> {
     Ok(())
 }
 
+/// タスクのタイトル・本文を更新する（None の項目は変更しない）
+pub fn task_update(
+    conn: &mut Connection,
+    id: &str,
+    title: Option<&str>,
+    content_md: Option<&str>,
+) -> Result<Task> {
+    let current = task_by_id(conn, id)?;
+    let new_title = title.unwrap_or(&current.title);
+    let new_content = content_md.unwrap_or(&current.content_md);
+    conn.execute(
+        "UPDATE tasks SET title = ?2, content_md = ?3, updated_at = datetime('now')
+         WHERE id = ?1",
+        params![id, new_title, new_content],
+    )?;
+    task_by_id(conn, id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -574,5 +592,86 @@ mod tests {
             1,
             "失敗したので消えていないこと"
         );
+    }
+
+    #[test]
+    fn 新規タスクはレーン先頭に入る() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let todo_id = statuses[0].id.clone();
+
+        task_create(&mut conn, &board_id, &todo_id, "A").expect("作れること");
+        task_create(&mut conn, &board_id, &todo_id, "B").expect("作れること");
+        let newest = task_create(&mut conn, &board_id, &todo_id, "C").expect("作れること");
+
+        let tasks = tasks_list(&mut conn, &board_id).expect("一覧を取れること");
+        let titles: Vec<&str> = tasks.iter().map(|t| t.title.as_str()).collect();
+        let positions: Vec<i64> = tasks.iter().map(|t| t.position).collect();
+        assert_eq!(titles, vec!["C", "B", "A"]);
+        assert_eq!(positions, vec![0, 1, 2]);
+        assert_eq!(newest.position, 0);
+    }
+
+    #[test]
+    fn 新規タスクの本文は空文字で始まる() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+
+        let task = task_create(&mut conn, &board_id, &statuses[0].id, "新規")
+            .expect("作れること");
+
+        assert_eq!(task.content_md, "");
+        assert_eq!(task.title, "新規");
+        assert_eq!(task.status_id, statuses[0].id);
+        assert_eq!(task.board_id, board_id);
+    }
+
+    #[test]
+    fn レーンが違えばpositionは独立して0から始まる() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+
+        let a = task_create(&mut conn, &board_id, &statuses[0].id, "A").expect("作れること");
+        let b = task_create(&mut conn, &board_id, &statuses[1].id, "B").expect("作れること");
+
+        assert_eq!(a.position, 0);
+        assert_eq!(b.position, 0);
+    }
+
+    #[test]
+    fn タスクのタイトルだけ更新できる() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let task = task_create(&mut conn, &board_id, &statuses[0].id, "旧題")
+            .expect("作れること");
+
+        let updated = task_update(&mut conn, &task.id, Some("新題"), None)
+            .expect("更新できること");
+
+        assert_eq!(updated.title, "新題");
+        assert_eq!(updated.content_md, "");
+    }
+
+    #[test]
+    fn タスクの本文だけ更新できる() {
+        let (mut conn, board_id) = setup_board();
+        let statuses = statuses_list(&mut conn, &board_id).expect("一覧を取れること");
+        let task = task_create(&mut conn, &board_id, &statuses[0].id, "題")
+            .expect("作れること");
+
+        let updated = task_update(&mut conn, &task.id, None, Some("# 見出し\n本文"))
+            .expect("更新できること");
+
+        assert_eq!(updated.content_md, "# 見出し\n本文");
+        assert_eq!(updated.title, "題", "タイトルは変わらない");
+    }
+
+    #[test]
+    fn 存在しないタスクの更新はNotFoundになる() {
+        let (mut conn, _board_id) = setup_board();
+
+        let result = task_update(&mut conn, "no-such-id", Some("題"), None);
+
+        assert!(matches!(result, Err(RepoError::NotFound(_))));
     }
 }
