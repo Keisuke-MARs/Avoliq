@@ -135,6 +135,16 @@ CREATE TABLE schema_migrations (
   起動直後のemit取りこぼし対策として settings の `hotkeyError` キーにも書き込む
 - メインウィンドウのラベル: `main`
 
+## 非同期競合の防御規約（レビューサイクルで確立・変更禁止）
+
+- `appStore.ts` はモジュールスコープの **boardEpoch**（`getBoardEpoch()` でexport）を持ち、
+  `selectBoard` は**要求時点で同期的に**インクリメントする。await後の状態反映（set・トースト含む）は
+  すべて「開始時に捕捉したepoch === 現在のepoch」のときだけ行う
+- `selectBoard` 読込中は `boardLoading` フラグが立ち、ミューテーション系アクションは冒頭で即return
+- `selectBoard` 要求時に `lastDeletedTaskId` を同期クリア（⌘Z undoはボードローカルな操作）
+- UIのcommit系関数（BoardSwitcher / StatusSettings）は `submittingRef` で二重実行を防ぐ
+- 切替後に届いた古い応答のトースト・反映は黙って破棄する（意図した仕様）
+
 ## フロント側の追加固定名
 
 - `src/lib/boardNav.ts`: カーソル移動・レーン跨ぎの純関数置き場（ストアを太らせない）
@@ -188,7 +198,7 @@ interface AppState {
   lastDeletedTaskId: string | null;   // ⌘Z undo 用（直近1件）
 
   loadBoards(): Promise<void>;
-  selectBoard(boardId: string): Promise<void>;   // statuses/tasksも再読込
+  selectBoard(boardId: string): Promise<boolean>; // statuses/tasksも再読込。反映=true/失敗・追い越し=false
   setView(view: View): void;
   setSearchQuery(q: string): void;
   setSelectedTask(id: string | null): void;
