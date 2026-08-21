@@ -444,6 +444,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   async toggleTaskTag(tagId) {
     if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
+    // 注意: ここでは tagSubmitting をあえて見ていない。createTagAndAttach が
+    // tagSubmitting=true のまま内部でこのアクションを呼ぶため、対称性を取ろうとして
+    // 「タグの付け外しも二重実行防止フラグを見るべきでは」と ifを足すと、
+    // タグ作成後の自動アタッチだけが黙って弾かれる(タグは作られるのに選択中タスクへ付かない)
+    // という壊れ方をする。付け外し自体の連打防止は不要(冪等かつ楽観的更新で十分)なので、
+    // このアクションだけ tagSubmitting を見ない設計を維持すること。
     const { tasks, selectedTaskId, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const target = tasks.find((t) => t.id === selectedTaskId);
@@ -481,7 +487,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async createTagAndAttach(name) {
-    if (boardLoading) return;
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtags/tasksを触ってしまうので拒否する
     if (tagSubmitting) return; // 応答待ち中の⌘Enter連打による二重作成を防ぐ
     const { currentBoardId, selectedTaskId } = get();
     const trimmed = name.trim();
@@ -506,8 +512,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async renameTag(id, name) {
-    if (boardLoading) return;
-    if (tagSubmitting) return;
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtagsを触ってしまうので拒否する
+    if (tagSubmitting) return; // 応答待ち中の連打による二重改名を防ぐ
     const trimmed = name.trim();
     if (trimmed === "") return;
 
@@ -526,8 +532,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   async deleteTag(id) {
-    if (boardLoading) return;
-    if (tagSubmitting) return;
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtags/tasksを触ってしまうので拒否する
+    if (tagSubmitting) return; // 応答待ち中の連打による二重削除を防ぐ
 
     const epoch = boardEpoch;
     tagSubmitting = true;

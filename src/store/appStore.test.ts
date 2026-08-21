@@ -1160,6 +1160,59 @@ describe("appStore: タグ系ミューテーション", () => {
     expect(s.tasks.every((t) => !t.tagIds.includes("tag-bug"))).toBe(true);
   });
 
+  it("応答保留中に連打しても、tagCreateは1回しか呼ばれない(tagSubmittingを共有する二重実行防止)", async () => {
+    const created: Tag = {
+      id: "tag-new",
+      boardId: "board-1",
+      name: "新規",
+      color: "#E88A85",
+      position: 3,
+    };
+    let resolveCreate: (value: Tag) => void = () => {};
+    mocked.tagCreate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+    useAppStore.setState({ currentBoardId: "board-1", tasks, tags, selectedTaskId: null });
+
+    const first = useAppStore.getState().createTagAndAttach("新規");
+    const second = useAppStore.getState().createTagAndAttach("新規");
+
+    expect(mocked.tagCreate).toHaveBeenCalledTimes(1);
+
+    resolveCreate(created);
+    await first;
+    await second;
+
+    expect(mocked.tagCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("失敗してもtagSubmittingはfinallyで解放され、次の呼び出しは通る", async () => {
+    const renamed: Tag = {
+      id: "tag-bug",
+      boardId: "board-1",
+      name: "不具合",
+      color: "#7EA9E8",
+      position: 0,
+    };
+    mocked.tagRename.mockRejectedValueOnce(new Error("失敗"));
+    mocked.tagRename.mockResolvedValueOnce(renamed);
+    useAppStore.setState({ currentBoardId: "board-1", tags });
+
+    await useAppStore.getState().renameTag("tag-bug", "不具合");
+    expect(toast.error).toHaveBeenCalled();
+
+    await useAppStore.getState().renameTag("tag-bug", "不具合");
+
+    expect(mocked.tagRename).toHaveBeenCalledTimes(2);
+    expect(useAppStore.getState().tags[0]).toEqual(renamed);
+  });
+
+  // このテストはselectBoardの応答を意図的に解決させず、boardLoadingがtrueのまま
+  // 終わる。以降にこの状態へ依存しないテストが続かないよう、このdescribeブロックの
+  // 最後に置くこと(module-scopeのboardLoadingはvitestのclearMocks/beforeEachでは
+  // リセットされない)。
   it("ボード切替の読込中はタグの付け外しを受け付けない", async () => {
     mocked.statusesList.mockImplementation(() => new Promise(() => {}));
     mocked.tasksList.mockImplementation(() => new Promise(() => {}));
