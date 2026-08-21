@@ -29,11 +29,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -51,73 +46,142 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ============================================================
+   Avoliq カラートークン
+
+   色の実値（hex / oklch リテラル）はこのブロックにだけ置く。
+   shadcn 変数・BlockNote 変数・各コンポーネントは var(--av-*) を参照するだけにする。
+   設計書: docs/superpowers/specs/2026-08-21-avoliq-color-system-design.md
+   ============================================================ */
+
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* ---- 原色層（モード非依存。.dark でも上書きしない） ---- */
+  /* ブランド設計書3節のカラーシステム。hexは正典の値 */
+  --av-blue-300: oklch(0.7748 0.1179 252.36); /* #7DBAFF ダークでの青文字 */
+  --av-blue-500: oklch(0.6243 0.2056 255.49); /* #0A84FF Avoliq Blue（正典）文字を載せない塗り */
+  --av-blue-600: oklch(0.5615 0.1958 256.54); /* #0070E4 白文字を載せる塗り */
+  --av-blue-700: oklch(0.4947 0.1750 256.92); /* #005DC2 ライトでの青文字 */
+  --av-azure: oklch(0.7730 0.1263 242.75); /* #66BEFF Glass Azure。屈折のみ */
+  --av-violet: oklch(0.5818 0.2316 277.23); /* #615EFF Glass Violet。屈折のみ */
+
+  /* ---- 意味層（ライト） ---- */
+  --av-text-primary: oklch(0.2488 0.0542 259.67); /* #11213B Ink */
+  --av-text-secondary: oklch(0.4922 0.0434 258.35); /* #52627A Slate */
+  --av-text-muted: oklch(0.5764 0.0260 258.37); /* #707A89 装飾のみ。AAは保証しない */
+  --av-text-on-accent: oklch(1 0 0);
+
+  --av-glass-tint: oklch(0.9844 0.0045 258.32); /* #F8FAFD */
+  --av-glass-alpha-top: 0.64;
+  --av-glass-alpha-bottom: 0.56;
+  --av-glass-edge: oklch(0.2488 0.0542 259.67 / 0.10);
+  --av-glass-specular: oklch(1 0 0 / 0.75);
+  --av-glass-refract-azure: oklch(0.7730 0.1263 242.75 / 0.14);
+  --av-glass-refract-violet: oklch(0.5818 0.2316 277.23 / 0.10);
+
+  --av-hairline: oklch(0.2488 0.0542 259.67 / 0.10);
+  --av-surface-card: oklch(1 0 0 / 0.72);
+  --av-surface-card-hover: oklch(0.9546 0.0087 264.52 / 0.80);
+  --av-surface-raised: oklch(0.9909 0.0029 264.54); /* #FBFCFE 不透明 */
+  --av-surface-hover: oklch(0.2488 0.0542 259.67 / 0.05);
+  --av-surface-selected: oklch(0.2488 0.0542 259.67 / 0.08);
+
+  --av-accent: var(--av-blue-500);
+  --av-accent-solid: var(--av-blue-600);
+  --av-accent-text: var(--av-blue-700);
+  --av-accent-mix: 12%;
+  --av-focus-ring: var(--av-blue-500);
+
+  --av-danger: oklch(0.5439 0.2049 28.61); /* #CC211B */
+  --av-danger-solid: oklch(0.5439 0.2049 28.61);
+  --av-danger-subtle: color-mix(in srgb, var(--av-danger) 12%, transparent);
+  --av-success: oklch(0.6000 0.1550 147.50); /* #2B9845 */
+  --av-toggle-off: oklch(0.2488 0.0542 259.67 / 0.20);
+  --av-scrim: oklch(0.2488 0.0542 259.67 / 0.28);
+
+  --av-shadow:
+    0 24px 64px oklch(0.2488 0.0542 259.67 / 0.22),
+    0 2px 8px oklch(0.2488 0.0542 259.67 / 0.08);
+
+  /* Apple純正のイージング(macOSのウィンドウアニメーションに近い) */
+  --av-ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---- shadcn 変数（すべて --av-* への参照。実値は持たせない） ---- */
+  /* ウィンドウが透過なので背景は器（.av-glass）が持つ */
+  --background: transparent;
+  --foreground: var(--av-text-primary);
+  --card: var(--av-surface-raised);
+  --card-foreground: var(--av-text-primary);
+  --popover: var(--av-surface-raised);
+  --popover-foreground: var(--av-text-primary);
+  --primary: var(--av-accent-solid);
+  --primary-foreground: var(--av-text-on-accent);
+  --secondary: var(--av-surface-selected);
+  --secondary-foreground: var(--av-text-primary);
+  --muted: var(--av-surface-selected);
+  --muted-foreground: var(--av-text-secondary);
+  --accent: var(--av-surface-selected);
+  --accent-foreground: var(--av-text-primary);
+  --destructive: var(--av-danger);
+  --destructive-foreground: var(--av-text-on-accent);
+  --border: var(--av-hairline);
+  --input: var(--av-hairline);
+  --ring: var(--av-focus-ring);
+  --sidebar: var(--av-surface-raised);
+  --sidebar-foreground: var(--av-text-primary);
+  --sidebar-primary: var(--av-accent-solid);
+  --sidebar-primary-foreground: var(--av-text-on-accent);
+  --sidebar-accent: var(--av-surface-selected);
+  --sidebar-accent-foreground: var(--av-text-primary);
+  --sidebar-border: var(--av-hairline);
+  --sidebar-ring: var(--av-focus-ring);
+
+  /* ---- 旧トークンのエイリアス（Task 4で撤去する） ---- */
+  --st-palette-border: var(--av-hairline);
+  --st-text-primary: var(--av-text-primary);
+  --st-text-secondary: var(--av-text-secondary);
+  --st-text-tertiary: var(--av-text-muted);
+  --st-surface-hover: var(--av-surface-hover);
+  --st-surface-selected: var(--av-surface-selected);
+  --st-card-bg: var(--av-surface-card);
+  --st-card-hover-bg: var(--av-surface-card-hover);
+  --st-shadow: var(--av-shadow);
+  --st-ease: var(--av-ease);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --av-text-primary: oklch(0.9660 0.0062 255.48); /* #F1F4F8 */
+  --av-text-secondary: oklch(0.7741 0.0175 259.42); /* #AFB6C1 */
+  --av-text-muted: oklch(0.6606 0.0201 258.37); /* #8B939F */
+
+  --av-glass-tint: oklch(0.2160 0.0200 258.34); /* #141A23 */
+  --av-glass-alpha-top: 0.68;
+  --av-glass-alpha-bottom: 0.58;
+  --av-glass-edge: oklch(1 0 0 / 0.12);
+  --av-glass-specular: oklch(1 0 0 / 0.16);
+  --av-glass-refract-azure: oklch(0.7730 0.1263 242.75 / 0.10);
+  --av-glass-refract-violet: oklch(0.5818 0.2316 277.23 / 0.14);
+
+  --av-hairline: oklch(1 0 0 / 0.12);
+  --av-surface-card: oklch(0.3076 0.0199 260.64 / 0.62);
+  --av-surface-card-hover: oklch(0.3503 0.0214 259.39 / 0.72);
+  --av-surface-raised: oklch(0.2790 0.0187 258.37); /* #232932 不透明 */
+  --av-surface-hover: oklch(1 0 0 / 0.07);
+  --av-surface-selected: oklch(1 0 0 / 0.11);
+
+  --av-accent-text: var(--av-blue-300);
+  --av-accent-mix: 16%;
+
+  --av-danger: oklch(0.7073 0.1847 25.94); /* #FF6961 */
+  /* danger-solid は白文字を載せるのでライトと同じ暗い赤のまま */
+  --av-danger-solid: oklch(0.5439 0.2049 28.61);
+  --av-toggle-off: oklch(1 0 0 / 0.22);
+  --av-scrim: oklch(0 0 0 / 0.50);
+
+  --av-shadow:
+    0 24px 64px oklch(0 0 0 / 0.55),
+    0 2px 8px oklch(0 0 0 / 0.35);
 }
 
 @layer base {
@@ -147,39 +211,6 @@ body {
   /* パレットは文書ではないのでテキスト選択させない */
   user-select: none;
   overflow: hidden;
-}
-
-/* ============ Avoliq デザイントークン ============ */
-:root {
-  /* 背後のぼかしはネイティブ側(tauri.conf.jsonのwindowEffects=NSVisualEffectView)が担う。
-     ここはその上に乗せる色味だけなので、ぼかしが見える程度に薄くしておく */
-  --st-palette-bg: rgba(250, 250, 252, 0.6);
-  --st-palette-border: rgba(0, 0, 0, 0.08);
-  --st-text-primary: #1c1c1e;
-  --st-text-secondary: #6e6e73;
-  --st-text-tertiary: #a1a1a6;
-  --st-surface-hover: rgba(0, 0, 0, 0.04);
-  --st-surface-selected: rgba(0, 0, 0, 0.07);
-  --st-card-bg: #ffffff;
-  --st-card-hover-bg: #f5f5f7;
-  --st-shadow: 0 24px 64px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.08);
-  /* Apple純正のイージング(macOSのウィンドウアニメーションに近い) */
-  --st-ease: cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --st-palette-bg: rgba(28, 28, 30, 0.55);
-    --st-palette-border: rgba(255, 255, 255, 0.1);
-    --st-text-primary: #f5f5f7;
-    --st-text-secondary: #a1a1a6;
-    --st-text-tertiary: #6e6e73;
-    --st-surface-hover: rgba(255, 255, 255, 0.06);
-    --st-surface-selected: rgba(255, 255, 255, 0.1);
-    --st-card-bg: #2c2c2e;
-    --st-card-hover-bg: #3a3a3c;
-    --st-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
 }
 
 /* ============ パレットの出現/消失 ============ */
