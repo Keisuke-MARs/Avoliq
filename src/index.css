@@ -63,8 +63,12 @@
   --av-blue-500: oklch(0.6243 0.2056 255.49); /* #0A84FF Avoliq Blue（正典）文字を載せない塗り */
   --av-blue-600: oklch(0.5615 0.1958 256.54); /* #0070E4 白文字を載せる塗り */
   --av-blue-700: oklch(0.4947 0.1750 256.92); /* #005DC2 ライトでの青文字 */
-  --av-azure: oklch(0.7730 0.1263 242.75); /* #66BEFF Glass Azure。屈折のみ */
-  --av-violet: oklch(0.5818 0.2316 277.23); /* #615EFF Glass Violet。屈折のみ */
+  /* Glass Azure / Glass Violet は屈折にしか使わず、light/dark でアルファだけが変わる。
+     成分（L C H）をトークンに持たせることで、色相を調整したときに
+     4箇所の屈折値が自動で追随する。color-mix を使うと非対応環境向けの
+     フォールバックが「不透明な原色」になってしまうため、この形にしている */
+  --av-azure-lch: 0.7730 0.1263 242.75; /* #66BEFF Glass Azure */
+  --av-violet-lch: 0.5818 0.2316 277.23; /* #615EFF Glass Violet */
 
   /* ---- 意味層（ライト） ---- */
   --av-text-primary: oklch(0.2488 0.0542 259.67); /* #11213B Ink */
@@ -77,8 +81,8 @@
   --av-glass-alpha-bottom: 0.56;
   --av-glass-edge: oklch(0.2488 0.0542 259.67 / 0.10);
   --av-glass-specular: oklch(1 0 0 / 0.75);
-  --av-glass-refract-azure: oklch(0.7730 0.1263 242.75 / 0.14);
-  --av-glass-refract-violet: oklch(0.5818 0.2316 277.23 / 0.10);
+  --av-glass-refract-azure: oklch(var(--av-azure-lch) / 0.14);
+  --av-glass-refract-violet: oklch(var(--av-violet-lch) / 0.10);
 
   --av-hairline: oklch(0.2488 0.0542 259.67 / 0.10);
   --av-surface-card: oklch(1 0 0 / 0.72);
@@ -153,8 +157,9 @@
   --av-glass-alpha-bottom: 0.58;
   --av-glass-edge: oklch(1 0 0 / 0.12);
   --av-glass-specular: oklch(1 0 0 / 0.16);
-  --av-glass-refract-azure: oklch(0.7730 0.1263 242.75 / 0.10);
-  --av-glass-refract-violet: oklch(0.5818 0.2316 277.23 / 0.14);
+  /* ダークでは Azure を薄く、Violet を濃くして奥行きを出す（ライトと逆） */
+  --av-glass-refract-azure: oklch(var(--av-azure-lch) / 0.10);
+  --av-glass-refract-violet: oklch(var(--av-violet-lch) / 0.14);
 
   --av-hairline: oklch(1 0 0 / 0.12);
   --av-surface-card: oklch(0.3076 0.0199 260.64 / 0.62);

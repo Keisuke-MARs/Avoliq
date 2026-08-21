@@ -119,8 +119,17 @@ CSS 変数だけ旧名が残るのは一貫性を欠く。
 | `--av-blue-500` | `oklch(0.6243 0.2056 255.49)` | `#0A84FF` | **Avoliq Blue（正典）**。文字を載せない塗り |
 | `--av-blue-600` | `oklch(0.5615 0.1958 256.54)` | `#0070E4` | 白文字を載せる塗り |
 | `--av-blue-700` | `oklch(0.4947 0.1750 256.92)` | `#005DC2` | ライトでの青文字 |
-| `--av-azure` | `oklch(0.7730 0.1263 242.75)` | `#66BEFF` | Glass Azure。屈折のみ |
-| `--av-violet` | `oklch(0.5818 0.2316 277.23)` | `#615EFF` | Glass Violet。屈折のみ |
+| `--av-azure-lch` | `0.7730 0.1263 242.75`（oklch の成分） | `#66BEFF` | Glass Azure。屈折のみ |
+| `--av-violet-lch` | `0.5818 0.2316 277.23`（oklch の成分） | `#615EFF` | Glass Violet。屈折のみ |
+
+Glass Azure / Glass Violet は**屈折にしか使わず、ライト／ダークでアルファだけが変わる**。
+色そのものではなく **oklch の成分（L C H）をトークンに持たせる**ことで、
+色相を調整したときに4箇所の屈折値が自動で追随する。
+
+`color-mix(in srgb, var(--av-azure) 14%, transparent)` でも同じ効果は得られるが、
+ビルド時に `color-mix` 非対応環境向けのフォールバックとして
+`--av-glass-refract-azure: var(--av-azure)`（＝**不透明な原色**）が出力されてしまう。
+到達しないパスではあるが、元は常に正しかった値を壊れうる形にする理由がないため、成分方式を採る。
 
 #### アクセント青を3階調に分ける理由
 
@@ -166,8 +175,8 @@ Slate は現行 secondary より**暗い**（L .4922 対 .5399）。
 | `--av-glass-alpha-bottom` | ガラス下端の不透明度 | `0.56` | `0.58` | 同上 |
 | `--av-glass-edge` | 縁の線 | `oklch(0.2488 0.0542 259.67 / 0.10)` | `oklch(1 0 0 / 0.12)` | `.av-glass` border |
 | `--av-glass-specular` | 上端スペキュラー | `oklch(1 0 0 / 0.75)` | `oklch(1 0 0 / 0.16)` | inset box-shadow |
-| `--av-glass-refract-azure` | 屈折（上／縁） | `oklch(0.7730 0.1263 242.75 / 0.14)` | `oklch(0.7730 0.1263 242.75 / 0.10)` | inset box-shadow |
-| `--av-glass-refract-violet` | 屈折（下／奥行き） | `oklch(0.5818 0.2316 277.23 / 0.10)` | `oklch(0.5818 0.2316 277.23 / 0.14)` | inset box-shadow |
+| `--av-glass-refract-azure` | 屈折（上／縁） | `color-mix(in srgb, var(--av-azure) 14%, transparent)` | `…10%…` | inset box-shadow |
+| `--av-glass-refract-violet` | 屈折（下／奥行き） | `color-mix(in srgb, var(--av-violet) 10%, transparent)` | `…14%…` | inset box-shadow |
 | `--av-hairline` | 区切り線・枠 | `oklch(0.2488 0.0542 259.67 / 0.10)` | `oklch(1 0 0 / 0.12)` | SearchBar 下線, Footer 上線, kbd 枠, 空レーン枠 |
 | `--av-surface-card` | タスクカード面 | `oklch(1 0 0 / 0.72)` | `oklch(0.3076 0.0199 260.64 / 0.62)` | `.av-card` |
 | `--av-surface-card-hover` | カード hover | `oklch(0.9546 0.0087 264.52 / 0.80)` | `oklch(0.3503 0.0214 259.39 / 0.72)` | `.av-card:hover` |
