@@ -259,10 +259,14 @@ export function TagPalette() {
                 aria-checked={row.attached}
                 data-testid="tag-palette-row"
                 data-highlighted={highlighted ? "true" : "false"}
-                // mousedownのデフォルト動作(フォーカス移動)を止め、入力欄のフォーカスを死守する。
-                // ただし改名中の行では、改名入力欄へ普通にクリック・カーソル移動できてほしいので外す。
+                // mousedownのデフォルト動作(フォーカス移動)を止め、今のフォーカス
+                // (検索入力欄 or 改名入力欄)を死守する。自分自身が改名中の行のときだけ外し、
+                // 改名入力欄へ普通にクリック・カーソル移動できるようにする。
                 onMouseDown={renamingId === row.tag.id ? undefined : (e) => e.preventDefault()}
-                onClick={renamingId === row.tag.id ? undefined : () => handleRowActivate(row.tag.id)}
+                // クリックでのトグルは list モードのときだけ。
+                // 「自分が改名中の行か」ではなく「今何らかの行が改名中か」で止めるのが重要
+                // (でないと改名中に別の行をクリックしてトグルが走ってしまう)。
+                onClick={mode === "list" ? () => handleRowActivate(row.tag.id) : undefined}
                 className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1 text-[12px] ${
                   highlighted ? "st-row-selected" : ""
                 }`}
@@ -316,7 +320,7 @@ export function TagPalette() {
           })}
         </div>
 
-        {canCreate && (
+        {canCreate && mode === "list" && (
           <div
             data-testid="tag-palette-create"
             onMouseDown={(e) => e.preventDefault()}

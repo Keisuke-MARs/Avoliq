@@ -277,4 +277,46 @@ describe("TagPalette: 作成・改名・削除", () => {
     await user.keyboard("{Escape}");
     expect(close).toHaveBeenCalled();
   });
+
+  it("改名中に別の行をクリックしてもトグルされず、改名モードも壊れずキーボード操作を続けられる", async () => {
+    const toggle = vi.fn();
+    const close = vi.fn();
+    useAppStore.setState({ toggleTaskTag: toggle, closeTagPalette: close });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    // 未付与順は使用件数降順で [バグ, 緊急, 設計]。ハイライトは先頭の「バグ」
+    await user.keyboard("{Meta>}r{/Meta}");
+    expect(screen.getByTestId("tag-palette-rename-input")).toBeInTheDocument();
+
+    // 改名中に別の行(緊急)をクリックしても無視されること
+    await user.click(screen.getByRole("option", { name: /緊急/ }));
+    expect(toggle).not.toHaveBeenCalled();
+
+    // 改名モードが壊れていないこと(改名入力欄がまだ残っている)
+    expect(screen.getByTestId("tag-palette-rename-input")).toBeInTheDocument();
+
+    // 改名をEscで取り消したあと、キーボード操作(Escでパレットを閉じる)が続けられること
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("tag-palette-rename-input")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(close).toHaveBeenCalled();
+  });
+
+  it("改名中は作成行が出ない(誤って作成されない)", async () => {
+    const create = vi.fn();
+    useAppStore.setState({ createTagAndAttach: create });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    // 部分一致で「バグ」が残りつつ完全一致は無いので、作成行が出る状態を作る
+    await user.type(screen.getByTestId("tag-palette-input"), "バ");
+    expect(screen.getByTestId("tag-palette-create")).toBeInTheDocument();
+
+    // クエリを残したまま改名モードへ入る
+    await user.keyboard("{Meta>}r{/Meta}");
+
+    expect(screen.queryByTestId("tag-palette-create")).not.toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+  });
 });
