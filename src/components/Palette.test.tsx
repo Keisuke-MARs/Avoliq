@@ -174,12 +174,11 @@ describe("Palette: 検索と新規作成", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("task-card")).toHaveLength(2);
     });
-    // フィクスチャの牛乳を買う/牛丼を食べるにはタグが付いているため、
-    // タイトルに続けてタグチップの文字列も textContent に含まれる
-    expect(screen.getAllByTestId("task-card").map((c) => c.textContent)).toEqual([
-      "牛乳を買うバグ",
-      "牛丼を食べるバグ緊急",
-    ]);
+    // textContentはタグチップの文字列も含んでしまい、絞り込みの検証意図と無関係な変更（タグ名やチップ構造の変更）
+    // で壊れやすいため、絞り込み結果の同一性は data-task-id で確認する（牛乳を買う=t-a / 牛丼を食べる=t-c）
+    expect(
+      screen.getAllByTestId("task-card").map((c) => c.dataset.taskId),
+    ).toEqual(["t-a", "t-c"]);
   });
 
   it("絞り込みで選択中のカードが消えたら選択が外れる", async () => {
