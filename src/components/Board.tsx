@@ -29,7 +29,7 @@ export function Board() {
           タスクはまだありません
         </p>
         <p className="text-xs" style={{ color: "var(--st-text-tertiary)" }}>
-          タスク名を入力して Enter で作成できます
+          タスク名を入力して Enter を2回で作成できます
         </p>
       </div>
     );

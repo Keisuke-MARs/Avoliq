@@ -33,6 +33,23 @@ function isPrintableKey(e: KeyboardEvent): boolean {
   return e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey;
 }
 
+/**
+ * ボード画面のEnterを二度押しにするための待機状態。
+ * 日本語IMEでは変換確定のEnterが isComposing=false のまま届くことがあり
+ * (WebKitはcompositionendがkeydownより先に出る)、変換を確定しただけのつもりで
+ * 作成/詳細遷移まで走ってしまう。そこで1回目のEnterは「待機」に留め、
+ * 同じ状態のまま2回目が来たときだけ実行する。
+ * 保持する値は待機した時点のボード状態(選択タスク+検索文字列)。
+ * 状態が変わっていたら別物とみなして、また1回目からやり直す。
+ */
+let pendingEnterContext: string | null = null;
+
+/** Enter待機の同一性を判定するためのキー。選択タスクと検索文字列の組で表す */
+function enterContext(s: AppState): string {
+  // 入力に現れないNUL文字で区切り、id末尾と検索文字列先頭の取り違えを防ぐ
+  return `${s.selectedTaskId ?? ""}\u0000${s.searchQuery}`;
+}
+
 /** ⌘付きのショートカット。処理したら true を返す */
 function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
   switch (e.key) {
@@ -91,6 +108,9 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
 
 /** ボード画面のキーマップ */
 function handleBoardKey(e: KeyboardEvent, s: AppState): void {
+  // Enter以外のキーが来た時点で、続けて2回押されたとは言えないので待機を解除する
+  if (e.key !== "Enter") pendingEnterContext = null;
+
   if (e.metaKey) {
     if (handleMetaKey(e, s)) e.preventDefault();
     return;
@@ -111,6 +131,15 @@ function handleBoardKey(e: KeyboardEvent, s: AppState): void {
     }
     case "Enter": {
       e.preventDefault();
+      // キーリピート(押しっぱなし)は「2回押した」とは言えないので待機も実行もしない
+      if (e.repeat) return;
+      const context = enterContext(s);
+      if (pendingEnterContext !== context) {
+        // 1回目。IMEの変換確定Enterの可能性があるので、ここでは何も実行しない
+        pendingEnterContext = context;
+        return;
+      }
+      pendingEnterContext = null;
       if (s.selectedTaskId !== null) {
         s.setView("detail");
         return;
@@ -218,9 +247,14 @@ function handleDetailKey(event: KeyboardEvent): void {
  */
 export function useKeyboard(): void {
   useEffect(() => {
+    // 前回のマウント時に残ったEnter待機を引き継がない
+    pendingEnterContext = null;
+
     function onKeyDown(e: KeyboardEvent) {
-      // IME変換中のキーは一切拾わない
-      if (e.isComposing || e.key === "Process") return;
+      // IME変換中のキーは一切拾わない。
+      // keyCode 229 は「IMEが処理中」を表す旧来の合図で、isComposingを立てない環境でも
+      // 変換確定のEnterがこれで届くことがあるため、同じくIME由来として捨てる。
+      if (e.isComposing || e.key === "Process" || e.keyCode === 229) return;
 
       const state = useAppStore.getState();
       if (state.view === "board") {
@@ -235,7 +269,26 @@ export function useKeyboard(): void {
       // (stopPropagationでここへは届かない前提。届いても二重処理しない)
     }
 
+    /**
+     * Enterの1回目を持ち越さない区切り。
+     * キー操作(Enter以外)は handleBoardKey 側で解除しているので、ここではそれ以外の
+     * 「操作が途切れた」合図を拾う: ウィンドウのフォーカス喪失(パレットを閉じた/他アプリへ)と、
+     * マウス・タッチ操作(パレット内のどこかを触った)。
+     * 時間で切らないのは、「押しても何も起きん→もう一度押す」という気づきの流れを
+     * 潰さないため(短い制限だと、ゆっくり押す人には何度押しても作成できなくなる)。
+     */
+    function discardPendingEnter() {
+      pendingEnterContext = null;
+    }
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("blur", discardPendingEnter);
+    // capture段で拾い、途中でstopPropagationされても取りこぼさない
+    window.addEventListener("pointerdown", discardPendingEnter, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("blur", discardPendingEnter);
+      window.removeEventListener("pointerdown", discardPendingEnter, true);
+    };
   }, []);
 }
