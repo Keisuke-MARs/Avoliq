@@ -41,7 +41,7 @@ const statuses: Status[] = [
     id: "st-2",
     boardId: "board-1",
     name: "進行中",
-    color: "#007AFF",
+    color: "#5AC8FA",
     position: 1,
   },
 ];

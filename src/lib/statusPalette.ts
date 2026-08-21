@@ -1,16 +1,15 @@
+import presets from "../../design/status-presets.json";
+
 /**
  * ステータス色のプリセットパレット。
- * macOSのシステムカラーに合わせ、デフォルトステータス4色を先頭に置く。
+ *
+ * 実値は design/status-presets.json が唯一のソースで、Rust 側のデフォルトステータスも
+ * 同じファイルを読む。片方だけ変えてズレることが構造的に起きないようにするため。
+ * 先頭4件が新規ボードのデフォルトステータスの色になる。
+ *
+ * macOSのシステムカラーを踏襲するが、ブランドの行動色 #0A84FF と見分けがつかない
+ * #007AFF は入れない（選択状態とステータスが混同されるため）。
  */
-export const STATUS_COLORS = [
-  { name: "グレー", value: "#8E8E93" },
-  { name: "ブルー", value: "#007AFF" },
-  { name: "オレンジ", value: "#FF9500" },
-  { name: "グリーン", value: "#34C759" },
-  { name: "レッド", value: "#FF3B30" },
-  { name: "パープル", value: "#AF52DE" },
-  { name: "ピンク", value: "#FF2D55" },
-  { name: "ティール", value: "#5AC8FA" },
-] as const;
+export const STATUS_COLORS: readonly { name: string; value: string }[] = presets;
 
-export type StatusColor = (typeof STATUS_COLORS)[number]["value"];
+export type StatusColor = string;

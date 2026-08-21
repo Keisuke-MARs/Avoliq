@@ -7,13 +7,33 @@ use uuid::Uuid;
 
 use super::{Board, RepoError, Result, Status, Task};
 
-/// 新規ボード作成時に自動投入するデフォルトステータス（name, color）。並び順は配列の順。
-pub const DEFAULT_STATUSES: &[(&str, &str)] = &[
-    ("未着手", "#8E8E93"),
-    ("進行中", "#007AFF"),
-    ("確認中", "#FF9500"),
-    ("完了", "#34C759"),
-];
+/// ステータス色プリセット（design/status-presets.json）の1件。
+/// TS側の STATUS_COLORS と同じファイルを読むことで、色のズレを構造的に防ぐ。
+#[derive(serde::Deserialize)]
+struct StatusPreset {
+    /// TS側の色ピッカーのラベルに使う。Rust側では色だけ使うので読み捨てる
+    #[allow(dead_code)]
+    name: String,
+    value: String,
+}
+
+/// プリセットのJSON。コンパイル時に埋め込むので実行時のI/Oは無い。
+const STATUS_PRESETS_JSON: &str = include_str!("../../../design/status-presets.json");
+
+/// 新規ボードのデフォルトステータス名。色はプリセットの先頭4件を順に使う。
+const DEFAULT_STATUS_NAMES: [&str; 4] = ["未着手", "進行中", "確認中", "完了"];
+
+/// 新規ボード作成時に自動投入するデフォルトステータス（name, color）。
+/// 名前はRust側、色はプリセットの先頭4件。並び順は配列の順。
+fn default_statuses() -> Vec<(String, String)> {
+    let presets: Vec<StatusPreset> = serde_json::from_str(STATUS_PRESETS_JSON)
+        .expect("design/status-presets.json のパースに失敗しました");
+    DEFAULT_STATUS_NAMES
+        .iter()
+        .zip(presets.into_iter())
+        .map(|(name, preset)| (name.to_string(), preset.value))
+        .collect()
+}
 
 /// 新しいUUID文字列を作る
 fn new_id() -> String {
@@ -86,10 +106,10 @@ pub fn board_create(conn: &mut Connection, name: &str) -> Result<Board> {
         "INSERT INTO boards (id, name, position) VALUES (?1, ?2, ?3)",
         params![&board_id, name, next_position],
     )?;
-    for (index, (status_name, color)) in DEFAULT_STATUSES.iter().enumerate() {
+    for (index, (status_name, color)) in default_statuses().iter().enumerate() {
         tx.execute(
             "INSERT INTO statuses (id, board_id, name, color, position) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![new_id(), &board_id, *status_name, *color, index as i64],
+            params![new_id(), &board_id, status_name, color, index as i64],
         )?;
     }
     tx.commit()?;
@@ -556,12 +576,21 @@ mod tests {
             actual,
             vec![
                 ("未着手", "#8E8E93", 0),
-                ("進行中", "#007AFF", 1),
+                ("進行中", "#5AC8FA", 1),
                 ("確認中", "#FF9500", 2),
                 ("完了", "#34C759", 3),
             ]
         );
         assert!(statuses.iter().all(|s| s.board_id == board.id));
+    }
+
+    #[test]
+    fn default_statuses_はプリセットの先頭4件を返す() {
+        let defaults = default_statuses();
+        assert_eq!(defaults.len(), 4);
+        assert_eq!(defaults[0], ("未着手".to_string(), "#8E8E93".to_string()));
+        // ここは design/status-presets.json の2件目と一致する必要がある
+        assert_eq!(defaults[1].1, "#5AC8FA");
     }
 
     #[test]

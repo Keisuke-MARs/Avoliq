@@ -46,7 +46,7 @@ describe("Board", () => {
     render(<Board />);
     const dot = screen.getAllByTestId("lane")[1].querySelector(".av-status-dot");
     expect(dot).not.toBeNull();
-    expect((dot as HTMLElement).style.getPropertyValue("--av-status")).toBe("#007AFF");
+    expect((dot as HTMLElement).style.getPropertyValue("--av-status")).toBe("#5AC8FA");
   });
 
   it("カードをposition順に並べる", () => {
