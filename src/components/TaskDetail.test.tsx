@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Board, Status, Task } from "../types";
@@ -164,7 +164,7 @@ describe("TaskDetail", () => {
   });
 
   describe("タイトル入力でのEnter/Tab", () => {
-    it("Enterで本文エディタへフォーカスが移る", async () => {
+    it("Enter1回では本文へ移らない(日本語入力の変換確定Enter対策)", async () => {
       const user = userEvent.setup();
       render(<TaskDetail />);
       editorFocus.mockClear();
@@ -173,7 +173,94 @@ describe("TaskDetail", () => {
       input.focus();
       await user.keyboard("{Enter}");
 
+      expect(editorFocus).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(input);
+    });
+
+    it("Enter2回で本文エディタへフォーカスが移る", async () => {
+      const user = userEvent.setup();
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く");
+      input.focus();
+      await user.keyboard("{Enter}{Enter}");
+
       expect(editorFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it("1回目のEnterのあとに文字を打ったら、また1回目からやり直しになる", async () => {
+      const user = userEvent.setup();
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く");
+      input.focus();
+      await user.keyboard("{Enter}");
+      // 変換確定のあと続けて入力した場合。古い1回目と組にならないこと
+      await user.keyboard("あ");
+      await user.keyboard("{Enter}");
+
+      expect(editorFocus).not.toHaveBeenCalled();
+    });
+
+    it("IME変換中のEnterは1回目にも数えない", async () => {
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く");
+      input.focus();
+      // 変換中(isComposing)のEnterと、IME処理中を示すkeyCode 229のEnter
+      fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+      fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(editorFocus).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(editorFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it("1回目のEnterのあとIME変換を挟んだら(取り消して値が変わらなくても)やり直しになる", async () => {
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く") as HTMLInputElement;
+      input.focus();
+      fireEvent.keyDown(input, { key: "Enter" });
+      // 変換を始めて取り消したケース。値が変わらないのでonChangeは来ない
+      fireEvent.keyDown(input, { key: "a", isComposing: true });
+      fireEvent.keyDown(input, { key: "Escape", isComposing: true });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(editorFocus).not.toHaveBeenCalled();
+    });
+
+    it("1回目のEnterのあとタイトル欄から離れて戻ったら、また1回目からやり直しになる", async () => {
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く") as HTMLInputElement;
+      input.focus();
+      fireEvent.keyDown(input, { key: "Enter" });
+      // ヘッダーのボタンを押すなどでフォーカスが外れ、その後タイトルへ戻ったケース
+      input.blur();
+      input.focus();
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(editorFocus).not.toHaveBeenCalled();
+    });
+
+    it("キーリピート(押しっぱなし)のEnterは2回目として扱わない", async () => {
+      render(<TaskDetail />);
+      editorFocus.mockClear();
+
+      const input = screen.getByDisplayValue("設計書を書く");
+      input.focus();
+      fireEvent.keyDown(input, { key: "Enter" });
+      fireEvent.keyDown(input, { key: "Enter", repeat: true });
+
+      expect(editorFocus).not.toHaveBeenCalled();
     });
 
     it("Tabで本文エディタへフォーカスが移る", async () => {

@@ -30,6 +30,14 @@ export function TaskDetail() {
 
   const [title, setTitle] = useState(task?.title ?? "");
   const titleRef = useRef<HTMLInputElement>(null);
+  /**
+   * タイトル欄でEnterを1回受けたかどうか。
+   * 日本語入力では変換確定のEnterが isComposing を立てずに届くことがあり
+   * (WebKitはcompositionendをkeydownより先に出す)、変換を確定しただけのつもりで
+   * 本文へフォーカスが飛んでしまう。そこでEnterは2回続けて押されたときだけ本文へ移す。
+   * 間に入力(変換確定を含む)や他のキーが挟まったら、また1回目からやり直す。
+   */
+  const titleEnterArmedRef = useRef(false);
   const isDark = usePrefersDark();
 
   // エディタのUI文言(スラッシュメニュー・プレースホルダ等)を日本語にする
@@ -175,13 +183,50 @@ export function TaskDetail() {
         onChange={(event) => {
           setTitle(event.target.value);
           titleSave.schedule(event.target.value);
+          // 文字が入った(変換が確定した)時点で、直前のEnterとは連続していない
+          titleEnterArmedRef.current = false;
+        }}
+        onBlur={() => {
+          // 一度タイトル欄から離れたら「続けて2回」ではないので待機を捨てる
+          // (ステータスボタンを押して戻ってきた場合など)
+          titleEnterArmedRef.current = false;
         }}
         onKeyDown={(event) => {
-          // Enter/Tabで本文へ入力を続けられるようにする(⌘Tで再度タイトルへ往復できる)
-          if (event.key === "Enter" || (event.key === "Tab" && !event.shiftKey)) {
-            event.preventDefault();
-            editor.focus();
+          // IMEが処理中のキーでは何も起こさない。keyCode 229 は isComposing を立てない
+          // 環境での合図。待機は捨てる: 変換を始めた/取り消した時点で直前のEnterとは
+          // 連続していないため(取り消しは値が変わらずonChangeが来ないので、ここで捨てる)。
+          // なお、変換確定のEnterがこの枝に入る環境では確定直後にinput(onChange)が続き、
+          // どのみち待機は解除される。ここで「1回目」として数えても押下回数は変わらない
+          if (event.nativeEvent.isComposing || event.keyCode === 229) {
+            titleEnterArmedRef.current = false;
+            return;
           }
+
+          // Tabは日本語入力と無関係なので従来どおり1回で本文へ移す
+          if (event.key === "Tab" && !event.shiftKey) {
+            event.preventDefault();
+            titleEnterArmedRef.current = false;
+            editor.focus();
+            return;
+          }
+
+          if (event.key !== "Enter") {
+            titleEnterArmedRef.current = false;
+            return;
+          }
+
+          // Enterで改行やフォームの送信をさせない(タイトルは1行)
+          event.preventDefault();
+          // キーリピート(押しっぱなし)は2回押しに数えない
+          if (event.repeat) return;
+          if (!titleEnterArmedRef.current) {
+            // 1回目。変換確定のEnterの可能性があるのでここでは移動しない
+            titleEnterArmedRef.current = true;
+            return;
+          }
+          // 2回目。本文へ入力を続けられるようにする(⌘Tで再度タイトルへ往復できる)
+          titleEnterArmedRef.current = false;
+          editor.focus();
         }}
         aria-label="タスクのタイトル"
         placeholder="タイトルを入力"
