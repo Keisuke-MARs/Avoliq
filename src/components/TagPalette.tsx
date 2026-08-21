@@ -33,6 +33,16 @@ export function TagPalette() {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  /** IME変換中かどうか。変換中はハイライトを外してEnterの着地点を消す */
+  const composingRef = useRef(false);
+  /**
+   * 「次のkeydownがEnterなら1回だけ無視する」フラグ。
+   * WebKitは compositionend を keydown より先に発火するため、isComposing だけでは
+   * 変換確定のEnterを取りこぼす(TaskDetailのタイトル欄が過去にこれで事故った)。
+   * 時間ではなく「次の1イベント」に依存させるので確実。待機はどのキーでも解除する
+   * (確定後に別のキーを打てば、次のEnterは通常どおり効く)。
+   */
+  const swallowEnterRef = useRef(false);
 
   const task = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
@@ -71,15 +81,22 @@ export function TagPalette() {
     confirmDeleteId !== null ? "confirm-delete" : renamingId !== null ? "rename" : "list";
 
   // 絞り込み文字列が変わったときは「今どこにいたか」より予測しやすさを優先し、常に先頭へ戻す
-  // (候補が0件になったら着地点なしにする)
+  // (候補が0件になったら着地点なしにする)。
+  // ただし変換中はIME入力のたびにqueryが変化するため、ここで先頭へ戻すと
+  // onCompositionStartで消したはずの着地点(null)が変換の途中で復活してしまう。
+  // 着地点の管理は変換中だけonCompositionStart/Endに任せ、ここでは何もしない。
   useEffect(() => {
+    if (composingRef.current) return;
     setHighlightId(rows[0]?.tag.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
   // トグルによる並び替えなど、クエリ以外の理由でrowsが変わった場合は、
-  // ハイライト中のタグがまだ候補に残っていればそのまま追随させ、消えたときだけ先頭へ戻す
+  // ハイライト中のタグがまだ候補に残っていればそのまま追随させ、消えたときだけ先頭へ戻す。
+  // これも変換中は素通りさせる。変換中はhighlightIdがnullなのが正常な状態であり、
+  // ここで「消えたので先頭へ戻す」と判定して復活させてしまうと着地点消しが台無しになる。
   useEffect(() => {
+    if (composingRef.current) return;
     if (highlightId !== null && rows.some((row) => row.tag.id === highlightId)) return;
     setHighlightId(rows[0]?.tag.id ?? null);
   }, [rows, highlightId]);
@@ -119,6 +136,24 @@ export function TagPalette() {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     // window側のハンドラへ漏らさない（useKeyboard 側でも tagPaletteOpen で止めているが二重に守る）
     event.stopPropagation();
+
+    // IMEが処理中のキーは一切拾わない。keyCode 229 は isComposing を立てない環境の合図。
+    // ⌘Enter(作成)や⌘⌫(削除)を含む全キーに効かせる。修飾キー付きだからIMEが生成できない
+    // というだけで、変換の最中にたまたま同じ物理キーが押される可能性は消せないため
+    // (例: 変換中にユーザーが誤って⌘を押しながら確定しようとした場合など)。
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+
+    // 変換確定の直後に届くEnterを1回だけ飲み込む。
+    // WebKitは compositionend を keydown より先に発火するため、上のisComposingガードだけでは
+    // 変換確定のEnterを取りこぼす。待機はどのキーでも解除するので、確定後に別のキーを
+    // 打てば次のEnterは通常どおり効く。
+    if (swallowEnterRef.current) {
+      swallowEnterRef.current = false;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        return;
+      }
+    }
 
     if (event.key === "Escape") {
       event.preventDefault();
@@ -232,6 +267,17 @@ export function TagPalette() {
           aria-activedescendant={activeOptionId}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onCompositionStart={() => {
+            composingRef.current = true;
+            // 変換中はEnterの着地点そのものを消す。これで変換確定Enterが万一漏れても何も起きない
+            setHighlightId(null);
+          }}
+          onCompositionEnd={() => {
+            composingRef.current = false;
+            // 直後に届くかもしれない変換確定のEnterを1回だけ飲み込む準備をする
+            swallowEnterRef.current = true;
+            setHighlightId(rows[0]?.tag.id ?? null);
+          }}
           autoComplete="off"
           spellCheck={false}
           placeholder="タグ名を入力"

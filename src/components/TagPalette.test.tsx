@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TagPalette } from "@/components/TagPalette";
@@ -342,5 +342,110 @@ describe("TagPalette: 作成・改名・削除", () => {
     // フォーカスが残っていれば、Escapeで改名を取り消せる
     await user.keyboard("{Escape}");
     expect(screen.queryByTestId("tag-palette-rename-input")).not.toBeInTheDocument();
+  });
+});
+
+describe("TagPalette: IME防御", () => {
+  beforeEach(() => {
+    setup();
+    vi.restoreAllMocks();
+  });
+
+  it("IME変換中はハイライトが外れ、Enterの着地点が無くなる", () => {
+    const toggle = vi.fn();
+    useAppStore.setState({ toggleTaskTag: toggle });
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    fireEvent.compositionStart(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(toggle).not.toHaveBeenCalled();
+    // 候補行が複数あるため queryByTestId は使えない(複数マッチで例外になる)。
+    // どの行もハイライトを外れていることを確認する
+    const rows = screen.getAllByTestId("tag-palette-row");
+    expect(rows.every((row) => row.dataset.highlighted === "false")).toBe(true);
+  });
+
+  it("変換確定の直後に来るEnterは1回だけ飲み込む", () => {
+    const toggle = vi.fn();
+    useAppStore.setState({ toggleTaskTag: toggle });
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    // WebKitは compositionend を keydown より先に出すため、isComposing だけでは防げない
+    fireEvent.compositionStart(input);
+    fireEvent.compositionEnd(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(toggle).not.toHaveBeenCalled();
+  });
+
+  it("飲み込んだ次のEnterは通常どおりトグルする", () => {
+    const toggle = vi.fn();
+    useAppStore.setState({ toggleTaskTag: toggle });
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    fireEvent.compositionStart(input);
+    fireEvent.compositionEnd(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("飲み込みの待機は Enter 以外のキーでも解除される", () => {
+    const toggle = vi.fn();
+    useAppStore.setState({ toggleTaskTag: toggle });
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    fireEvent.compositionStart(input);
+    fireEvent.compositionEnd(input);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("変換中に↑↓を押してもIMEに譲り、ハイライトは動かない", () => {
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    fireEvent.compositionStart(input);
+    // WebKit実機ではkeydown自体にisComposingが立つ場合がある。jsdomではKeyboardEventInitで再現する
+    fireEvent.keyDown(input, { key: "ArrowDown", isComposing: true });
+
+    const rows = screen.getAllByTestId("tag-palette-row");
+    expect(rows.every((row) => row.dataset.highlighted === "false")).toBe(true);
+  });
+
+  it("変換中の⌘Enter(作成)や⌘⌫(削除)もIMEガードで抑止される", async () => {
+    const create = vi.fn();
+    useAppStore.setState({ createTagAndAttach: create });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+    await user.type(input, "新規タグ");
+    expect(screen.getByTestId("tag-palette-create")).toBeInTheDocument();
+
+    fireEvent.compositionStart(input);
+    fireEvent.keyDown(input, { key: "Enter", metaKey: true, isComposing: true });
+    expect(create).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: "Backspace", metaKey: true, isComposing: true });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("変換確定後、ハイライトが先頭の候補に戻る", () => {
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    fireEvent.compositionStart(input);
+    fireEvent.compositionEnd(input);
+
+    const rows = screen.getAllByTestId("tag-palette-row");
+    expect(rows[0]?.dataset.highlighted).toBe("true");
   });
 });
