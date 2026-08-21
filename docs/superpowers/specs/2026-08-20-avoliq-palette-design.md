@@ -1,4 +1,4 @@
-# smartTask — Spotlight風タスク管理パレット 設計書
+# Avoliq — Spotlight風タスク管理パレット 設計書
 
 作成日: 2026-08-20
 ステータス: ユーザー承認済み（ブレインストーミングセッションにて各セクション承認）
@@ -50,7 +50,7 @@ CRUD・ステータス更新が完結する。UI/UXに特化する。
 - **DBアクセスはRust側リポジトリ層に一元化**。フロントエンドはTauriコマンド経由で
   読み書きするのみ。将来のMCPサーバーが同じリポジトリ層・同じSQLiteファイルを
   再利用できる構造にする。
-- DBファイルは `~/Library/Application Support/smartTask/` に配置。
+- DBファイルは `~/Library/Application Support/Avoliq/` に配置。
 - ログイン時自動起動（tauri-plugin-autostart、設定でOFF可）。
 - メニューバー常駐アイコン（開く / 設定 / 終了）。Dockアイコンは出さない。
 

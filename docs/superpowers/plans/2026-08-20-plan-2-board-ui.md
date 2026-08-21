@@ -1,5 +1,8 @@
 # 計画書2: ボードUI（カンバン + キーボード操作）実装計画
 
+> **注記(2026-08-21)**: 本計画の実行後、製品名は smartTask から **Avoliq** に正式改名された。
+> 本文中の `smartTask` / `smart-task` は実行当時の記録。現行の正しい名前は実装コントラクトを参照。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** smartTaskのパレット内に「ステータスごとの縦レーン(カンバン) + 検索/クイック追加 + キーボードだけで完結する盤面操作」を実装し、マウスに触れずタスクの作成・移動・並び替え・削除・復元ができる状態にする。

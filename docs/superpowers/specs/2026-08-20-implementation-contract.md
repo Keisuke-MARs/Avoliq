@@ -1,6 +1,6 @@
-# smartTask 実装コントラクト
+# Avoliq 実装コントラクト
 
-設計書 `2026-08-20-smart-task-palette-design.md` を実装に落とすための共通契約。
+設計書 `2026-08-20-avoliq-palette-design.md` を実装に落とすための共通契約。
 **計画書・実装は必ずこのファイルの名前・型・シグネチャに従うこと。**（勝手に改名しない）
 
 ## 技術スタック（バージョン方針）
@@ -88,7 +88,7 @@ CREATE TABLE schema_migrations (
 ```
 
 - 外部キー有効化: 接続ごとに `PRAGMA foreign_keys = ON;`
-- DBパス: `~/Library/Application Support/smartTask/smart-task.db`
+- DBパス: `~/Library/Application Support/Avoliq/avoliq.db`
   （テストはインメモリ `Connection::open_in_memory()`）
 - 初回起動時: ボード「メイン」を1枚 + デフォルトステータス4つを自動作成
 

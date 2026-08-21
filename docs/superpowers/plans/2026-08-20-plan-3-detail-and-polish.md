@@ -1,5 +1,8 @@
 # smartTask 詳細画面・ボード管理・仕上げ 実装計画（計画書3）
 
+> **注記(2026-08-21)**: 本計画の実行後、製品名は smartTask から **Avoliq** に正式改名された。
+> 本文中の `smartTask` / `smart-task` は実行当時の記録。現行の正しい名前は実装コントラクトを参照。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** タスク詳細（BlockNoteによるNotion風Markdown編集）・ボードスイッチャー・ボード設定・自動起動/ホットキー変更を実装し、UIUXを磨き込んで設計書の全機能を完成させる。

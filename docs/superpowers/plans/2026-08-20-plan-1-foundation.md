@@ -1,5 +1,8 @@
 # smartTask 基盤 実装計画（計画書1: 基盤）
 
+> **注記(2026-08-21)**: 本計画の実行後、製品名は smartTask から **Avoliq** に正式改名された。
+> 本文中の `smartTask` / `smart-task` は実行当時の記録。現行の正しい名前は実装コントラクトを参照。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** ⌥Space でプレースホルダーのフローティングパレットが開閉する macOS アプリと、cargo テストで完全に検証された SQLite リポジトリ層を作る。
