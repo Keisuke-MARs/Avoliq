@@ -1468,7 +1468,10 @@ mod tests {
 
         let result = super::task_tag_toggle(&mut conn, &task_id, "no-such-tag");
 
-        assert!(result.is_err(), "外部キー制約で弾かれること");
+        assert!(
+            matches!(result, Err(RepoError::NotFound(_))),
+            "タグの存在チェックでNotFoundとして弾かれること"
+        );
     }
 
     #[test]
@@ -1482,7 +1485,7 @@ mod tests {
 
         let result = super::task_tag_toggle(&mut conn, &task_id, &other_tag.id);
 
-        assert!(result.is_err(), "別ボードのタグは付けられないこと");
+        assert!(matches!(result, Err(RepoError::Rule(_))));
     }
 
     #[test]
