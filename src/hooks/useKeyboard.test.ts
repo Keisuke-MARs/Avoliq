@@ -95,6 +95,19 @@ describe("useKeyboard: ⌘K (タグパレット)", () => {
     expect(useAppStore.getState().tagPaletteOpen).toBe(true);
   });
 
+  it("board で ⌘K は defaultPrevented でも横取りする（boardにガードが無いことの担保）", () => {
+    // board にはBlockNoteエディタが無いのでdefaultPreventedガードは不要、という設計になっている。
+    // 「対称性のため」とboard側にもガードを足す誤修正が入った瞬間にこのテストが赤くなって気付ける。
+    useAppStore.setState({ ...initialAppState, tasks, statuses, tags, selectedTaskId: "t-a" });
+    renderHook(() => useKeyboard());
+    const event = new KeyboardEvent("keydown", { key: "k", metaKey: true, cancelable: true });
+    event.preventDefault();
+
+    window.dispatchEvent(event);
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(true);
+  });
+
   it("board でカード未選択の ⌘K は何も起きない", () => {
     useAppStore.setState({ ...initialAppState, tasks, statuses, tags, selectedTaskId: null });
     renderHook(() => useKeyboard());

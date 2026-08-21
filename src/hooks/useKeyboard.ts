@@ -69,7 +69,9 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
       return true;
     case "k":
     case "K":
-      // タグパレットを開く。カード未選択なら openTagPalette 側で無反応になる
+      // タグパレットを開く。カード未選択なら openTagPalette 側で無反応になる。
+      // board にはBlockNoteエディタが存在せず ⌘K を preventDefault する相手がいないため、
+      // detail側(下のhandleDetailKey)にあるdefaultPreventedガードはここには不要(対称性で足さないこと)
       s.openTagPalette();
       return true;
     case "b":
