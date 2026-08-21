@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Board, Status, Task } from "../types";
+import type { Board, Status, Tag, Task } from "../types";
 import { NEW_TASK_TITLE, useAppStore } from "../store/appStore";
 import { TaskDetail } from "./TaskDetail";
 
@@ -46,6 +46,12 @@ const statuses: Status[] = [
   },
 ];
 
+const tags: Tag[] = [
+  { id: "tag-bug", boardId: "board-1", name: "バグ", color: "#7EA9E8", position: 0 },
+  { id: "tag-urgent", boardId: "board-1", name: "緊急", color: "#E8B478", position: 1 },
+  { id: "tag-design", boardId: "board-1", name: "設計", color: "#7FCF9A", position: 2 },
+];
+
 const task: Task = {
   id: "task-1",
   boardId: "board-1",
@@ -67,6 +73,7 @@ describe("TaskDetail", () => {
       boards: [board],
       currentBoardId: "board-1",
       statuses,
+      tags,
       tasks: [task],
       selectedTaskId: "task-1",
       view: "detail",
@@ -94,6 +101,25 @@ describe("TaskDetail", () => {
     render(<TaskDetail />);
 
     expect(screen.getByTestId("blocknote-view")).toBeInTheDocument();
+  });
+
+  it("タイトルの下にタグを省略なしで表示する", () => {
+    useAppStore.setState({
+      tasks: [{ ...task, tagIds: ["tag-bug", "tag-urgent", "tag-design"] }],
+    });
+
+    render(<TaskDetail />);
+
+    const row = screen.getByTestId("task-detail-tags");
+    expect(row).toHaveTextContent("バグ");
+    expect(row).toHaveTextContent("緊急");
+    expect(row).toHaveTextContent("設計");
+  });
+
+  it("タグが無いときは追加を促す文言を出す", () => {
+    render(<TaskDetail />);
+
+    expect(screen.getByText("⌘K でタグを追加")).toBeInTheDocument();
   });
 
   it("タイトルを編集すると500ms後に保存される", async () => {

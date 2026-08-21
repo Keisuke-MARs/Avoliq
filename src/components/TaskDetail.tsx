@@ -7,7 +7,9 @@ import { useDebouncedSave } from "../hooks/useDebouncedSave";
 import { usePrefersDark } from "../hooks/usePrefersDark";
 import { registerDetailBridge } from "../lib/detailBridge";
 import { reflowStrayMarkdownTables } from "../lib/markdownTableFix";
+import { tagChipStyle } from "../lib/tagPalette";
 import { useAppStore } from "../store/appStore";
+import type { Tag } from "../types";
 
 /**
  * タスク詳細画面。BlockNoteでNotion風にMarkdownを編集し、500msデバウンスで自動保存する。
@@ -24,9 +26,14 @@ export function TaskDetail() {
   const updateTaskContent = useAppStore((state) => state.updateTaskContent);
   const updateTaskTitle = useAppStore((state) => state.updateTaskTitle);
   const moveSelectedTask = useAppStore((state) => state.moveSelectedTask);
+  const allTags = useAppStore((state) => state.tags);
 
   const task = tasks.find((item) => item.id === selectedTaskId) ?? null;
   const status = statuses.find((item) => item.id === task?.statusId) ?? null;
+  // 既に消えたタグidが残っていても落ちないよう、引けたものだけ使う
+  const tags = (task?.tagIds ?? [])
+    .map((id) => allTags.find((t) => t.id === id))
+    .filter((t): t is Tag => t !== undefined);
 
   const [title, setTitle] = useState(task?.title ?? "");
   const titleRef = useRef<HTMLInputElement>(null);
@@ -232,6 +239,25 @@ export function TaskDetail() {
         placeholder="タイトルを入力"
         className="mx-8 mb-3 bg-transparent text-xl font-semibold st-text-1 outline-none st-input"
       />
+
+      <div data-testid="task-detail-tags" className="mx-8 mb-3 flex flex-wrap gap-1.5">
+        {tags.length === 0 ? (
+          <span className="text-[11px]" style={{ color: "var(--st-text-tertiary)" }}>
+            ⌘K でタグを追加
+          </span>
+        ) : (
+          tags.map((tag) => (
+            <span
+              key={tag.id}
+              className="rounded-[5px] px-1.5 py-0.5 text-[11px]"
+              // 詳細画面はステータス色のベタ塗りが無いので常に通常配色（第2引数はfalse）
+              style={tagChipStyle(tag.color, false, isDark)}
+            >
+              {tag.name}
+            </span>
+          ))
+        )}
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-4">
         <BlockNoteView
