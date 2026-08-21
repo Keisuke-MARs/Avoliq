@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Board, Status, Task } from "@/types";
+import type { Board, Status, Tag, Task } from "@/types";
 
 // ---- ボード ----
 
@@ -75,6 +75,29 @@ export function taskDelete(id: string): Promise<Task> {
 
 export function taskRestore(id: string): Promise<Task> {
   return invoke<Task>("task_restore", { id });
+}
+
+// ---- タグ ----
+
+export function tagsList(boardId: string): Promise<Tag[]> {
+  return invoke<Tag[]>("tags_list", { boardId });
+}
+
+export function tagCreate(boardId: string, name: string): Promise<Tag> {
+  return invoke<Tag>("tag_create", { boardId, name });
+}
+
+export function tagRename(id: string, name: string): Promise<Tag> {
+  return invoke<Tag>("tag_rename", { id, name });
+}
+
+export function tagDelete(id: string): Promise<void> {
+  return invoke<void>("tag_delete", { id });
+}
+
+/** タスクのタグを付け外しする。戻り値はトグル後のtagIds。 */
+export function taskTagToggle(taskId: string, tagId: string): Promise<string[]> {
+  return invoke<string[]>("task_tag_toggle", { taskId, tagId });
 }
 
 // ---- 設定 ----

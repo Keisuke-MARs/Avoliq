@@ -76,4 +76,48 @@ describe("Tauri invoke ラッパー", () => {
     await api.hidePalette();
     expect(invokeMock).toHaveBeenCalledWith("palette_hide");
   });
+
+  it("tagsList はキャメルケースの boardId を渡す", async () => {
+    invokeMock.mockResolvedValue([]);
+
+    await api.tagsList("board-1");
+
+    expect(invokeMock).toHaveBeenCalledWith("tags_list", { boardId: "board-1" });
+  });
+
+  it("tagCreate は boardId と name を渡す", async () => {
+    invokeMock.mockResolvedValue({});
+
+    await api.tagCreate("board-1", "バグ");
+
+    expect(invokeMock).toHaveBeenCalledWith("tag_create", {
+      boardId: "board-1",
+      name: "バグ",
+    });
+  });
+
+  it("tagRename は id と name を渡す", async () => {
+    invokeMock.mockResolvedValue({});
+
+    await api.tagRename("tag-1", "不具合");
+
+    expect(invokeMock).toHaveBeenCalledWith("tag_rename", { id: "tag-1", name: "不具合" });
+  });
+
+  it("tagDelete は id を渡す", async () => {
+    await api.tagDelete("tag-1");
+
+    expect(invokeMock).toHaveBeenCalledWith("tag_delete", { id: "tag-1" });
+  });
+
+  it("taskTagToggle は taskId と tagId を渡す", async () => {
+    invokeMock.mockResolvedValue([]);
+
+    await api.taskTagToggle("t-a", "g-1");
+
+    expect(invokeMock).toHaveBeenCalledWith("task_tag_toggle", {
+      taskId: "t-a",
+      tagId: "g-1",
+    });
+  });
 });

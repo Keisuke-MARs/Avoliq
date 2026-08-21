@@ -12,6 +12,14 @@ export interface Status {
   position: number;
 }
 
+export interface Tag {
+  id: string;
+  boardId: string;
+  name: string;
+  color: string;
+  position: number;
+}
+
 export interface Task {
   id: string;
   boardId: string;
@@ -21,6 +29,8 @@ export interface Task {
   position: number;
   createdAt: string;
   updatedAt: string;
+  /** 付いているタグのid。tags.position 昇順(Rust側が保証する) */
+  tagIds: string[];
 }
 
 export type View = "board" | "detail" | "switcher" | "settings";

@@ -199,6 +199,7 @@ describe("Palette: 検索と新規作成", () => {
       position: 0,
       createdAt: "2026-08-20T02:00:00Z",
       updatedAt: "2026-08-20T02:00:00Z",
+      tagIds: [],
     };
     mocked.taskCreate.mockResolvedValue(created);
 
@@ -256,6 +257,7 @@ describe("Palette: 検索と新規作成", () => {
       position: 0,
       createdAt: "2026-08-20T02:00:00Z",
       updatedAt: "2026-08-20T02:00:00Z",
+      tagIds: [],
     };
     mocked.taskCreate.mockResolvedValue(created);
 
@@ -287,6 +289,7 @@ describe("Palette: 詳細画面での⌘N・⌘P", () => {
       position: 0,
       createdAt: "2026-08-20T02:00:00Z",
       updatedAt: "2026-08-20T02:00:00Z",
+      tagIds: [],
     };
     mocked.taskCreate.mockResolvedValue(created);
 

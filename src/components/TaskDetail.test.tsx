@@ -55,6 +55,7 @@ const task: Task = {
   position: 0,
   createdAt: "2026-08-20 10:00:00",
   updatedAt: "2026-08-20 10:00:00",
+  tagIds: [],
 };
 
 describe("TaskDetail", () => {

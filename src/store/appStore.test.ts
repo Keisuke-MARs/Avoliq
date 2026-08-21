@@ -271,6 +271,7 @@ describe("appStore: createTaskFromSearch", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     mocked.taskCreate.mockResolvedValue(created);
     // 作成成功後の反映はtasksListでの正引きなので、Rust側が再採番した後の実状態を用意する
@@ -327,6 +328,7 @@ describe("appStore: createTaskFromSearch", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     let switchPromise: Promise<boolean> = Promise.resolve(true);
     // 作成自体はDBに済むが、応答が返ってくる前に⌘1-9等で本物の切替要求(selectBoard)が
@@ -358,6 +360,7 @@ describe("appStore: createTaskFromSearch", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     let resolveCreate: (value: Task) => void = () => {};
     mocked.taskCreate.mockReturnValueOnce(
@@ -389,6 +392,7 @@ describe("appStore: createTaskFromSearch", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     let resolveCreate: (value: Task) => void = () => {};
     mocked.taskCreate.mockReturnValueOnce(
@@ -426,6 +430,7 @@ describe("appStore: createNewTask", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     mocked.taskCreate.mockResolvedValue(created);
     // 作成成功後の反映はtasksListでの正引きなので、Rust側が再採番した後の実状態を用意する
@@ -467,6 +472,7 @@ describe("appStore: createNewTask", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     let resolveCreate: (value: Task) => void = () => {};
     mocked.taskCreate.mockReturnValueOnce(
@@ -502,6 +508,7 @@ describe("appStore: createNewTask", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     let resolveCreate: (value: Task) => void = () => {};
     mocked.taskCreate.mockReturnValueOnce(
@@ -551,6 +558,7 @@ describe("appStore: createNewTask", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     });
 
     await useAppStore.getState().createNewTask();
@@ -601,6 +609,7 @@ describe("appStore: createNewTask", () => {
       position: 0,
       createdAt: "2026-08-20T01:00:00Z",
       updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
     };
     let switchPromise: Promise<boolean> = Promise.resolve(true);
     mocked.taskCreate.mockImplementation(async () => {
