@@ -5,7 +5,7 @@
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 use uuid::Uuid;
 
-use super::{Board, RepoError, Result, Status, Task};
+use super::{Board, RepoError, Result, Status, Tag, Task};
 
 /// 新規ボード作成時に自動投入するデフォルトステータス（name, color）。並び順は配列の順。
 pub const DEFAULT_STATUSES: &[(&str, &str)] = &[
@@ -13,6 +13,13 @@ pub const DEFAULT_STATUSES: &[(&str, &str)] = &[
     ("進行中", "#007AFF"),
     ("確認中", "#FF9500"),
     ("完了", "#34C759"),
+];
+
+/// タグ色のプリセット。ステータス色より彩度を落とし、看板の主役（ステータス色）を食わないようにする。
+/// 作成時に「そのボードでまだ使われていない最初の色」を選ぶ。全部埋まったら先頭から循環する。
+pub const TAG_COLORS: &[&str] = &[
+    "#7EA9E8", "#E8B478", "#7FCF9A", "#E88A85", "#B98CD8", "#E88AA6", "#8FC9E0", "#A8A8AE",
+    "#C9B478",
 ];
 
 /// 新しいUUID文字列を作る
@@ -36,6 +43,27 @@ fn row_to_status(row: &Row<'_>) -> rusqlite::Result<Status> {
         color: row.get("color")?,
         position: row.get("position")?,
     })
+}
+
+fn row_to_tag(row: &Row<'_>) -> rusqlite::Result<Tag> {
+    Ok(Tag {
+        id: row.get("id")?,
+        board_id: row.get("board_id")?,
+        name: row.get("name")?,
+        color: row.get("color")?,
+        position: row.get("position")?,
+    })
+}
+
+/// IDでタグを1件引く
+fn tag_by_id(conn: &Connection, id: &str) -> Result<Tag> {
+    conn.query_row(
+        "SELECT id, board_id, name, color, position FROM tags WHERE id = ?1",
+        params![id],
+        row_to_tag,
+    )
+    .optional()?
+    .ok_or_else(|| RepoError::NotFound(format!("タグ {id}")))
 }
 
 fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
@@ -503,6 +531,111 @@ pub fn seed_if_empty(conn: &mut Connection) -> Result<()> {
     }
     if setting_get(conn, HOTKEY_SETTING_KEY)?.is_none() {
         setting_set(conn, HOTKEY_SETTING_KEY, DEFAULT_HOTKEY)?;
+    }
+    Ok(())
+}
+
+// ---- タグ ----
+
+/// タグ名を検証して正規化する（前後の空白を落とす）
+fn normalize_tag_name(name: &str) -> Result<String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(RepoError::Rule("タグ名を入力してください".to_string()));
+    }
+    Ok(trimmed.to_string())
+}
+
+/// タグ一覧（position昇順）
+pub fn tags_list(conn: &mut Connection, board_id: &str) -> Result<Vec<Tag>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, board_id, name, color, position FROM tags
+         WHERE board_id = ?1
+         ORDER BY position, rowid",
+    )?;
+    let tags = stmt
+        .query_map(params![board_id], row_to_tag)?
+        .collect::<rusqlite::Result<Vec<Tag>>>()?;
+    Ok(tags)
+}
+
+/// タグを作る。色はそのボードで未使用の色から自動で決まり、以後変わらない。
+pub fn tag_create(conn: &mut Connection, board_id: &str, name: &str) -> Result<Tag> {
+    let name = normalize_tag_name(name)?;
+    let id = new_id();
+
+    let tx = conn.transaction()?;
+    // UNIQUE INDEX は SQLite 既定の BINARY 照合なので Bug と bug を通してしまう。
+    // 大文字小文字を無視した同名拒否はここで行い、INDEX は最後の砦として残す。
+    let duplicated: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM tags WHERE board_id = ?1 AND LOWER(name) = LOWER(?2)",
+        params![board_id, &name],
+        |row| row.get(0),
+    )?;
+    if duplicated > 0 {
+        return Err(RepoError::Rule(format!("タグ「{name}」は既にあります")));
+    }
+
+    let used: Vec<String> = {
+        let mut stmt = tx.prepare("SELECT color FROM tags WHERE board_id = ?1")?;
+        let mapped = stmt.query_map(params![board_id], |row| row.get::<_, String>(0))?;
+        let collected: rusqlite::Result<Vec<String>> = mapped.collect();
+        collected?
+    };
+    let color = TAG_COLORS
+        .iter()
+        .find(|candidate| !used.iter().any(|u| u == *candidate))
+        .copied()
+        .unwrap_or(TAG_COLORS[used.len() % TAG_COLORS.len()]);
+
+    let next_position: i64 = tx.query_row(
+        "SELECT COALESCE(MAX(position) + 1, 0) FROM tags WHERE board_id = ?1",
+        params![board_id],
+        |row| row.get(0),
+    )?;
+    tx.execute(
+        "INSERT INTO tags (id, board_id, name, color, position) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![&id, board_id, &name, color, next_position],
+    )?;
+    tx.commit()?;
+
+    tag_by_id(conn, &id)
+}
+
+/// タグを改名する。色とpositionは変わらない。
+pub fn tag_rename(conn: &mut Connection, id: &str, name: &str) -> Result<Tag> {
+    let name = normalize_tag_name(name)?;
+
+    let tx = conn.transaction()?;
+    let board_id: String = tx
+        .query_row("SELECT board_id FROM tags WHERE id = ?1", params![id], |row| {
+            row.get(0)
+        })
+        .optional()?
+        .ok_or_else(|| RepoError::NotFound(format!("タグ {id}")))?;
+    // 自分自身は衝突相手から除く（同じ名前へ改名しても通るようにする）
+    let duplicated: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM tags WHERE board_id = ?1 AND LOWER(name) = LOWER(?2) AND id <> ?3",
+        params![&board_id, &name, id],
+        |row| row.get(0),
+    )?;
+    if duplicated > 0 {
+        return Err(RepoError::Rule(format!("タグ「{name}」は既にあります")));
+    }
+    tx.execute(
+        "UPDATE tags SET name = ?2, updated_at = datetime('now') WHERE id = ?1",
+        params![id, &name],
+    )?;
+    tx.commit()?;
+
+    tag_by_id(conn, id)
+}
+
+/// タグを削除する。task_tags は ON DELETE CASCADE で一緒に消える。
+pub fn tag_delete(conn: &mut Connection, id: &str) -> Result<()> {
+    let changed = conn.execute("DELETE FROM tags WHERE id = ?1", params![id])?;
+    if changed == 0 {
+        return Err(RepoError::NotFound(format!("タグ {id}")));
     }
     Ok(())
 }
@@ -1031,6 +1164,135 @@ mod tests {
 
         assert_eq!(b.position, 0);
         assert_eq!(lane_titles(&mut conn, &board_id, &todo_id), vec!["B"]);
+    }
+
+    #[test]
+    fn タグを作ると一覧に出る() {
+        let (mut conn, board_id) = setup_board();
+
+        let created = super::tag_create(&mut conn, &board_id, "バグ").expect("タグを作れること");
+
+        let tags = super::tags_list(&mut conn, &board_id).expect("一覧を引けること");
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].id, created.id);
+        assert_eq!(tags[0].name, "バグ");
+        assert_eq!(tags[0].position, 0);
+    }
+
+    #[test]
+    fn タグ名は前後の空白を落として保存される() {
+        let (mut conn, board_id) = setup_board();
+
+        let created = super::tag_create(&mut conn, &board_id, "  バグ  ").expect("タグを作れること");
+
+        assert_eq!(created.name, "バグ");
+    }
+
+    #[test]
+    fn 空のタグ名は作れない() {
+        let (mut conn, board_id) = setup_board();
+
+        let result = super::tag_create(&mut conn, &board_id, "   ");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn 同名のタグは大文字小文字を無視して弾かれる() {
+        let (mut conn, board_id) = setup_board();
+        super::tag_create(&mut conn, &board_id, "Bug").expect("1件目を作れること");
+
+        let result = super::tag_create(&mut conn, &board_id, "bug");
+
+        assert!(result.is_err(), "大文字小文字違いも同名として弾くこと");
+    }
+
+    #[test]
+    fn 別のボードなら同名のタグを作れる() {
+        let (mut conn, board_a) = setup_board();
+        let board_b = super::board_create(&mut conn, "私用").expect("2枚目のボード").id;
+        super::tag_create(&mut conn, &board_a, "バグ").expect("Aに作れること");
+
+        let created = super::tag_create(&mut conn, &board_b, "バグ").expect("Bにも作れること");
+
+        assert_eq!(created.board_id, board_b);
+    }
+
+    #[test]
+    fn タグ色は未使用の色から順に割り当てられる() {
+        let (mut conn, board_id) = setup_board();
+
+        let first = super::tag_create(&mut conn, &board_id, "一").expect("1件目");
+        let second = super::tag_create(&mut conn, &board_id, "二").expect("2件目");
+
+        assert_eq!(first.color, super::TAG_COLORS[0]);
+        assert_eq!(second.color, super::TAG_COLORS[1]);
+    }
+
+    #[test]
+    fn 途中のタグを消しても残りのタグの色は変わらない() {
+        let (mut conn, board_id) = setup_board();
+        let first = super::tag_create(&mut conn, &board_id, "一").expect("1件目");
+        let second = super::tag_create(&mut conn, &board_id, "二").expect("2件目");
+
+        super::tag_delete(&mut conn, &first.id).expect("1件目を消せること");
+
+        let tags = super::tags_list(&mut conn, &board_id).expect("一覧を引けること");
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].color, second.color, "色は作成時に確定して動かないこと");
+    }
+
+    #[test]
+    fn 色を使い切ったら先頭から循環する() {
+        let (mut conn, board_id) = setup_board();
+        for index in 0..super::TAG_COLORS.len() {
+            super::tag_create(&mut conn, &board_id, &format!("タグ{index}")).expect("作れること");
+        }
+
+        let extra = super::tag_create(&mut conn, &board_id, "あふれ").expect("10件目も作れること");
+
+        assert_eq!(extra.color, super::TAG_COLORS[0]);
+    }
+
+    #[test]
+    fn タグを改名できる() {
+        let (mut conn, board_id) = setup_board();
+        let created = super::tag_create(&mut conn, &board_id, "バグ").expect("作れること");
+
+        let renamed = super::tag_rename(&mut conn, &created.id, " 不具合 ").expect("改名できること");
+
+        assert_eq!(renamed.name, "不具合");
+        assert_eq!(renamed.color, created.color, "改名しても色は変わらないこと");
+    }
+
+    #[test]
+    fn 既にある名前へは改名できない() {
+        let (mut conn, board_id) = setup_board();
+        super::tag_create(&mut conn, &board_id, "バグ").expect("1件目");
+        let second = super::tag_create(&mut conn, &board_id, "設計").expect("2件目");
+
+        let result = super::tag_rename(&mut conn, &second.id, "バグ");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn 自分自身と同じ名前への改名は通る() {
+        let (mut conn, board_id) = setup_board();
+        let created = super::tag_create(&mut conn, &board_id, "バグ").expect("作れること");
+
+        let renamed = super::tag_rename(&mut conn, &created.id, "バグ").expect("通ること");
+
+        assert_eq!(renamed.name, "バグ");
+    }
+
+    #[test]
+    fn 存在しないタグは削除できない() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        let result = super::tag_delete(&mut conn, "no-such-tag");
+
+        assert!(result.is_err());
     }
 
     #[test]

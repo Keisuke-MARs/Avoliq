@@ -100,3 +100,14 @@ pub struct Task {
     pub created_at: String,
     pub updated_at: String,
 }
+
+/// タグ（ボードごとのラベル）
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tag {
+    pub id: String,
+    pub board_id: String,
+    pub name: String,
+    pub color: String,
+    pub position: i64,
+}
