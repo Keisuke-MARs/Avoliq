@@ -105,6 +105,55 @@ describe("TagPalette", () => {
   });
 });
 
+describe("TagPalette: フォーカスの復帰(C-1)", () => {
+  beforeEach(() => {
+    setup();
+    vi.restoreAllMocks();
+  });
+
+  it("detail: 開く前にフォーカスしていた要素(本文相当)へ、閉じたときにフォーカスが戻る", () => {
+    // BlockNoteの本文編集エリアの代わりに、実際にフォーカス可能な要素を用意する
+    const editorStandIn = document.createElement("div");
+    editorStandIn.tabIndex = -1;
+    document.body.appendChild(editorStandIn);
+    editorStandIn.focus();
+    expect(editorStandIn).toHaveFocus();
+
+    const { unmount } = render(<TagPalette />);
+    // マウント直後は入力欄へフォーカスが移っている(既存の挙動)
+    expect(screen.getByTestId("tag-palette-input")).toHaveFocus();
+
+    // Escでの閉じるはPalette側の条件レンダリングでアンマウントされる形で実現されるため、
+    // ここではその実際の経路(アンマウント)を直接検証する
+    unmount();
+
+    expect(editorStandIn).toHaveFocus();
+    editorStandIn.remove();
+  });
+
+  it("board: 検索欄にフォーカスがあった状態から開いて閉じても検索欄に戻る", () => {
+    const searchInput = document.createElement("input");
+    searchInput.id = "avoliq-search";
+    document.body.appendChild(searchInput);
+    searchInput.focus();
+    expect(searchInput).toHaveFocus();
+
+    const { unmount } = render(<TagPalette />);
+    unmount();
+
+    expect(searchInput).toHaveFocus();
+    searchInput.remove();
+  });
+
+  it("board: どこにもフォーカスが無い状態(カード選択中)で開いて閉じても壊れない", () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    const { unmount } = render(<TagPalette />);
+
+    expect(() => unmount()).not.toThrow();
+  });
+});
+
 /**
  * 実際のstore.toggleTaskTagと同じ「押したタグの付与状態を反転してtasksを更新する」だけの
  * 簡易フェイク。トグルによってrowsの並び順が変わる状況を再現するために使う

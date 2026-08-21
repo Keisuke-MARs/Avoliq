@@ -88,6 +88,31 @@ export function TagPalette() {
   const mode: Mode =
     confirmDeleteId !== null ? "confirm-delete" : renamingId !== null ? "rename" : "list";
 
+  /**
+   * ⌘Kで開く直前にフォーカスがあった要素を覚えておき、閉じるときに戻す。
+   * board側はuseKeyboardの印字キー処理(検索欄へフォーカスを戻す)で自己修復するが、
+   * detail側はBlockNoteエディタへのフォーカスがTaskDetailマウント時の1回しか走らないため、
+   * ここで戻してやらないとフォーカスが宙に浮いたまま(document.body)になり、
+   * 本文を再クリックするまで入力できなくなる(C-1)。
+   * マウント/アンマウントちょうど1回だけ走らせたいので、モードが変わるたびに走る
+   * 下のフォーカス制御effectとは別に、空配列のeffectとして独立させている
+   * (このeffectは他のeffectより先に宣言し、inputRef.focus()より前に実行させること。
+   * でないと「パレット自身の入力欄」を覚えてしまう)。
+   */
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      // 戻す先が既にDOMから消えている場合(詳細画面自体を離れた、タスクが削除されたなど)は
+      // 何もしない。isConnectedでなければfocus()は実質何もしないはずだが、念のため明示する。
+      if (previouslyFocused !== null && previouslyFocused.isConnected) {
+        previouslyFocused.focus();
+      }
+    };
+    // マウント時に一度だけ記憶し、アンマウント時に一度だけ戻したいので依存配列は空でよい
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 絞り込み文字列が変わったときは「今どこにいたか」より予測しやすさを優先し、常に先頭へ戻す
   // (候補が0件になったら着地点なしにする)。
   // ただし変換中はIME入力のたびにqueryが変化するため、ここで先頭へ戻すと
