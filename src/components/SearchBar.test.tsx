@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SearchBar } from "@/components/SearchBar";
@@ -139,5 +139,19 @@ describe("SearchBar: 既存のキー操作を邪魔しないこと", () => {
     expect(keys).toContain("a");
     expect(keys).toContain("Enter");
     expect(keys).toContain("ArrowDown");
+  });
+
+  it("候補が0件のときはTabのデフォルト動作(フォーカス移動)を邪魔しない", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+
+    // 存在しないタグ名なので候補は0件になる
+    fireEvent.change(input, { target: { value: "#存在しないタグ名" } });
+
+    // fireEventはdispatchEventの戻り値を返す。cancelableなイベントでpreventDefault()が
+    // 呼ばれているとfalseになるので、これでTabのデフォルト動作が生きているか判定できる
+    const notPrevented = fireEvent.keyDown(input, { key: "Tab" });
+
+    expect(notPrevented).toBe(true);
   });
 });

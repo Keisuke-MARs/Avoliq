@@ -63,18 +63,25 @@ export function SearchBar() {
     }
     if (!isTagToken) return;
 
-    // 補完は Tab だけで行う。Enter は board の「詳細を開く / 新規作成」の中核キーなので
-    // ここで奪うと board のゴールデンパスが壊れる。Tab はIMEの変換確定を生成せず、
+    // tabBaseRef はまだ書き換えず、今回使う base だけ先に確定する。
+    // 直前のTab以外のキーで参照だけリセットされ再描画が起きていない場合に備え、
+    // 描画時のsuggestionsを使い回さずここで確定した base から作り直す
+    const base = tabBaseRef.current ?? lastToken;
+    const freshSuggestions = computeSuggestions(base);
+    // 候補が0件ならここで抜ける。tabBaseRef/tabCycleRefはまだ何も書き換えていないので
+    // 状態は汚れない(次に候補が出たとき、変な位置から候補送りが始まらない)。
+    // ここで preventDefault していないので、Tabのネイティブなフォーカス移動も邪魔しない
+    if (freshSuggestions.length === 0) return;
+
+    // 候補が1件以上あるときだけ preventDefault する。補完は Tab だけで行う。
+    // Enter は board の「詳細を開く / 新規作成」の中核キーなので、ここで奪うと
+    // board のゴールデンパスが壊れる。Tab はIMEの変換確定を生成せず、
     // board でも未割当(default: break)なので安全に奪える
     event.preventDefault();
     if (tabBaseRef.current === null) {
-      tabBaseRef.current = lastToken;
+      tabBaseRef.current = base;
       tabCycleRef.current = 0;
     }
-    // 直前のTab以外のキーで参照だけリセットされ再描画が起きていない場合に備え、
-    // 描画時のsuggestionsを使い回さずここで確定した base から作り直す
-    const freshSuggestions = computeSuggestions(tabBaseRef.current);
-    if (freshSuggestions.length === 0) return;
     const picked = freshSuggestions[tabCycleRef.current % freshSuggestions.length];
     tabCycleRef.current += 1;
 
