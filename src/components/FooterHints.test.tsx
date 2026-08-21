@@ -37,6 +37,20 @@ describe("FooterHints", () => {
     expect(screen.getByText("検索")).toBeInTheDocument();
   });
 
+  it("board のヒントに ⌘K タグ が入る", () => {
+    render(<FooterHints view="board" />);
+
+    expect(screen.getByText("⌘K")).toBeInTheDocument();
+    expect(screen.getByText("タグ")).toBeInTheDocument();
+  });
+
+  it("detail のヒントにも ⌘K タグ が入る", () => {
+    render(<FooterHints view="detail" />);
+
+    expect(screen.getByText("⌘K")).toBeInTheDocument();
+    expect(screen.getByText("タグ")).toBeInTheDocument();
+  });
+
   it("switcherビューではボード管理のヒントを出す", () => {
     render(<FooterHints view="switcher" />);
 
