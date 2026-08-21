@@ -3,6 +3,7 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useDebouncedSave } from "../hooks/useDebouncedSave";
 import { registerDetailBridge } from "../lib/detailBridge";
 import { reflowStrayMarkdownTables } from "../lib/markdownTableFix";
@@ -161,11 +162,10 @@ export function TaskDetail({ isDark }: TaskDetailProps) {
             <ChevronLeft size={16} />
           </button>
           <span
-            className="rounded-full px-3 py-1 text-xs font-medium"
-            style={{
-              backgroundColor: `${status?.color ?? "#8E8E93"}1F`,
-              color: status?.color ?? "#8E8E93",
-            }}
+            className="av-status-chip rounded-full px-3 py-1 text-xs font-medium"
+            style={
+              { "--av-status": status?.color ?? "#8E8E93" } as CSSProperties
+            }
           >
             {status?.name ?? "未分類"}
           </span>
