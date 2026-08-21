@@ -4,16 +4,20 @@ import { BlockNoteView } from "@blocknote/shadcn";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDebouncedSave } from "../hooks/useDebouncedSave";
-import { usePrefersDark } from "../hooks/usePrefersDark";
 import { registerDetailBridge } from "../lib/detailBridge";
 import { reflowStrayMarkdownTables } from "../lib/markdownTableFix";
 import { useAppStore } from "../store/appStore";
+
+interface TaskDetailProps {
+  /** OSのカラースキーム。購読はPalette側で行い、ここでは受け取るだけ */
+  isDark: boolean;
+}
 
 /**
  * タスク詳細画面。BlockNoteでNotion風にMarkdownを編集し、500msデバウンスで自動保存する。
  * 保存ボタンは無く、Escでボードへ戻る前に保留分をフラッシュする。
  */
-export function TaskDetail() {
+export function TaskDetail({ isDark }: TaskDetailProps) {
   const tasks = useAppStore((state) => state.tasks);
   const statuses = useAppStore((state) => state.statuses);
   const selectedTaskId = useAppStore((state) => state.selectedTaskId);
@@ -38,7 +42,6 @@ export function TaskDetail() {
    * 間に入力(変換確定を含む)や他のキーが挟まったら、また1回目からやり直す。
    */
   const titleEnterArmedRef = useRef(false);
-  const isDark = usePrefersDark();
 
   // エディタのUI文言(スラッシュメニュー・プレースホルダ等)を日本語にする
   const editor = useCreateBlockNote({ dictionary: ja });

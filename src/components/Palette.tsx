@@ -6,6 +6,7 @@ import { BoardSwitcher } from "./BoardSwitcher";
 import { FooterHints } from "./FooterHints";
 import { SearchBar } from "./SearchBar";
 import { TaskDetail } from "./TaskDetail";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { useFlushOnHide } from "@/hooks/useFlushOnHide";
 import { useHotkeyErrorToast } from "@/hooks/useHotkeyErrorToast";
 import { useKeyboard } from "@/hooks/useKeyboard";
@@ -20,6 +21,8 @@ export function Palette() {
   useKeyboard();
   useFlushOnHide();
   useHotkeyErrorToast();
+  // カラースキームの購読はここ1箇所だけ。値は子へpropsで渡す
+  const isDark = useColorScheme();
 
   useEffect(() => {
     void loadBoards();
@@ -59,14 +62,16 @@ export function Palette() {
         }`}
       >
         {view === "board" && <Board />}
-        {view === "detail" && <TaskDetail key={selectedTaskId ?? "none"} />}
+        {view === "detail" && (
+          <TaskDetail key={selectedTaskId ?? "none"} isDark={isDark} />
+        )}
         {view === "switcher" && <BoardSwitcher />}
         {view === "settings" && <BoardSettings />}
       </div>
 
       <FooterHints view={view} />
 
-      <Toaster />
+      <Toaster isDark={isDark} />
     </div>
   );
 }
