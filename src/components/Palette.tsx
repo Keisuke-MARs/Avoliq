@@ -58,7 +58,7 @@ export function Palette() {
       <div
         key={view}
         className={`flex min-h-0 flex-1 flex-col ${
-          direction === "forward" ? "st-view-forward" : "st-view-back"
+          direction === "forward" ? "av-view-forward" : "av-view-back"
         }`}
       >
         {view === "board" && <Board />}

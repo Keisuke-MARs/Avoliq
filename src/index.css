@@ -136,18 +136,6 @@
   --sidebar-accent-foreground: var(--av-text-primary);
   --sidebar-border: var(--av-hairline);
   --sidebar-ring: var(--av-focus-ring);
-
-  /* ---- 旧トークンのエイリアス（Task 4で撤去する） ---- */
-  --st-palette-border: var(--av-hairline);
-  --st-text-primary: var(--av-text-primary);
-  --st-text-secondary: var(--av-text-secondary);
-  --st-text-tertiary: var(--av-text-muted);
-  --st-surface-hover: var(--av-surface-hover);
-  --st-surface-selected: var(--av-surface-selected);
-  --st-card-bg: var(--av-surface-card);
-  --st-card-hover-bg: var(--av-surface-card-hover);
-  --st-shadow: var(--av-shadow);
-  --st-ease: var(--av-ease);
 }
 
 .dark {
@@ -214,7 +202,7 @@ body {
 }
 
 /* ============ パレットの出現/消失 ============ */
-@keyframes st-palette-in {
+@keyframes av-palette-in {
   from {
     opacity: 0;
     transform: scale(0.96) translateY(-6px);
@@ -257,7 +245,7 @@ body {
     /* 底の Glass Violet による奥行き */
     inset 0 -24px 44px -28px var(--av-glass-refract-violet),
     var(--av-shadow);
-  animation: st-palette-in 180ms var(--av-ease) both;
+  animation: av-palette-in 180ms var(--av-ease) both;
 }
 
 /* vibrancy が使えない環境ではぼかしが無い。半透明のままだと壁紙が素通しになり
@@ -269,7 +257,7 @@ body {
 }
 
 /* ============ ドリルイン遷移(ボード⇄詳細など) ============ */
-@keyframes st-drill-in {
+@keyframes av-drill-in {
   from {
     opacity: 0;
     transform: translateX(16px);
@@ -280,7 +268,7 @@ body {
   }
 }
 
-@keyframes st-drill-back {
+@keyframes av-drill-back {
   from {
     opacity: 0;
     transform: translateX(-16px);
@@ -291,70 +279,65 @@ body {
   }
 }
 
-.st-view-forward {
-  animation: st-drill-in 200ms var(--st-ease) both;
+.av-view-forward {
+  animation: av-drill-in 200ms var(--av-ease) both;
 }
 
-.st-view-back {
-  animation: st-drill-back 200ms var(--st-ease) both;
+.av-view-back {
+  animation: av-drill-back 200ms var(--av-ease) both;
 }
 
 /* ============ カードのマイクロインタラクション ============
    選択カードの背景色はステータス色をインラインstyleで塗る(承認済み仕様)ため、
    ここでは背景の既定値・ホバー・浮きだけを受け持つ */
-.st-card {
-  background-color: var(--st-card-bg);
+.av-card {
+  background-color: var(--av-surface-card);
   transition:
-    background-color 120ms var(--st-ease),
-    color 120ms var(--st-ease),
-    transform 120ms var(--st-ease),
-    box-shadow 120ms var(--st-ease);
+    background-color 120ms var(--av-ease),
+    color 120ms var(--av-ease),
+    transform 120ms var(--av-ease),
+    box-shadow 120ms var(--av-ease);
 }
 
-.st-card[data-selected="true"] {
+.av-card[data-selected="true"] {
   transform: translateY(-1px);
 }
 
-.st-card:hover:not([data-selected="true"]) {
-  background-color: var(--st-card-hover-bg);
-}
-
-/* 検索バーのプレースホルダー(ダークモードでも可読に) */
-.st-search-input::placeholder {
-  color: var(--st-text-tertiary);
+.av-card:hover:not([data-selected="true"]) {
+  background-color: var(--av-surface-card-hover);
 }
 
 /* ============ トークンのユーティリティクラス ============
    Tailwindのneutral系ハードコードはダークモードで破綻するため、こちらを使う */
-.st-text-1 {
-  color: var(--st-text-primary);
+.av-text-1 {
+  color: var(--av-text-primary);
 }
-.st-text-2 {
-  color: var(--st-text-secondary);
+.av-text-2 {
+  color: var(--av-text-secondary);
 }
-.st-text-3 {
-  color: var(--st-text-tertiary);
+.av-text-3 {
+  color: var(--av-text-muted);
 }
-.st-row-selected {
-  background-color: var(--st-surface-selected);
+.av-row-selected {
+  background-color: var(--av-surface-selected);
 }
-.st-border {
-  border-color: var(--st-palette-border);
+.av-border {
+  border-color: var(--av-hairline);
 }
-.st-chip {
-  background-color: var(--st-surface-hover);
+.av-chip {
+  background-color: var(--av-surface-hover);
 }
-.st-input::placeholder {
-  color: var(--st-text-tertiary);
+.av-input::placeholder {
+  color: var(--av-text-muted);
 }
 /* トグルスイッチOFF時のトラック(AppleのsystemGray相当。両モード共通) */
-.st-toggle-off {
+.av-toggle-off {
   background-color: rgba(120, 120, 128, 0.32);
 }
 
 /* ホバーで薄く反応する汎用ボタン */
-.st-btn-ghost:hover {
-  background-color: var(--st-surface-hover);
+.av-btn-ghost:hover {
+  background-color: var(--av-surface-hover);
 }
 
 /* BlockNoteの配色をパレットに合わせる */
@@ -402,11 +385,11 @@ body {
 /* OSの視差効果を減らす設定を尊重する */
 @media (prefers-reduced-motion: reduce) {
   .av-glass,
-  .st-view-forward,
-  .st-view-back {
+  .av-view-forward,
+  .av-view-back {
     animation: none;
   }
-  .st-card {
+  .av-card {
     transition: none;
   }
 }

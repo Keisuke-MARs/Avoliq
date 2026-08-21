@@ -24,14 +24,14 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
         <Circle size={10} stroke={status.color} fill={status.color} strokeWidth={2} />
         <span
           className="text-[12px] font-semibold"
-          style={{ color: "var(--st-text-secondary)" }}
+          style={{ color: "var(--av-text-secondary)" }}
         >
           {status.name}
         </span>
         <span
           data-testid="lane-count"
           className="ml-auto text-[11px] tabular-nums"
-          style={{ color: "var(--st-text-tertiary)" }}
+          style={{ color: "var(--av-text-muted)" }}
         >
           {tasks.length}
         </span>
@@ -41,8 +41,8 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
           <div
             className="rounded-lg border border-dashed px-3 py-4 text-center text-xs"
             style={{
-              borderColor: "var(--st-palette-border)",
-              color: "var(--st-text-tertiary)",
+              borderColor: "var(--av-hairline)",
+              color: "var(--av-text-muted)",
             }}
           >
             なし

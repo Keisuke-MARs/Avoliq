@@ -35,8 +35,8 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
       }}
       className={
         selected
-          ? "st-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug"
-          : "st-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug shadow-sm"
+          ? "av-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug"
+          : "av-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug shadow-sm"
       }
       style={
         selected
@@ -45,7 +45,7 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
               color: "#fff",
               boxShadow: `0 4px 12px ${statusColor}59`,
             }
-          : { color: "var(--st-text-primary)" }
+          : { color: "var(--av-text-primary)" }
       }
     >
       {task.title}

@@ -23,12 +23,12 @@ export function Board() {
         <Inbox
           size={28}
           strokeWidth={1.5}
-          style={{ color: "var(--st-text-tertiary)" }}
+          style={{ color: "var(--av-text-muted)" }}
         />
-        <p className="text-sm" style={{ color: "var(--st-text-secondary)" }}>
+        <p className="text-sm" style={{ color: "var(--av-text-secondary)" }}>
           タスクはまだありません
         </p>
-        <p className="text-xs" style={{ color: "var(--st-text-tertiary)" }}>
+        <p className="text-xs" style={{ color: "var(--av-text-muted)" }}>
           タスク名を入力して Enter で作成できます
         </p>
       </div>

@@ -48,20 +48,20 @@ export function ConfirmDialog({
     >
       <div
         className="w-full max-w-sm rounded-xl p-5 shadow-xl"
-        style={{ backgroundColor: "var(--st-palette-bg)" }}
+        style={{ backgroundColor: "var(--av-surface-raised)" }}
       >
         <div className="flex items-start gap-3">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#FF3B30]" />
           <div className="min-w-0">
             <h2
               className="text-sm font-semibold"
-              style={{ color: "var(--st-text-primary)" }}
+              style={{ color: "var(--av-text-primary)" }}
             >
               {title}
             </h2>
             <p
               className="mt-1 text-xs leading-relaxed"
-              style={{ color: "var(--st-text-secondary)" }}
+              style={{ color: "var(--av-text-secondary)" }}
             >
               {description}
             </p>
@@ -72,8 +72,8 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="st-btn-ghost rounded-md px-3 py-1.5 transition-colors"
-            style={{ color: "var(--st-text-secondary)" }}
+            className="av-btn-ghost rounded-md px-3 py-1.5 transition-colors"
+            style={{ color: "var(--av-text-secondary)" }}
           >
             キャンセル (Esc)
           </button>

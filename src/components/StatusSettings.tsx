@@ -298,7 +298,7 @@ export function StatusSettings() {
             role="option"
             aria-selected={i === index}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-              i === index ? "st-row-selected" : ""
+              i === index ? "av-row-selected" : ""
             }`}
           >
             <span
@@ -312,10 +312,10 @@ export function StatusSettings() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleInputKeyDown}
-                className="flex-1 bg-transparent st-text-1 outline-none"
+                className="flex-1 bg-transparent av-text-1 outline-none"
               />
             ) : (
-              <span className="flex-1 truncate st-text-1">
+              <span className="flex-1 truncate av-text-1">
                 {status.name}
               </span>
             )}
@@ -323,7 +323,7 @@ export function StatusSettings() {
         ))}
       </div>
 
-      <div className="flex items-center gap-3 border-t st-border px-4 py-2 text-sm st-text-2">
+      <div className="flex items-center gap-3 border-t av-border px-4 py-2 text-sm av-text-2">
         <Plus size={14} />
         {mode === "create" ? (
           <input
@@ -333,7 +333,7 @@ export function StatusSettings() {
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder="ステータス名を入力"
-            className="flex-1 bg-transparent st-text-1 outline-none st-input"
+            className="flex-1 bg-transparent av-text-1 outline-none av-input"
           />
         ) : (
           <span>新規ステータス (N)</span>
@@ -357,7 +357,7 @@ export function StatusSettings() {
           role="listbox"
           aria-label="色を選択"
           onKeyDown={handleColorKeyDown}
-          className="flex items-center gap-2 border-t st-border px-4 py-3 outline-none"
+          className="flex items-center gap-2 border-t av-border px-4 py-3 outline-none"
         >
           {STATUS_COLORS.map((color, i) => (
             <span
@@ -367,7 +367,7 @@ export function StatusSettings() {
               aria-selected={i === colorIndex}
               className={`h-5 w-5 rounded-full transition-transform ${
                 i === colorIndex
-                  ? "scale-110 ring-2 ring-[var(--st-text-secondary)] ring-offset-2"
+                  ? "scale-110 ring-2 ring-[var(--av-text-secondary)] ring-offset-2"
                   : ""
               }`}
               style={{ backgroundColor: color.value }}

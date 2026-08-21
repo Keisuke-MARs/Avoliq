@@ -54,8 +54,8 @@ export function FooterHints({ view }: { view: View }) {
       data-testid="keyboard-hints"
       className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-2 text-[11px]"
       style={{
-        borderColor: "var(--st-palette-border)",
-        color: "var(--st-text-secondary)",
+        borderColor: "var(--av-hairline)",
+        color: "var(--av-text-secondary)",
       }}
     >
       {HINTS[view].map(([key, label]) => (
@@ -63,8 +63,8 @@ export function FooterHints({ view }: { view: View }) {
           <kbd
             className="rounded border px-1.5 py-0.5 font-medium"
             style={{
-              borderColor: "var(--st-palette-border)",
-              backgroundColor: "var(--st-surface-hover)",
+              borderColor: "var(--av-hairline)",
+              backgroundColor: "var(--av-surface-hover)",
             }}
           >
             {key}
