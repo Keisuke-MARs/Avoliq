@@ -363,9 +363,11 @@ detail: ["⌘←→","ステータス"], ["⌘T","タイトル"], ["⌘K","タ�
 3. **`⌘K` と BlockNote のリンク作成の共存**。`useKeyboard` の先頭の `defaultPrevented` チェック
 4. **`board_delete` の明示削除順**に `task_tags → tags` を追加
 5. **`selectBoard` の boardEpoch チェックに `tags` を含める**（非同期競合の防御規約）
-6. **`filterTasks` のシグネチャ変更**（第3引数に `tags` が増える）。呼び出し元は
-   `Board.tsx` と `useKeyboard.ts`（`handleBoardKey` 内の `buildLanes`）の2箇所。
-   カーソル移動のレーン計算と実際の表示が食い違わないよう、両方を必ず同時に直す
+6. **`filterTasks` のシグネチャ変更**（第3引数に `tags` が増える）。呼び出し元は**4箇所**:
+   `Board.tsx` / `useKeyboard.ts`（`handleBoardKey` 内の `buildLanes`）/
+   `appStore.ts` の `setSearchQuery` と `deleteSelectedTask`。
+   カーソル移動のレーン計算・削除後の選択・実際の表示が食い違わないよう、必ず全部同時に直す。
+   第3引数は**省略不可**にして、直し忘れをコンパイルエラーで検出させる
 
 ## テスト方針
 

@@ -23,7 +23,7 @@ Avoliq のブランド設計書は Avoliq Blue `#0A84FF` を「唯一の行動�
 | ダークモードの二重機構 | CSS は `@media (prefers-color-scheme: dark)`、JS は `matchMedia`。`.dark` クラスがアプリ本体に付かず、`index.css` の `.dark { … }` は BlockNote のサブツリー以外では死にコード |
 | アクセント青の分裂 | `#007AFF` / `#007aff`（大小文字違いで別リテラル）/ shadcn `--primary`（実は `oklch(.205 0 0)` ＝ ほぼ黒）の3系統 |
 | 危険色の分裂 | `#FF3B30` 直書き と shadcn `--destructive` の2系統 |
-| ガラスが機能していない | `backdrop-filter` は透過 WebView ではデスクトップをぼかせず完全な no-op。透け感は生アルファの素通しでしかない |
+| ガラスが機能していなかった | `backdrop-filter` は透過 WebView ではデスクトップをぼかせず完全な no-op だった。**コミット `c2f9b6c` で `windowEffects` により解消済み**。本設計はその上に重ねる CSS 層を定める |
 | コントラストの破綻 | 選択カードの白文字はステータス8色すべてで AA 不合格（1.90〜4.28） |
 
 本書は、これらを一度に解消する配色トークン体系を定義する。
@@ -54,7 +54,7 @@ Avoliq のブランド設計書は Avoliq Blue `#0A84FF` を「唯一の行動�
 | 命名 | **`--st-*` → `--av-*` へ改名**。ユーティリティクラスも `st-*` → `av-*` |
 | 文字色 | **ブランドの Ink / Slate を採用**。完全無彩色をやめる |
 | アクセント青 | `#0A84FF` を軸に**3階調**へ分解。正典色は維持 |
-| ガラス | `window-vibrancy` + `NSVisualEffectMaterial::HudWindow` + CSS の**二層構成** |
+| ガラス | `tauri.conf.json` の `windowEffects`（`popover` / `active` / `radius 16`）+ CSS の**二層構成**。外部クレートは使わない |
 | ダーク判定 | **`.dark` クラス一本**。`matchMedia` が唯一の源 |
 | ステータス8色 | **Apple systemColors を維持**。ただし `#007AFF` をインディゴ `#5856D6` へ差し替え |
 | 選択カード | **ベタ塗り＋白文字を廃止**。ブランド青の淡面＋2px リング＋ステータス点（案A） |
@@ -243,63 +243,67 @@ Slate は現行 secondary より**暗い**（L .4922 対 .5399）。
 
 ## 5. ガラス（Liquid Glass）の実装
 
-### 5.1 なぜ Rust 側の変更が必須か
+### 5.1 なぜ CSS だけでは届かないか（対応済み）
 
-`index.css` の `.st-palette` にある `backdrop-filter: saturate(180%) blur(30px)` は、
+`index.css` の `.st-palette` にあった `backdrop-filter: saturate(180%) blur(30px)` は、
 透過 WebView の下（＝ネイティブ層）には届かず、Web 側スタッキングコンテキストには何も無いため
-**完全な no-op** である。GPU に無駄な合成レイヤーを1枚作るだけなので撤去する。
+**完全な no-op** だった。透け感は生アルファで壁紙が素通ししているだけで、
+背後の文字がぼけずに読める状態になっていた。これが「ガラスに見えない」原因。
 
-現状の透け感は `rgba(250,250,252,0.92)` の生アルファで壁紙が素通ししているだけであり、
-背後の文字がぼけずにそのまま読める状態になっている。これが「ガラスに見えない」原因。
+**この点はコミット `c2f9b6c` で既に解消済み**である。`backdrop-filter` は撤去され、
+ネイティブのぼかしが導入された。本節の残りは、その上に重ねる CSS 層の仕様を定める。
 
-### 5.2 NSVisualEffectMaterial の選定
+### 5.2 ネイティブのぼかしは `windowEffects` が担う（実装済み）
 
-**`NSVisualEffectMaterial::HudWindow` + `NSVisualEffectState::Active` + corner radius `16.0` を採用する。**
+Tauri v2 は `tauri.conf.json` の `windowEffects` で `NSVisualEffectView` を宣言的に適用できる。
+**外部クレート（`window-vibrancy`）は使わない。** 既に次の設定が入っている。
 
-```toml
-# src-tauri/Cargo.toml
-[target."cfg(target_os = \"macos\")".dependencies]
-window-vibrancy = "0.6"
+```jsonc
+// src-tauri/tauri.conf.json の windows[0]
+"windowEffects": {
+  "effects": ["popover"],
+  "state": "active",
+  "radius": 16
+}
 ```
 
-```rust
-// panel.rs / init_panel の末尾（set_event_handler の直後）
-window_vibrancy::apply_vibrancy(
-    &window,
-    window_vibrancy::NSVisualEffectMaterial::HudWindow,
-    Some(window_vibrancy::NSVisualEffectState::Active),
-    Some(PANEL_CORNER_RADIUS),
-)?;
-```
+**`state: "active"` が必須である理由**
 
-**HudWindow を選ぶ理由**
-
-- Apple が「常時浮かぶユーティリティパネル」に使う素材で、NSPanel という本アプリの形態と用途が一致する。Spotlight / Alfred の見えに最も近い。
-- Popover / Menu より色味が中立で、Sidebar より不透明度が高い。**CSS 層だけでは可読性が成立しない**ため、素材側の不透明度は可読性の土台として必要。
-- appearance に自動追従するため、`.dark` クラスと別管理にならない。
-
-**`NSVisualEffectState::Active` が必須である理由**
-
-既定の `FollowsWindowActiveState` にすると、パネルがキーウィンドウでない間、
+既定の `followsWindowActiveState` にすると、パネルがキーウィンドウでない間、
 素材が「非アクティブ」表示（彩度が落ちてのっぺりしたグレー）になる。
 本アプリは `panel.rs` で `nonactivating_panel` を指定し、**意図的にアプリをアクティブ化しない**ため、
-この状態に頻繁に入る。`Active` 固定にしないとパレットが出るたび灰色に濁る。
+この状態に頻繁に入る。`active` 固定にしないとパレットが出るたび灰色に濁る。
 
-### 5.3 tauri-nspanel との適用順序
+**素材が `popover` である点について**
 
-**`to_panel()` とその後の各種設定を全部終えてから、最後に `apply_vibrancy` を呼ぶ。**
+本設計は当初 `hudWindow` を推していた。理由は「Apple が常時浮かぶユーティリティパネルに使う素材で、
+NSPanel という本アプリの形態と用途が一致する」こと。
+一方 `popover` を却下した理由は「自前の角丸マスクを持ち、`panel.rs` の `set_corner_radius(16.0)` と
+二重マスクになって縁がざらつく」という懸念だった。
 
-1. **contentView の生存**: `window-vibrancy` は `NSVisualEffectView` を contentView の**サブビューとして最背面に挿入**する。
-   `to_panel()` は NSWindow のクラスを差し替える方式で contentView は温存するが、
-   順序を逆にすると将来 tauri-nspanel 側の実装が変わったときに黙って効果ビューが消える。
-2. **角丸の二重管理**: `panel.rs` の `set_corner_radius(16.0)` はパネル側のレイヤーにしか効かない。
-   `apply_vibrancy` の第4引数に**同じ 16.0 を渡さないと、効果ビューだけが四角いまま**丸角パレットの外側にはみ出す。
-   CSS の `border-radius: 16px` と合わせて **3箇所を 16 で揃える**。
-   マジックナンバーなので Rust 側に `const PANEL_CORNER_RADIUS: f64 = 16.0;` を置き、CSS 側はコメントで参照元を明示する。
-3. **影の形状**: `set_has_shadow(true)` は不透明なコンテンツの輪郭から影を計算する。
-   効果ビューが入ると輪郭がウィンドウ矩形全体になるため、2 を怠ると**影も四角くなる**。
-4. **既存の `StyleMask` の罠は維持する**: `borderless()` → `nonactivating_panel()` の順序（既存コメントのとおり）。
-   vibrancy を足すときにこの行を触らない。
+**この懸念は机上のものであり、実機で検証していない。**
+既に `popover` で動いているため、**実装は `popover` のまま進め、角のざらつきは手動スモーク（11節）で確認する**。
+ざらつきが実際に出た場合にのみ `effects` を `["hudWindow"]` に変える（変更は1行）。
+どちらの素材でもライト／ダークの appearance には自動追従するため、`.dark` クラスと別管理にはならない。
+
+### 5.3 角丸の値を揃える
+
+角丸 `16` は**3箇所**に散っている。1つでもズレると効果ビューがはみ出すか、影が角丸に沿わなくなる。
+
+| 箇所 | 値 |
+|---|---|
+| `src-tauri/tauri.conf.json` の `windowEffects.radius` | `16` |
+| `src-tauri/src/panel.rs` の `panel.set_corner_radius(…)` | `16.0` |
+| `src/index.css` の `.av-glass` の `border-radius` | `16px` |
+
+`panel.rs` 側はマジックナンバーなので `const PANEL_CORNER_RADIUS: f64 = 16.0;` として定数化し、
+CSS と `tauri.conf.json` にはコメントで参照元を明示する。
+
+**影の形状**: `panel.rs` の `set_has_shadow(true)` は不透明なコンテンツの輪郭から影を計算する。
+効果ビューが入ると輪郭がウィンドウ矩形全体になるため、角丸がズレると**影も四角くなる**。
+
+**既存の `StyleMask` の罠は維持する**: `borderless()` → `nonactivating_panel()` の順序（既存コメントのとおり）。
+ガラスまわりを触るときにこの行を動かさない。
 
 ### 5.4 CSS レイヤーの具体値
 
@@ -368,15 +372,23 @@ ConfirmDialog 本体・トースト・BlockNote のメニューは**不透明** 
 1. **AA が必要な文字はガラスに直接置かない**。情報量のある `Lane.tsx` のレーン件数と
    `Board.tsx` の空状態サブ行は **secondary へ格上げ**する。
 2. `--av-text-muted` は「最悪面で 3:1」を保証水準とし、AA は保証しない。用途は placeholder・アイコン・無効状態に限定する。
-3. **vibrancy 失敗時のフォールバック（必須）**。`apply_vibrancy` が `Err` を返した場合、
-   Rust から `vibrancy-unavailable` を emit し、フロントは `<html>` に `data-vibrancy="off"` を付ける。
+3. **ぼかしが無い状態への退避弁**。素材が無い状態でアルファ 0.56 のままだと、
+   黒壁紙上で実効背景が `#818284` になり Slate が **1.61:1** まで落ちて UI が読めなくなる。
+   次の CSS を用意し、`<html>` に `data-vibrancy="off"` を付ければ実質不透明へ退避できるようにする。
 
    ```css
    [data-vibrancy="off"] { --av-glass-alpha-top: 0.96; --av-glass-alpha-bottom: 0.94; }
    ```
 
-   素材が無い状態で 0.56 のままだと Slate が **1.61:1** まで落ちて UI が読めなくなる。
-   これは装飾ではなく必須の安全装置であり、**`apply_vibrancy` の `Result` を握り潰してはならない**。
+   **これは自動フォールバックではない。** `windowEffects` は宣言的な設定であり、
+   フロントや Rust が「適用に失敗した」ことを知る戻り値は無い。
+   一方 `NSVisualEffectView` は macOS 10.10 以降つねに利用可能で、
+   Avoliq は macOS 専用アプリなので、実質的に失敗経路は存在しない。
+
+   したがってこの属性は **手動の退避弁 / デバッグ用**として位置づける。
+   将来 `window-vibrancy` クレートへ移行して `Result` を拾えるようになった場合は、
+   そこから自動で付けるようにしてよい。
+   手動で付けた状態で UI が読めることは、手動スモーク（11節）で確認する。
 
 ---
 
@@ -732,6 +744,8 @@ CLI 実行後は必ず差分を確認する運用とし、README に一行足す
 - [ ] ダークモード・白い壁紙の上で、カードの文字が読めるか
 - [ ] 派手な壁紙（彩度の高い写真）の上で色被りが許容範囲か
 - [ ] パレットの角丸が 16px で揃い、効果ビューがはみ出していないか
+- [ ] **角の縁がざらついていないか**（`popover` 素材の二重マスク懸念の検証。5.2節。
+      ざらついていたら `windowEffects.effects` を `["hudWindow"]` に変えて再確認する）
 - [ ] 影が丸角に沿っているか（四角くなっていないか）
 - [ ] 他アプリにフォーカスがある状態でパレットを出し、素材が灰色に濁らないか（`Active` の検証）
 - [ ] ダークのシステムで起動時に白く光らないか（FOUC の検証）
@@ -747,7 +761,8 @@ CLI 実行後は必ず差分を確認する運用とし、README に一行足す
 
 1. **`.dark` クラス基盤の一本化**（4節）— 先にこれを入れないと以降の値が検証できない
 2. **`--av-*` トークン定義の追加と shadcn 変数の付け替え**（3節 / 7.1節）。`--st-*` は当面 `--av-*` のエイリアスとして残す
-3. **`window-vibrancy` 導入とフォールバック**（5節）— **実機スクリーンショットで 5.6節の合成モデルを検証する**
+3. **ガラスの CSS 層と退避弁**（5節）。ネイティブ側は `windowEffects` で実装済みなので、
+   角丸の定数化と CSS の作り込みが対象 — **実機スクリーンショットで 5.6節の合成モデルを検証する**
 4. **コンポーネント側の `--st-*` → `--av-*` 機械置換とエイリアス撤去**
 5. **選択カード案A・ステータスチップ・`color-mix` 化**（6.3 / 6.4節）
 6. **sonner / ConfirmDialog / BlockNote**（7.2〜7.5節）
@@ -759,17 +774,18 @@ CLI 実行後は必ず差分を確認する運用とし、README に一行足す
 
 ## 13. リスクと落とし穴
 
-1. **vibrancy は可読性の土台であり、装飾ではない（最重要）**
-   CSS 層だけ（素材なし・アルファ 0.56）で黒壁紙に置くと、実効背景は `#818284` になり
+1. **ぼかしは可読性の土台であり、装飾ではない（最重要）**
+   CSS 層だけ（ぼかしなし・アルファ 0.56）で黒壁紙に置くと、実効背景は `#818284` になり
    **Slate が 1.61:1**、Ink ですら 4.18。**UI が読めなくなる。**
-   5.6節のフォールバックは必須。`apply_vibrancy` の `Result` を握り潰さないこと。
+   `windowEffects` を外す・無効化する変更を入れるときは、必ず 5.6節の退避弁とセットで行うこと。
 
-2. **`16.0` を3箇所で揃える**
-   `panel.set_corner_radius(16.0)` / `apply_vibrancy(…, Some(16.0))` / CSS `border-radius: 16px`。
+2. **`16` を3箇所で揃える**
+   `tauri.conf.json` の `windowEffects.radius` / `panel.set_corner_radius(…)` / CSS `border-radius: 16px`。
    1つでもズレると角がはみ出るか影が四角くなる。
 
-3. **`NSVisualEffectState` の既定値が罠**
-   `FollowsWindowActiveState` のままだと `nonactivating_panel` との組み合わせでパレットが出るたび灰色に濁る。`Active` を明示する。
+3. **`state` の既定値が罠**
+   `followsWindowActiveState` のままだと `nonactivating_panel` との組み合わせでパレットが出るたび灰色に濁る。
+   `"active"` を明示する（設定済み）。この行を消さないこと。
 
 4. **`StyleMask` の適用順序（既存の罠・維持すること）**
    `borderless()` → `nonactivating_panel()` の順。vibrancy を足すときにこの行を触らない。
@@ -798,9 +814,10 @@ CLI 実行後は必ず差分を確認する運用とし、README に一行足す
 |---|---|
 | `--st-*` を名前ごと維持 | 改名が済んだ他レイヤーと不整合。移行コストが実質ゼロ（テスト参照 0 件）と確認できたので、残す理由が無くなった |
 | 色値を hex で統一 | shadcn 側が oklch のため必ず混在する。同一色相ランプの関係が hex では読めない |
-| `NSVisualEffectMaterial::Sidebar` | 最も「ガラスらしい」が透過が強く、派手壁紙で Slate が 3:1 を割る。可読性の土台にならない |
-| `UnderWindowBackground` | ウィンドウ背後のコンテンツ向け素材。前面に浮くパネルでは意図した見えにならない |
-| `Popover` | 見えは良いが自前の角丸マスクを持ち、`set_corner_radius(16.0)` と二重マスクになって縁がざらつく |
+| `sidebar` 素材 | 最も「ガラスらしい」が透過が強く、派手壁紙で Slate が 3:1 を割る。可読性の土台にならない |
+| `underWindowBackground` 素材 | ウィンドウ背後のコンテンツ向け素材。前面に浮くパネルでは意図した見えにならない |
+| `window-vibrancy` クレートの導入 | Tauri v2 が `windowEffects` を組み込みで持っており、外部クレートは冗長。既に `windowEffects` で動いているものを置き換える理由がない。`Result` を拾って自動フォールバックできる利点はあるが、macOS 専用アプリでは失敗経路が実質存在しない（5.6節） |
+| `hudWindow` 素材（当初の推奨） | NSPanel との相性という論拠は妥当だが、既に `popover` で動いている。素材差し替えの根拠は実機での角のざらつきの有無であり、机上では決着しない。11節のスモークで確認し、問題が出た場合にのみ切り替える |
 | CSS `backdrop-filter` でデスクトップをぼかす | 透過 WebView の下（ネイティブ層）には届かない。完全な no-op |
 | タスクカードもガラスにする | ガラス×ガラスで屈折が二乗になり濁る。ブランド設計書4節に反する |
 | ステータス8色をブランド調和色に置換 | ブランド設計書5節が「主パレットへ持ち出さない」＝隔離を求めており、調和は要求されていない。既存ボードの色は変わらないので効果も無い |
@@ -821,10 +838,10 @@ CLI 実行後は必ず差分を確認する運用とし、README に一行足す
 - [ ] Avoliq Blue `#0A84FF` が `--av-blue-500` として実在し、選択リング・フォーカスリングに使われている
 - [ ] `.dark` クラスが `documentElement` に付き、`@media (prefers-color-scheme: dark)` ブロックが `index.css` から消えている
 - [ ] `usePrefersDark` が `useColorScheme` に統合され、`matchMedia` の購読者が 1箇所だけになっている
-- [ ] `window-vibrancy` が導入され、`apply_vibrancy` の `Result` が処理されている
-- [ ] `apply_vibrancy` 失敗時に `data-vibrancy="off"` が付き、ガラスが実質不透明へ退避する
+- [ ] `windowEffects` が `state: "active"` と `radius: 16` を保ったまま残っている
+- [ ] `data-vibrancy="off"` を手で付けるとガラスが実質不透明へ退避する
 - [ ] `backdrop-filter` が `.av-glass` から削除されている
-- [ ] 角丸 16 が Rust の定数 / `apply_vibrancy` 引数 / CSS の3箇所で揃っている
+- [ ] 角丸 16 が `tauri.conf.json` / `panel.rs` の定数 / CSS の3箇所で揃っている
 - [ ] 選択カードがステータス色でベタ塗りされておらず、白文字固定が消えている
 - [ ] hex 文字列連結によるアルファ生成（`${color}59` 形式）がコードベースに残っていない
 - [ ] ステータスプリセットが `design/status-presets.json` 単一ソースになり、Rust / TS の二重管理が消えている

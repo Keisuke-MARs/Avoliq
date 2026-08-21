@@ -38,8 +38,7 @@
 | `src/components/AppSettings.tsx` | トグル・ホットキーボタン・エラー表示をトークンへ |
 | `src/components/StatusSettings.tsx` | 色ピッカーの ring / ring-offset を修正 |
 | `src/lib/statusPalette.ts` | ハードコード配列を JSON import へ |
-| `src-tauri/Cargo.toml` | `window-vibrancy` 追加 |
-| `src-tauri/src/panel.rs` | `apply_vibrancy` と角丸定数、失敗時の emit |
+| `src-tauri/src/panel.rs` | 角丸を定数化（ネイティブのぼかし自体は `windowEffects` で実装済み） |
 | `src-tauri/src/db/repo.rs` | `DEFAULT_STATUSES` を JSON 由来へ |
 | `docs/superpowers/specs/2026-08-20-avoliq-brand-design.md` | 第4節に Avoliq における適用を追記 |
 
@@ -487,85 +486,54 @@ git commit -m "feat: --av-* カラートークンを定義しshadcn変数を参�
 
 ---
 
-## Task 3: `window-vibrancy` でガラスを実装する
+## Task 3: ガラスの CSS 層を作り込み、角丸の値を揃える
 
 設計書 5節。**ここが本計画で唯一「計算では詰めきれない」箇所**なので、実機確認を必ず行う。
 
+**前提（重要）**: ネイティブのぼかしは**コミット `c2f9b6c` で既に実装済み**である。
+`src-tauri/tauri.conf.json` の `windowEffects`（`popover` / `active` / `radius 16`）が
+`NSVisualEffectView` を敷いており、`.st-palette` の `backdrop-filter` も撤去済み。
+**`window-vibrancy` クレートは導入しない。** このタスクはその上に重ねる CSS 層を作る。
+
 **Files:**
-- Modify: `src-tauri/Cargo.toml`
-- Modify: `src-tauri/src/panel.rs`
+- Modify: `src-tauri/src/panel.rs`（角丸の定数化のみ）
+- Modify: `src-tauri/tauri.conf.json`（コメント追加のみ）
 - Modify: `src/index.css`
 - Modify: `src/components/Palette.tsx`
 
-- [ ] **Step 1: 依存を追加する**
+- [ ] **Step 1: 角丸を定数化する**
 
-`src-tauri/Cargo.toml` の依存セクションの末尾に追加する。macOS 専用のため target 指定にする。
+`16` は `tauri.conf.json` / `panel.rs` / CSS の3箇所に散っている。1つでもズレると
+効果ビューがはみ出すか影が四角くなるので、Rust 側を定数にして参照元を明示する。
 
-```toml
-[target."cfg(target_os = \"macos\")".dependencies]
-window-vibrancy = "0.6"
-```
-
-Run: `cd src-tauri && cargo fetch`
-Expected: `window-vibrancy` が解決される
-
-- [ ] **Step 2: 角丸を定数化して vibrancy を適用する**
-
-`src-tauri/src/panel.rs` を編集する。
-
-まず `MAIN_WINDOW_LABEL` の定義の下に定数を足す。
+`src-tauri/src/panel.rs` の `MAIN_WINDOW_LABEL` の定義の下に足す。
 
 ```rust
 /// パネルの角丸半径。
-/// NSPanel側・NSVisualEffectView側・CSSの border-radius の3箇所で必ず同じ値にすること。
-/// ズレると効果ビューだけ四角くなり、影も角丸に沿わなくなる。
+/// tauri.conf.json の windowEffects.radius と CSS の .av-glass の border-radius が
+/// 同じ値である必要がある。ズレると効果ビューだけ四角くなり、影も角丸に沿わなくなる。
 pub const PANEL_CORNER_RADIUS: f64 = 16.0;
-
-/// vibrancy（ネイティブのぼかし）の適用に失敗したことをフロントへ知らせるイベント名
-pub const VIBRANCY_UNAVAILABLE_EVENT: &str = "vibrancy-unavailable";
 ```
 
-次に `panel.set_corner_radius(16.0);` の行を定数へ置き換える。
+`panel.set_corner_radius(16.0);` の行を置き換える。
 
 ```rust
     panel.set_corner_radius(PANEL_CORNER_RADIUS);
 ```
 
-最後に `panel.set_event_handler(Some(events.as_ref()));` の**直後**、`Ok(())` の**前**に次を挿入する。
-`to_panel()` と各種設定を全部終えてから最後に呼ぶ（設計書 5.3節）。
+- [ ] **Step 2: `tauri.conf.json` に参照元のコメントを残せないので README で補う**
 
-```rust
-    // ネイティブのぼかしを最背面に敷く。
-    // CSSの backdrop-filter は透過WebViewの下（＝デスクトップ）には届かないため、
-    // ガラスの見えはこの NSVisualEffectView が作る。
-    //
-    // 順序: to_panel() と各種設定を全部終えてから最後に呼ぶ。効果ビューは contentView の
-    //       サブビューとして挿入されるため、先に呼ぶと後続の設定で失われうる。
-    // 素材: HudWindow は Apple が常時浮かぶユーティリティパネルに使う素材で、NSPanel と用途が一致する。
-    // 状態: Active 固定にしないと、nonactivating_panel の本アプリではパネルが
-    //       キーウィンドウでない間ずっと灰色に濁る。
-    #[cfg(target_os = "macos")]
-    {
-        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+JSON はコメントを書けないため、`windowEffects` の意図は設計書と README に置く。
+このステップでは `tauri.conf.json` を**変更しない**（`radius: 16` / `state: "active"` は既に正しい）。
 
-        if let Err(error) = apply_vibrancy(
-            &window,
-            NSVisualEffectMaterial::HudWindow,
-            Some(NSVisualEffectState::Active),
-            Some(PANEL_CORNER_RADIUS),
-        ) {
-            // ぼかしが無いと半透明の器は壁紙が素通しになり、文字が読めなくなる。
-            // フロントへ知らせて、CSS側でガラスを実質不透明へ退避させる。
-            eprintln!("vibrancyの適用に失敗しました: {error}");
-            let _ = window.app_handle().emit(VIBRANCY_UNAVAILABLE_EVENT, ());
-        }
-    }
-```
+Run: `grep -n "windowEffects" -A 4 src-tauri/tauri.conf.json`
+Expected: `"effects": ["popover"]` / `"state": "active"` / `"radius": 16` が並んでいること。
+**この3つが揃っていなければ先に進まない。**（`state` が無いと、非アクティブ時にパネルが灰色に濁る）
 
 - [ ] **Step 3: Rust がビルドできることを確認する**
 
 Run: `cd src-tauri && cargo build`
-Expected: 成功。`Emitter` は既に `use tauri::{… Emitter …}` で import 済みなので追加不要。
+Expected: 成功
 
 - [ ] **Step 4: Rust のテストを通す**
 
@@ -641,38 +609,20 @@ Expected: 全 PASS（44件）
 
 `st-view-forward` / `st-view-back` / `st-card` は Task 4 の sed でまとめて改名される。
 
-- [ ] **Step 6: `Palette.tsx` にクラス名変更と失敗イベントの購読を足す**
+- [ ] **Step 6: `Palette.tsx` のクラス名を変える**
 
-`src/components/Palette.tsx` の `className="st-palette flex h-screen …"` を `className="av-glass flex h-screen …"` に変える。
+`src/components/Palette.tsx`（47行目付近）の `className="st-palette flex h-screen …"` を
+`className="av-glass flex h-screen …"` に変える。
 
-import に追加する。
-
-```tsx
-import { listen } from "@tauri-apps/api/event";
-```
-
-`useColorScheme()` の呼び出しの下に追加する。
-
-```tsx
-  // ネイティブのぼかしが使えない環境では、ガラスを実質不透明へ退避させる。
-  // 半透明のままだと壁紙が素通しになり文字が読めなくなるため。
-  useEffect(() => {
-    const unlisten = listen("vibrancy-unavailable", () => {
-      document.documentElement.setAttribute("data-vibrancy", "off");
-    });
-    return () => {
-      void unlisten.then((off) => off());
-    };
-  }, []);
-```
-
-`useEffect` が未 import なら import に足す。
+`data-vibrancy` を自動で付ける仕組みは**作らない**。`windowEffects` は宣言的な設定で、
+適用に失敗したことを知る戻り値が無い。一方 `NSVisualEffectView` は macOS 10.10 以降つねに
+利用可能で、Avoliq は macOS 専用なので実質的に失敗経路が存在しない（設計書 5.6節）。
+この属性は手動の退避弁 / デバッグ用として CSS 側にだけ用意しておく。
 
 - [ ] **Step 7: 型検査・ビルド・テストを通す**
 
 Run: `npx tsc --noEmit && npm run build && npx vitest run`
-Expected: すべて成功。`Palette.test.tsx` が `@tauri-apps/api/event` のモックを必要とする場合は、
-既存のモック方針（`vi.mock`）に合わせて `listen: () => Promise.resolve(() => {})` を足す。
+Expected: すべて成功
 
 - [ ] **Step 8: 実機で確認する（このタスクの本体）**
 
@@ -683,6 +633,9 @@ Run: `npm run tauri dev`
 
 - [ ] 壁紙がぼけている（背後の他アプリの文字が読めない）
 - [ ] パレットの角が丸く、効果ビューがはみ出していない
+- [ ] **角の縁がざらついていない**（`popover` 素材の二重マスク懸念の検証。設計書 5.2節。
+      ざらついていたら `tauri.conf.json` の `effects` を `["hudWindow"]` に変えて再確認し、
+      どちらを採ったかを設計書 5.2節に追記する）
 - [ ] 影が丸角に沿っている（四角くなっていない）
 - [ ] 他アプリにフォーカスがある状態でパレットを出しても灰色に濁らない
 - [ ] 黒い壁紙の上でレーン名（secondary）が読める
@@ -704,12 +657,11 @@ Expected: ガラスがほぼ不透明になり、壁紙が透けなくなる。�
 
 ```bash
 git add -A
-git commit -m "feat: window-vibrancyでパレットをガラスにする
+git commit -m "feat: ガラスの器にハイライトと屈折を重ねる
 
-透過WebViewではCSSのbackdrop-filterがデスクトップに届かないため、
-ネイティブのNSVisualEffectViewでぼかしを敷き、その上にCSSで
-色味とハイライトと屈折を重ねる。適用に失敗した場合は
-ガラスを実質不透明へ退避させて可読性を守る。"
+ネイティブのぼかしの上に、上端のスペキュラーハイライトと
+縁のごく薄い屈折を乗せて、平らな半透明から立体的なガラスにする。
+角丸の値は設定とCSSとで揃える必要があるため定数にする。"
 ```
 
 ---
@@ -1649,13 +1601,17 @@ grep -n "prefers-color-scheme" src/index.css ; echo "---"
 # usePrefersDark が消えている
 grep -rn "usePrefersDark" src ; echo "---"
 # 角丸16が3箇所で揃っている
-grep -n "PANEL_CORNER_RADIUS" src-tauri/src/panel.rs ; grep -n "border-radius: 16px" src/index.css
+grep -n "PANEL_CORNER_RADIUS" src-tauri/src/panel.rs
+grep -n "border-radius: 16px" src/index.css
+grep -n '"radius"' src-tauri/tauri.conf.json
 ```
 
 Expected:
 - 最初の6つの grep は**すべて出力なし**（`prefers-color-scheme` は `index.html` にはあるが `index.css` には無い）
-- 最後の grep は `PANEL_CORNER_RADIUS` が定数定義・`set_corner_radius`・`apply_vibrancy` の3箇所、
-  CSS の `border-radius: 16px` が `.av-glass` の1箇所
+- `PANEL_CORNER_RADIUS` が定数定義と `set_corner_radius` の2箇所
+- CSS の `border-radius: 16px` が `.av-glass` の1箇所
+- `tauri.conf.json` の `"radius": 16` が1箇所
+- **3つのファイルの値がすべて 16 であること**
 
 - [ ] **Step 3: 全テストと型検査とビルドを通す**
 
