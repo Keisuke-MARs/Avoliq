@@ -166,3 +166,115 @@ describe("TagPalette: コードレビュー指摘の回帰", () => {
     expect(toggle).toHaveBeenNthCalledWith(2, "tag-urgent");
   });
 });
+
+describe("TagPalette: 作成・改名・削除", () => {
+  beforeEach(() => {
+    setup();
+    vi.restoreAllMocks();
+  });
+
+  it("未登録の名前を打つと作成行が出る", async () => {
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.type(screen.getByTestId("tag-palette-input"), "新規タグ");
+
+    expect(screen.getByTestId("tag-palette-create")).toHaveTextContent("新規タグ");
+  });
+
+  it("既にある名前と完全一致するなら作成行は出さない", async () => {
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.type(screen.getByTestId("tag-palette-input"), "バグ");
+
+    expect(screen.queryByTestId("tag-palette-create")).not.toBeInTheDocument();
+  });
+
+  it("⌘Enter で作成する（素のEnterでは作らない）", async () => {
+    const create = vi.fn();
+    useAppStore.setState({ createTagAndAttach: create });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+    await user.type(screen.getByTestId("tag-palette-input"), "新規タグ");
+
+    // 素のEnterは作成しない（IMEの変換確定で誤爆させないため）
+    await user.keyboard("{Enter}");
+    expect(create).not.toHaveBeenCalled();
+
+    await user.keyboard("{Meta>}{Enter}{/Meta}");
+    expect(create).toHaveBeenCalledWith("新規タグ");
+  });
+
+  it("⌘R で改名の入力欄に変わり、⌘Enter で確定する", async () => {
+    const rename = vi.fn();
+    useAppStore.setState({ renameTag: rename });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.keyboard("{Meta>}r{/Meta}");
+    const input = screen.getByTestId("tag-palette-rename-input");
+    expect(input).toHaveValue("バグ");
+
+    await user.clear(input);
+    await user.type(input, "不具合");
+    await user.keyboard("{Meta>}{Enter}{/Meta}");
+
+    expect(rename).toHaveBeenCalledWith("tag-bug", "不具合");
+  });
+
+  it("改名は Esc で取り消せる", async () => {
+    const rename = vi.fn();
+    useAppStore.setState({ renameTag: rename });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.keyboard("{Meta>}r{/Meta}");
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByTestId("tag-palette-rename-input")).not.toBeInTheDocument();
+    expect(rename).not.toHaveBeenCalled();
+  });
+
+  it("⌘Backspace で確認ダイアログを出し、件数を伝える", async () => {
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText(/2件のタスクからこのタグが外れます/)).toBeInTheDocument();
+  });
+
+  it("確認ダイアログで Enter を押すと削除する", async () => {
+    const remove = vi.fn();
+    useAppStore.setState({ deleteTag: remove });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+
+    await user.keyboard("{Enter}");
+
+    expect(remove).toHaveBeenCalledWith("tag-bug");
+  });
+
+  it("削除の確認ダイアログを Esc で閉じると、入力欄にフォーカスが戻り操作を続けられる", async () => {
+    const close = vi.fn();
+    const remove = vi.fn();
+    useAppStore.setState({ closeTagPalette: close, deleteTag: remove });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(remove).not.toHaveBeenCalled();
+    expect(screen.getByTestId("tag-palette-input")).toHaveFocus();
+
+    // フォーカスが入力欄に戻っていなければ、この2回目のEscapeはどこにも届かない
+    await user.keyboard("{Escape}");
+    expect(close).toHaveBeenCalled();
+  });
+});
