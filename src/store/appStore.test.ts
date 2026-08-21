@@ -295,6 +295,51 @@ describe("appStore: setSearchQuery", () => {
   });
 });
 
+describe("appStore: closeTagPalette と絞り込み", () => {
+  beforeEach(async () => {
+    await loadFixtureBoard();
+  });
+
+  it("タグを外して絞り込みから外れたカードは選択を解除する", () => {
+    // 検索欄が#バグの状態でt-a(バグ持ち)を選択中→タグパレットでバグを外した状況を再現する
+    useAppStore.setState({
+      searchQuery: "#バグ",
+      selectedTaskId: "t-a",
+      tagPaletteOpen: true,
+      tasks: useAppStore
+        .getState()
+        .tasks.map((t) => (t.id === "t-a" ? { ...t, tagIds: t.tagIds.filter((id) => id !== "tag-bug") } : t)),
+    });
+
+    useAppStore.getState().closeTagPalette();
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(false);
+    expect(useAppStore.getState().selectedTaskId).toBeNull();
+  });
+
+  it("絞り込みから外れていなければ選択を維持する", () => {
+    // t-a はバグを持ったまま(絞り込みに残る)
+    useAppStore.setState({ searchQuery: "#バグ", selectedTaskId: "t-a", tagPaletteOpen: true });
+
+    useAppStore.getState().closeTagPalette();
+
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+  });
+
+  it("検索クエリが空ならタグを外しても選択を維持する", () => {
+    useAppStore.setState({
+      searchQuery: "",
+      selectedTaskId: "t-a",
+      tagPaletteOpen: true,
+      tasks: useAppStore.getState().tasks.map((t) => (t.id === "t-a" ? { ...t, tagIds: [] } : t)),
+    });
+
+    useAppStore.getState().closeTagPalette();
+
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+  });
+});
+
 describe("appStore: setView / setSelectedTask", () => {
   it("view を切り替える", () => {
     useAppStore.getState().setView("detail");

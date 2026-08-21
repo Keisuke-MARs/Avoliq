@@ -87,6 +87,24 @@ describe("Board", () => {
     expect(screen.getAllByTestId("lane")[0].querySelector("[data-testid='lane-count']")?.textContent).toBe("2");
   });
 
+  it("絞り込み結果が0件のとき、タスク自体が無い場合とは別の空状態を出す", () => {
+    setupBoard();
+    useAppStore.setState({ searchQuery: "存在しないタスク名" });
+    render(<Board />);
+    expect(screen.queryAllByTestId("task-card")).toHaveLength(0);
+    expect(screen.queryAllByTestId("lane")).toHaveLength(0);
+    expect(screen.getByText("該当するタスクがありません")).toBeInTheDocument();
+    // タスクがまだ無いときの空状態文言とは区別されていること
+    expect(screen.queryByText("タスクはまだありません")).not.toBeInTheDocument();
+  });
+
+  it("存在しないタグで絞り込んでも0件の空状態を出す", () => {
+    setupBoard();
+    useAppStore.setState({ searchQuery: "#存在しないタグ" });
+    render(<Board />);
+    expect(screen.getByText("該当するタスクがありません")).toBeInTheDocument();
+  });
+
   it("カードをクリックすると選択される", async () => {
     const user = userEvent.setup();
     setupBoard();

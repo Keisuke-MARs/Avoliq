@@ -100,6 +100,21 @@ let taskCreating = false;
 let tagSubmitting = false;
 
 /**
+ * 指定タスクが、現在の絞り込み条件(検索文字列＋タグ)のもとでもまだ見えているかを判定する。
+ * setSearchQuery(検索文字列の変更)とcloseTagPalette(タグの付け外し/削除で絞り込み対象集合が
+ * 変わりうる)の両方が「選択中のカードが絞り込みから外れたら選択を解除する」という同じ判定を
+ * 必要とするため、ここに1本化する。重複させると片方だけ直したときに片肺になる。
+ */
+function isTaskStillVisible(
+  taskId: string,
+  tasks: Task[],
+  searchQuery: string,
+  tags: Tag[],
+): boolean {
+  return filterTasks(tasks, searchQuery, tags).some((t) => t.id === taskId);
+}
+
+/**
  * 楽観的更新の失敗時に呼ぶ復旧処理。
  * 古いsnapshot全体で巻き戻すと待機中の他操作まで巻き戻してしまうので、
  * DBの実状態を読み直して合わせる。読み直し自体も失敗したらsnapshotへ戻す。
@@ -199,7 +214,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const { tasks, tags, selectedTaskId } = get();
     // 絞り込みの結果、選択中のカードが表示対象から外れたら選択を解除して検索バーへ戻す
     const stillVisible =
-      selectedTaskId !== null && filterTasks(tasks, q, tags).some((t) => t.id === selectedTaskId);
+      selectedTaskId !== null && isTaskStillVisible(selectedTaskId, tasks, q, tags);
     set({ searchQuery: q, selectedTaskId: stillVisible ? selectedTaskId : null });
   },
 
@@ -439,7 +454,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   closeTagPalette() {
-    set({ tagPaletteOpen: false });
+    // タグの付け外し/削除で選択中のカードが絞り込みから外れていたら、
+    // setSearchQueryと同じ判定をやり直して選択を解除する(残したままだと、見えていない
+    // カードの詳細が開いてしまう)。toggleTaskTag/deleteTag側で選択を外すと、パレットが
+    // 開いたままの間に対象タスクがnullになり以後トグルできなくなるため、ここで一括してやる
+    const { tasks, tags, searchQuery, selectedTaskId } = get();
+    const stillVisible =
+      selectedTaskId !== null && isTaskStillVisible(selectedTaskId, tasks, searchQuery, tags);
+    set({ tagPaletteOpen: false, selectedTaskId: stillVisible ? selectedTaskId : null });
   },
 
   async toggleTaskTag(tagId) {
