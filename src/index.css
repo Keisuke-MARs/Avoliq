@@ -449,6 +449,12 @@ body {
   border-color: transparent;
 }
 
+/* BlockNoteのツールチップは text-background を使うが、Avoliqの通常背景は透過。
+   そのままでは説明文が透明になるため、暗いツールチップ面には白文字を明示する。 */
+.bn-root [data-slot="tooltip-content"] {
+  color: var(--av-text-on-accent);
+}
+
 /* OSの視差効果を減らす設定を尊重する */
 @media (prefers-reduced-motion: reduce) {
   .av-glass,
