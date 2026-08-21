@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** ブランド色 Avoliq Blue を実装に導入し、ダークモード基盤を `.dark` クラスへ一本化したうえで、`window-vibrancy` による Liquid Glass の器を実現する。
+**Goal:** ブランド色 Avoliq Blue を実装に導入し、ダークモード基盤を `.dark` クラスへ一本化したうえで、`windowEffects` のぼかしの上に Liquid Glass の器を作り込む。
 
 **Architecture:** 色の実値を `--av-*` トークン定義ブロック1箇所だけに集約し、shadcn 変数・BlockNote 変数・コンポーネントはすべて `var(--av-*)` を参照するだけにする。ガラスはネイティブの `NSVisualEffectView`（可読性の土台）とその上の CSS レイヤー（色味・ハイライト・屈折）の二層構成にする。ステータス色は Rust / TS が同一の JSON を読む単一ソースにする。
 
-**Tech Stack:** Tauri v2 (Rust) / tauri-nspanel / window-vibrancy / React 19 / TypeScript / Tailwind v4 / shadcn (base-nova) / BlockNote 0.54.0 / sonner / Vitest + Testing Library
+**Tech Stack:** Tauri v2 (Rust) / tauri-nspanel / windowEffects (NSVisualEffectView) / React 19 / TypeScript / Tailwind v4 / shadcn (base-nova) / BlockNote 0.54.0 / sonner / Vitest + Testing Library
 
 **設計書:** `docs/superpowers/specs/2026-08-21-avoliq-color-system-design.md`（本計画の各タスクは設計書の節番号を参照する）
 
@@ -547,7 +547,7 @@ Expected: 全 PASS（44件）
 
 ```css
 /* ============ パレットの器（ガラス） ============
-   ネイティブの NSVisualEffectView（panel.rs の apply_vibrancy）が敷いたぼかしの上に、
+   ネイティブの NSVisualEffectView（tauri.conf.json の windowEffects）が敷いたぼかしの上に、
    色味・スペキュラーハイライト・屈折を重ねる二層構成の上側。
    border-radius は panel.rs の PANEL_CORNER_RADIUS と必ず揃えること。 */
 .av-glass {
