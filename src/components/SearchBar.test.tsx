@@ -155,3 +155,67 @@ describe("SearchBar: 既存のキー操作を邪魔しないこと", () => {
     expect(notPrevented).toBe(true);
   });
 });
+
+describe("SearchBar: 常時マウントされていることによる副作用の防止", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tasks, tags });
+  });
+
+  it("view が detail のときはサジェストを表示しない(SearchBar自体はviewに関係なく常時マウントされているため)", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    await user.type(input, "#");
+    expect(screen.getByTestId("tag-suggest")).toBeInTheDocument();
+
+    // カードを開いて詳細画面へ遷移する(searchQueryはクリアされない)。
+    // SearchBarはPalette.tsxでviewに関わらず常時マウントされたままなので、
+    // view側で絞らないと詳細画面の上にドロップダウンが浮いたまま残ってしまう
+    useAppStore.setState({ view: "detail" });
+
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId("tag-suggest")).not.toBeInTheDocument();
+    });
+  });
+
+  it("ボードを切り替えるとTabの候補送りサイクルがリセットされる", async () => {
+    const user = userEvent.setup();
+    useAppStore.setState({ currentBoardId: "board-1" });
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    await user.type(input, "#");
+
+    await user.keyboard("{Tab}"); // -> "#バグ"
+    await user.keyboard("{Tab}"); // -> "#緊急"
+    expect(useAppStore.getState().searchQuery).toBe("#緊急");
+
+    // selectBoardはonChange/onBlurを経由せず、searchQueryとcurrentBoardIdを直接書き換える。
+    // その経路をここで再現する
+    useAppStore.setState({ currentBoardId: "board-2", searchQuery: "" });
+
+    // currentBoardId の変化を検知する useEffect は再描画のコミット後に走る。
+    // ここで待たずに次の操作へ進むと、refs のリセットが間に合う前にアサーションしてしまい
+    // 「リセットされたかどうか」を正しく検証できない。DOM側の反映(入力欄が空になったこと)を
+    // 待つことで、useEffectのリセットも確実に完了させてから次へ進む
+    await vi.waitFor(() => {
+      expect(input).toHaveValue("");
+    });
+
+    // ここで user.type(input, "#") を使うと、DOM の onChange 経由で refs が
+    // その場でリセットされてしまい、currentBoardId の変化によるリセットの検証にならない。
+    // useKeyboard.ts の非フォーカス時の経路(検索欄が非フォーカスのまま印字可能キーが来ると
+    // s.setSearchQuery を store 経由で直接呼ぶ)を再現するため、ここも store を直接呼ぶ
+    useAppStore.getState().setSearchQuery("#");
+    // 同様に、store直呼びの反映(再描画)を待ってから keyDown を発火する。
+    // 待たずに発火すると、input の onKeyDown ハンドラが「#」反映前の古い描画に
+    // 紐づいたクロージャのままになり、isTagToken が false のTab押下として空振りする
+    await vi.waitFor(() => {
+      expect(input).toHaveValue("#");
+    });
+    fireEvent.keyDown(input, { key: "Tab" });
+
+    // リセットされていなければ前ボードのcycle位置(2週目)から続いて「設計」になってしまうが、
+    // リセットされていれば新しいボードでも先頭候補の「バグ」に戻る
+    expect(useAppStore.getState().searchQuery).toBe("#バグ");
+  });
+});

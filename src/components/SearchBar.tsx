@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SEARCH_INPUT_ID } from "@/hooks/useKeyboard";
 import { useAppStore } from "@/store/appStore";
 import type { Tag } from "@/types";
@@ -12,6 +12,8 @@ export function SearchBar() {
   const setSearchQuery = useAppStore((s) => s.setSearchQuery);
   const tags = useAppStore((s) => s.tags);
   const tasks = useAppStore((s) => s.tasks);
+  const view = useAppStore((s) => s.view);
+  const currentBoardId = useAppStore((s) => s.currentBoardId);
 
   /**
    * Tab連打で候補を送るための状態。
@@ -20,6 +22,25 @@ export function SearchBar() {
    */
   const tabBaseRef = useRef<string | null>(null);
   const tabCycleRef = useRef(0);
+
+  /**
+   * SearchBar は Palette.tsx で view に関係なく常時マウントされたままなので
+   * (Board/TaskDetailのようにviewでアンマウントされない)、「今この入力欄を操作中か」を
+   * フォーカス状態として別に持っておく。これが無いと、検索欄で#タグを打ってから
+   * カードを開いて詳細画面に移っても、ドロップダウンが詳細画面の上に浮いたまま残ってしまう。
+   */
+  const [focused, setFocused] = useState(false);
+
+  /**
+   * ボード切替(selectBoard)はonChange/onBlurを経由せず、searchQueryとcurrentBoardIdを
+   * 直接まとめて書き換える。そのため候補送りの状態(tabBaseRef/tabCycleRef)を放置すると、
+   * 切替後に前のボードの続きの位置からTab補完が始まってしまう。currentBoardIdの変化を
+   * 検知して、そのタイミングで必ずリセットする。
+   */
+  useEffect(() => {
+    tabBaseRef.current = null;
+    tabCycleRef.current = 0;
+  }, [currentBoardId]);
 
   // 全角＃は日本語入力ONのShift+3で出る。boardNav.parseSearchQuery と同じく必ず正規化する
   const normalized = searchQuery.replace(/＃/g, "#");
@@ -111,12 +132,27 @@ export function SearchBar() {
           tabCycleRef.current = 0;
           setSearchQuery(e.target.value);
         }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          // フォーカスが外れたら候補送りの状態も一緒に捨てる。
+          // (例: カード選択でuseKeyboardがblurSearchInputを呼んだあと、再び検索欄へ戻って
+          // Tabを押したとき、前回の続きの位置から補完されると使用者が混乱するため)
+          tabBaseRef.current = null;
+          tabCycleRef.current = 0;
+          setFocused(false);
+        }}
         onKeyDown={handleKeyDown}
         className="st-search-input w-full bg-transparent text-[17px] outline-none"
         style={{ color: "var(--st-text-primary)" }}
       />
 
-      {isTagToken && suggestions.length > 0 && (
+      {/*
+        フォーカスと同時にview==="board"も見ているのは、SearchBar自体はview非依存に
+        常時マウントされているため。フォーカスだけだと、詳細画面をマウスクリックで開いた場合など
+        入力欄が明示的にblurされない経路が万一あってもドロップダウンが残ってしまう恐れがある。
+        boardに戻ってきていない間は「今ここで検索操作中」ではないので出さない。
+      */}
+      {focused && view === "board" && isTagToken && suggestions.length > 0 && (
         <div
           data-testid="tag-suggest"
           className="absolute left-11 top-[52px] z-20 w-56 overflow-hidden rounded-lg py-1 shadow-lg"
