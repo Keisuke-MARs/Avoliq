@@ -22,8 +22,11 @@ export function TagPalette() {
   const toggleTaskTag = useAppStore((s) => s.toggleTaskTag);
 
   const [query, setQuery] = useState("");
-  // -1 は「着地点なし」。IME変換中はここへ落としてEnterを無害化する
-  const [highlight, setHighlight] = useState(0);
+  // ハイライトはindexではなくタグidで持つ。トグルすると付与済み/使用件数で並び替わるため、
+  // indexだけで管理すると「押した直後に別の行を指してしまう」事故が起きる
+  // (idで持てば、並び替わっても同じタグを指し続ける)。nullは「着地点なし」。
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const task = tasks.find((t) => t.id === selectedTaskId) ?? null;
@@ -52,14 +55,43 @@ export function TagPalette() {
     return [...attached, ...rest];
   }, [allTags, tasks, task, query]);
 
-  // 候補が変わったら先頭に戻す（候補が消えたら着地点なしにする）
+  // 絞り込み文字列が変わったときは「今どこにいたか」より予測しやすさを優先し、常に先頭へ戻す
+  // (候補が0件になったら着地点なしにする)
   useEffect(() => {
-    setHighlight(rows.length > 0 ? 0 : -1);
-  }, [rows.length, query]);
+    setHighlightId(rows[0]?.tag.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  // トグルによる並び替えなど、クエリ以外の理由でrowsが変わった場合は、
+  // ハイライト中のタグがまだ候補に残っていればそのまま追随させ、消えたときだけ先頭へ戻す
+  useEffect(() => {
+    if (highlightId !== null && rows.some((row) => row.tag.id === highlightId)) return;
+    setHighlightId(rows[0]?.tag.id ?? null);
+  }, [rows, highlightId]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  const highlightIndex = highlightId === null ? -1 : rows.findIndex((row) => row.tag.id === highlightId);
+
+  const moveHighlight = (delta: 1 | -1) => {
+    if (rows.length === 0) {
+      setHighlightId(null);
+      return;
+    }
+    const base = highlightIndex === -1 ? 0 : highlightIndex;
+    const next = Math.min(Math.max(base + delta, 0), rows.length - 1);
+    setHighlightId(rows[next]?.tag.id ?? null);
+  };
+
+  // 行クリック後もタイピングを続けられるよう、フォーカスは常に入力欄に残す。
+  // 行のdivはtabIndexを持たないフォーカス不可能な要素なので、クリック(mousedown)の
+  // デフォルト動作を止めないと入力欄からフォーカスが外れ、以後キー操作が効かなくなる。
+  const handleRowActivate = (tagId: string) => {
+    void toggleTaskTag(tagId);
+    inputRef.current?.focus();
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     // window側のハンドラへ漏らさない（useKeyboard 側でも tagPaletteOpen で止めているが二重に守る）
@@ -73,13 +105,13 @@ export function TagPalette() {
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setHighlight((current) => (rows.length === 0 ? -1 : Math.min(current + 1, rows.length - 1)));
+      moveHighlight(1);
       return;
     }
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setHighlight((current) => (rows.length === 0 ? -1 : Math.max(current - 1, 0)));
+      moveHighlight(-1);
       return;
     }
 
@@ -94,7 +126,7 @@ export function TagPalette() {
 
     if (event.key === "Enter" && !event.metaKey) {
       event.preventDefault();
-      const row = rows[highlight];
+      const row = rows[highlightIndex];
       if (row === undefined) return;
       // トグルは可逆なので、万一の誤爆でももう一度押せば戻る
       void toggleTaskTag(row.tag.id);
@@ -103,6 +135,8 @@ export function TagPalette() {
     }
   };
 
+  const activeOptionId = highlightId === null ? undefined : `tag-palette-option-${highlightId}`;
+
   return (
     <div
       data-testid="tag-palette-scrim"
@@ -110,8 +144,13 @@ export function TagPalette() {
       onClick={closeTagPalette}
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-label="タグ"
+        // BoardSwitcher/ConfirmDialogと同じく、コンテナ自体をフォーカス可能にしておく
+        // (最終的なフォーカスは入力欄に置くが、何らかの理由でフォーカスが外れても
+        // documentまで飛ばさずこの中に留めるための保険)
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
         className="flex max-h-[260px] w-[300px] flex-col overflow-hidden rounded-xl shadow-xl"
@@ -137,6 +176,7 @@ export function TagPalette() {
           ref={inputRef}
           data-testid="tag-palette-input"
           aria-label="タグを検索または作成"
+          aria-activedescendant={activeOptionId}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoComplete="off"
@@ -147,34 +187,43 @@ export function TagPalette() {
         />
 
         <div role="listbox" aria-label="タグ候補" className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-1.5">
-          {rows.map((row, index) => (
-            <div
-              key={row.tag.id}
-              role="option"
-              aria-selected={row.attached}
-              data-testid="tag-palette-row"
-              data-highlighted={index === highlight ? "true" : "false"}
-              onClick={() => void toggleTaskTag(row.tag.id)}
-              className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1 text-[12px] ${
-                index === highlight ? "st-row-selected" : ""
-              }`}
-              style={{ color: "var(--st-text-primary)" }}
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: row.tag.color }}
-              />
-              <span className="flex w-3 shrink-0 items-center justify-center">
-                {row.attached && (
-                  <Check size={11} style={{ color: "var(--st-text-secondary)" }} />
-                )}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{row.tag.name}</span>
-              <span className="shrink-0 tabular-nums text-[10px]" style={{ color: "var(--st-text-tertiary)" }}>
-                {row.count}
-              </span>
-            </div>
-          ))}
+          {rows.map((row) => {
+            const highlighted = row.tag.id === highlightId;
+            return (
+              <div
+                key={row.tag.id}
+                id={`tag-palette-option-${row.tag.id}`}
+                role="option"
+                // aria-selectedはキーボードカーソルの位置(BoardSwitcher等と同じ意味)。
+                // 付与済みかどうかはaria-checkedで別途表す。
+                aria-selected={highlighted}
+                aria-checked={row.attached}
+                data-testid="tag-palette-row"
+                data-highlighted={highlighted ? "true" : "false"}
+                // mousedownのデフォルト動作(フォーカス移動)を止め、入力欄のフォーカスを死守する
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleRowActivate(row.tag.id)}
+                className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1 text-[12px] ${
+                  highlighted ? "st-row-selected" : ""
+                }`}
+                style={{ color: "var(--st-text-primary)" }}
+              >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: row.tag.color }}
+                />
+                <span className="flex w-3 shrink-0 items-center justify-center">
+                  {row.attached && (
+                    <Check size={11} style={{ color: "var(--st-text-secondary)" }} />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{row.tag.name}</span>
+                <span className="shrink-0 tabular-nums text-[10px]" style={{ color: "var(--st-text-tertiary)" }}>
+                  {row.count}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         <footer

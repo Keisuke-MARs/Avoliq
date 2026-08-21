@@ -104,3 +104,65 @@ describe("TagPalette", () => {
     expect(screen.getByRole("option", { name: /バグ/ })).toHaveTextContent("2");
   });
 });
+
+/**
+ * 実際のstore.toggleTaskTagと同じ「押したタグの付与状態を反転してtasksを更新する」だけの
+ * 簡易フェイク。トグルによってrowsの並び順が変わる状況を再現するために使う
+ * (何もしないvi.fn()だとtasksが変化せず、並び替え後もハイライトが正しい行を
+ * 指しているかという回帰の検証ができない)。
+ */
+function makeReorderingToggle() {
+  return vi.fn((tagId: string) => {
+    const { tasks: currentTasks, selectedTaskId } = useAppStore.getState();
+    useAppStore.setState({
+      tasks: currentTasks.map((t) =>
+        t.id === selectedTaskId
+          ? {
+              ...t,
+              tagIds: t.tagIds.includes(tagId)
+                ? t.tagIds.filter((id) => id !== tagId)
+                : [...t.tagIds, tagId],
+            }
+          : t,
+      ),
+    });
+    return Promise.resolve();
+  });
+}
+
+describe("TagPalette: コードレビュー指摘の回帰", () => {
+  beforeEach(() => {
+    setup();
+    vi.restoreAllMocks();
+  });
+
+  it("タグ行をクリックしても入力欄のフォーカスが外れず、続けてキーボード操作できる", async () => {
+    const close = vi.fn();
+    useAppStore.setState({ closeTagPalette: close });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.click(screen.getByRole("option", { name: /設計/ }));
+
+    expect(screen.getByTestId("tag-palette-input")).toHaveFocus();
+
+    // フォーカスが外れて document.body 起点になっていると、Escapeはdialogのハンドラへ届かない
+    await user.keyboard("{Escape}");
+    expect(close).toHaveBeenCalled();
+  });
+
+  it("トグルで並び順が変わってもハイライトは同じタグを指し続ける(ArrowDown→Enter→Enterで同じタグが2回トグルされる)", async () => {
+    const toggle = makeReorderingToggle();
+    useAppStore.setState({ toggleTaskTag: toggle });
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    // t-b はタグなし。未付与順は使用件数降順で [バグ, 緊急, 設計]
+    await user.keyboard("{ArrowDown}"); // ハイライトを「緊急」へ
+    await user.keyboard("{Enter}"); // 緊急を付与 → 並びは [緊急(付与済み), バグ, 設計] に変わる
+    await user.keyboard("{Enter}"); // ハイライトが「緊急」に追随していれば、もう一度緊急がトグルされる
+
+    expect(toggle).toHaveBeenNthCalledWith(1, "tag-urgent");
+    expect(toggle).toHaveBeenNthCalledWith(2, "tag-urgent");
+  });
+});
