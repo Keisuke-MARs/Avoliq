@@ -114,7 +114,7 @@ CREATE TABLE schema_migrations (
 | `boards_list` | – | `Vec<Board>` | position昇順 |
 | `board_create` | `name: String` | `Board` | デフォルトステータス4つも作成 |
 | `board_rename` | `id, name` | `Board` | |
-| `board_delete` | `id` | `()` | 物理削除。FK違反を避けるためtasks→statuses→boardsの順で明示削除。UI側で確認必須 |
+| `board_delete` | `id` | `()` | 物理削除。FK違反を避けるためtask_tags→tasks→tags→statuses→boardsの順で明示削除。UI側で確認必須 |
 | `statuses_list` | `board_id` | `Vec<Status>` | position昇順 |
 | `status_create` | `board_id, name, color` | `Status` | 末尾に追加 |
 | `status_update` | `id, name: Option, color: Option` | `Status` | |

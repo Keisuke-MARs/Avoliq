@@ -287,8 +287,9 @@ Esc          閉じる（トグル時点で保存済み。保存操作は無い�
 
 1. **不可逆な操作（作成・改名確定・削除）は必ず修飾キー付き**（`⌘Enter` / `⌘⌫`）。
    IMEの変換確定が出せるのは素の `Enter` だけなので、誤爆が構造的に不可能になる
-2. **IME変換中（`compositionstart` 〜 `compositionend`）はハイライトを `-1`** にし、
-   `Enter` の着地点そのものを消す
+2. **IME変換中（`compositionstart` 〜 `compositionend`）は `highlightId` を `null`** にし、
+   `Enter` の着地点そのものを消す（`-1` という数値の着地点は存在しない。上記「ハイライトの
+   管理方法」のとおり `highlightId: string | null` で持つため）
 3. **`compositionend` で「次の `keydown` が `Enter` なら1回だけ無視する」フラグ**を立てる。
    時間ではなく**次の1イベント**に依存するため確実（WebKitは `compositionend` を
    `keydown` より先に発火するため、`isComposing` だけでは変換確定Enterを取りこぼす）
@@ -436,7 +437,7 @@ detail: ["⌘←→","ステータス"], ["⌘T","タイトル"], ["⌘K","タ�
 - `tagChipStyle`: 通常時・選択時・ダークモードの3系統／`TAG_COLORS` に無い hex でも落ちないこと
 - `TagPalette`: 絞り込み／`↑↓` 移動／`Enter` トグル／空欄 `⌫` で末尾を外す／
   `⌘Enter` 作成／`⌘R` 改名／`⌘⌫` 削除の確認ダイアログ／`Esc` で閉じる
-- **IME**: `compositionstart` 中はハイライトが `-1` になること／
+- **IME**: `compositionstart` 中は `highlightId` が `null` になること／
   `compositionend` 直後の `Enter` が1回だけ無視されること／
   その次の `Enter` は通常どおりトグルすること
 - `TaskCard`: チップの表示／タグ0個のとき行が描画されないこと／`+n` の省略／
