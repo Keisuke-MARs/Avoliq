@@ -1,6 +1,8 @@
 # ブレインストーミング用モックアップ（ローカル作業ファイル）
 .superpowers/
 .worktrees/
+# Claude Codeが作るworktreeの置き場（.claude/自体は追跡対象なのでここだけ除外する）
+.claude/worktrees/
 
 # Logs
 logs
