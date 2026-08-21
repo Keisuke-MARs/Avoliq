@@ -698,6 +698,17 @@ fn load_tag_ids_for_board(
 /// タスクのタグを付け外しする（トグル）。戻り値はトグル後の tag_ids。
 pub fn task_tag_toggle(conn: &mut Connection, task_id: &str, tag_id: &str) -> Result<Vec<String>> {
     let tx = conn.transaction()?;
+    // タスクとタグが同じボードに属しているか検証する。
+    // task_tags にはボードの列が無いため、外部キー制約だけでは「別ボードのタグを付ける」事故を防げない。
+    // task_create / task_move と同じ要領で、ここで明示的に検証する。
+    let task = task_by_id(&tx, task_id)?;
+    let tag = tag_by_id(&tx, tag_id)?;
+    if tag.board_id != task.board_id {
+        return Err(RepoError::Rule(
+            "タグが指定のボードに属していません".to_string(),
+        ));
+    }
+
     let attached: i64 = tx.query_row(
         "SELECT COUNT(*) FROM task_tags WHERE task_id = ?1 AND tag_id = ?2",
         params![task_id, tag_id],
@@ -709,7 +720,7 @@ pub fn task_tag_toggle(conn: &mut Connection, task_id: &str, tag_id: &str) -> Re
             params![task_id, tag_id],
         )?;
     } else {
-        // 存在しない task_id / tag_id はここで外部キー制約に弾かれる
+        // 存在確認とボード検証は上で済んでいるので、ここでの INSERT は通常想定どおり成功する
         tx.execute(
             "INSERT INTO task_tags (task_id, tag_id) VALUES (?1, ?2)",
             params![task_id, tag_id],
@@ -1430,6 +1441,20 @@ mod tests {
         let result = super::task_tag_toggle(&mut conn, &task_id, "no-such-tag");
 
         assert!(result.is_err(), "外部キー制約で弾かれること");
+    }
+
+    #[test]
+    fn 別ボードのタグを付けようとするとエラーになる() {
+        let (mut conn, _board_id, task_id) = setup_board_with_task();
+        let other_board_id = super::board_create(&mut conn, "別ボード")
+            .expect("別ボードを作れること")
+            .id;
+        let other_tag = super::tag_create(&mut conn, &other_board_id, "他ボードのタグ")
+            .expect("タグを作れること");
+
+        let result = super::task_tag_toggle(&mut conn, &task_id, &other_tag.id);
+
+        assert!(result.is_err(), "別ボードのタグは付けられないこと");
     }
 
     #[test]
