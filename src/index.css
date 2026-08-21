@@ -392,7 +392,13 @@ body {
 
 /* BlockNoteの配色をパレットに合わせる。
    data-color-scheme は TaskDetail の theme prop（= useColorScheme の値）が駆動する。
-   .dark が documentElement に付いているので、var() は自動的に正しい側を引く */
+   .dark が documentElement に付いているので、var() は自動的に正しい側を引く。
+   属性セレクタは「.bn-root だけで十分では」と削られがちだが消してはいけない。
+   BlockNote自身(@blocknote/react/style.css)が .bn-root { --bn-colors-editor-text: #3f3f3f; ... }（詳細度0,1,0）と
+   .bn-root[data-color-scheme="dark"] { ... }（詳細度0,2,0）の2段構えで既定値を持っており、
+   dark側は詳細度0,2,0でしか勝てない。ここを .bn-root 単独(0,1,0)まで落とすと、
+   ダークモードで本家の .bn-root[data-color-scheme="dark"] に上書きされて配色が効かなくなる。
+   light側と詳細度を揃える意味でもあえて両方に属性セレクタを付けている */
 .bn-root[data-color-scheme="light"],
 .bn-root[data-color-scheme="dark"] {
   --bn-colors-editor-background: transparent;

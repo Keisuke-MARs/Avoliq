@@ -47,27 +47,15 @@ export function ConfirmDialog({
       className="absolute inset-0 z-20 flex items-center justify-center p-6 outline-none backdrop-blur-[2px]"
       style={{ backgroundColor: "var(--av-scrim)" }}
     >
-      <div
-        className="w-full max-w-sm rounded-xl p-5 shadow-xl"
-        style={{ backgroundColor: "var(--av-surface-raised)" }}
-      >
+      <div className="av-surface-raised w-full max-w-sm rounded-xl p-5 shadow-xl">
         <div className="flex items-start gap-3">
           <AlertTriangle
             size={18}
-            className="mt-0.5 shrink-0"
-            style={{ color: "var(--av-danger)" }}
+            className="av-danger-text mt-0.5 shrink-0"
           />
           <div className="min-w-0">
-            <h2
-              className="text-sm font-semibold"
-              style={{ color: "var(--av-text-primary)" }}
-            >
-              {title}
-            </h2>
-            <p
-              className="mt-1 text-xs leading-relaxed"
-              style={{ color: "var(--av-text-secondary)" }}
-            >
+            <h2 className="av-text-1 text-sm font-semibold">{title}</h2>
+            <p className="av-text-2 mt-1 text-xs leading-relaxed">
               {description}
             </p>
           </div>
@@ -77,8 +65,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="av-btn-ghost rounded-md px-3 py-1.5 transition-colors"
-            style={{ color: "var(--av-text-secondary)" }}
+            className="av-btn-ghost av-text-2 rounded-md px-3 py-1.5 transition-colors"
           >
             キャンセル (Esc)
           </button>
