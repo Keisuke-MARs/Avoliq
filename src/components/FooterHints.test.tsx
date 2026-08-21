@@ -19,13 +19,6 @@ describe("FooterHints", () => {
     expect(screen.getByText("検索")).toBeInTheDocument();
   });
 
-  it("boardビューのEnterは2回押しと分かる表記になっている", () => {
-    render(<FooterHints view="board" />);
-
-    expect(screen.getByText("Enter×2")).toBeInTheDocument();
-    expect(screen.getByText("開く / 作成")).toBeInTheDocument();
-  });
-
   it("detailビューでは詳細画面のヒントに差し替わる", () => {
     render(<FooterHints view="detail" />);
 

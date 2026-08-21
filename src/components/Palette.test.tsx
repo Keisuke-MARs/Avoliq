@@ -207,8 +207,7 @@ describe("Palette: 検索と新規作成", () => {
     // (初回読込のtasksList呼び出しを消費させないよう、renderPalette完了後にキューする)
     mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
     fireEvent.change(screen.getByTestId("search-input"), { target: { value: "牛乳を買い足す" } });
-    // IMEの変換確定Enterで誤作成しないよう、作成はEnter2回押し
-    await user.keyboard("{Enter}{Enter}");
+    await user.keyboard("{Enter}");
 
     await waitFor(() => {
       expect(
@@ -222,23 +221,14 @@ describe("Palette: 検索と新規作成", () => {
 
   it("入力なしでEnterを押しても何も起きない", async () => {
     const user = await renderPalette();
-    await user.keyboard("{Enter}{Enter}");
-    expect(mocked.taskCreate).not.toHaveBeenCalled();
-    expect(useAppStore.getState().view).toBe("board");
-  });
-
-  it("入力ありでもEnter1回では作成しない(IMEの変換確定対策)", async () => {
-    const user = await renderPalette();
-    fireEvent.change(screen.getByTestId("search-input"), { target: { value: "牛乳を買い足す" } });
     await user.keyboard("{Enter}");
-
     expect(mocked.taskCreate).not.toHaveBeenCalled();
     expect(useAppStore.getState().view).toBe("board");
   });
 
-  it("カード選択中のEnterは2回押しで詳細を開く", async () => {
+  it("カード選択中のEnterは詳細を開く", async () => {
     const user = await renderPalette();
-    await user.keyboard("{ArrowDown}{Enter}{Enter}");
+    await user.keyboard("{ArrowDown}{Enter}");
     expect(
       screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
     ).toBeInTheDocument();
@@ -301,7 +291,7 @@ describe("Palette: 詳細画面での⌘N・⌘P", () => {
     mocked.taskCreate.mockResolvedValue(created);
 
     const user = await renderPalette();
-    await user.keyboard("{ArrowDown}{Enter}{Enter}");
+    await user.keyboard("{ArrowDown}{Enter}");
     expect(screen.getByDisplayValue("牛乳を買う")).toBeInTheDocument();
 
     await user.keyboard("{Meta>}n{/Meta}");
@@ -316,7 +306,7 @@ describe("Palette: 詳細画面での⌘N・⌘P", () => {
 
   it("詳細画面で⌘Pを押すとボードへ戻り検索バーへフォーカスする", async () => {
     const user = await renderPalette();
-    await user.keyboard("{ArrowDown}{Enter}{Enter}");
+    await user.keyboard("{ArrowDown}{Enter}");
     expect(
       screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
     ).toBeInTheDocument();
@@ -466,7 +456,7 @@ describe("Palette: Escとビュー切替", () => {
 
   it("詳細ビューでEscを押すと盤面へ戻り、パレットは閉じない", async () => {
     const user = await renderPalette();
-    await user.keyboard("{ArrowDown}{Enter}{Enter}");
+    await user.keyboard("{ArrowDown}{Enter}");
     expect(
       screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
     ).toBeInTheDocument();

@@ -9,8 +9,7 @@ type Hint = readonly [key: string, label: string];
 const HINTS: Record<View, readonly Hint[]> = {
   board: [
     ["↑↓←→", "移動"],
-    // 日本語IMEの変換確定Enterで誤って開く/作られるのを防ぐため、boardのEnterは2回押し
-    ["Enter×2", "開く / 作成"],
+    ["Enter", "開く / 作成"],
     ["⌘←→", "ステータス"],
     ["⌘↑↓", "並び替え"],
     ["⌘⌫", "削除"],
