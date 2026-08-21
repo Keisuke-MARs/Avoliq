@@ -41,8 +41,16 @@ export function TagPalette() {
    * 変換確定のEnterを取りこぼす(TaskDetailのタイトル欄が過去にこれで事故った)。
    * 時間ではなく「次の1イベント」に依存させるので確実。待機はどのキーでも解除する
    * (確定後に別のキーを打てば、次のEnterは通常どおり効く)。
+   * 注意: compositionend はEnterでの確定以外(IME候補をマウスで選ぶ/ライブ変換の自動確定/
+   * 他所クリックによる確定)でも発火する。その場合、直後に押した「本気のEnter」が1回だけ
+   * 無視されるが、対象は可逆なトグルなのでもう一度押せば戻る(設計上許容している)。
    */
   const swallowEnterRef = useRef(false);
+  // composingRef を false に戻すのは onCompositionEnd の1箇所だけ。
+  // パレットを閉じるときにアンマウントされる前提(Task 17で `{tagPaletteOpen && <TagPalette />}`
+  // のようにマウント/アンマウントで開閉する想定)でこの設計にしている。もしCSSでの
+  // 表示/非表示切り替えに変えるなら、閉じるタイミングで composingRef.current = false に
+  // リセットする処理を別途足すこと(でないと変換中に閉じた場合、ハイライトが永久に復活しなくなる)。
 
   const task = tasks.find((t) => t.id === selectedTaskId) ?? null;
 

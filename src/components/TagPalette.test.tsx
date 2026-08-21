@@ -427,8 +427,12 @@ describe("TagPalette: IME防御", () => {
     const user = userEvent.setup();
     render(<TagPalette />);
     const input = screen.getByTestId("tag-palette-input");
-    await user.type(input, "新規タグ");
+    // "バ"は「バグ」に部分一致するので、作成行を出しつつハイライト対象の行(バグ)も残る状態を作る。
+    // 完全に未登録の文字列(例:「新規タグ」)だと候補行が0件になり、rows[highlightIndex]が
+    // 常にundefinedになるため、⌘⌫の検証がガードの有無にかかわらず常に成立してしまい空振りする
+    await user.type(input, "バ");
     expect(screen.getByTestId("tag-palette-create")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /バグ/ })).toBeInTheDocument();
 
     fireEvent.compositionStart(input);
     fireEvent.keyDown(input, { key: "Enter", metaKey: true, isComposing: true });
@@ -447,5 +451,42 @@ describe("TagPalette: IME防御", () => {
 
     const rows = screen.getAllByTestId("tag-palette-row");
     expect(rows[0]?.dataset.highlighted).toBe("true");
+  });
+
+  it("変換中に入力が変わってもハイライトは復活しない", () => {
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    fireEvent.compositionStart(input);
+    // 変換の途中でIMEがqueryを書き換える(実機での主要経路)。"バ"は「バグ」に部分一致するので、
+    // ガードが外れていると先頭行(バグ)が復活してしまう
+    fireEvent.change(input, { target: { value: "バ" } });
+
+    const rows = screen.getAllByTestId("tag-palette-row");
+    expect(rows.every((row) => row.dataset.highlighted === "false")).toBe(true);
+  });
+
+  it("変換確定後は入力の変化でハイライトが追随する(composing状態が残らない)", () => {
+    render(<TagPalette />);
+    const input = screen.getByTestId("tag-palette-input");
+
+    fireEvent.compositionStart(input);
+    fireEvent.compositionEnd(input);
+    // 確定後にcomposingRefがfalseへ戻っていなければ、この変更でハイライトが追随しない
+    fireEvent.change(input, { target: { value: "設計" } });
+
+    const rows = screen.getAllByTestId("tag-palette-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.dataset.highlighted).toBe("true");
+  });
+
+  it("isComposingが立たない環境(keyCode 229)でもEnterを拾わない", () => {
+    const toggle = vi.fn();
+    useAppStore.setState({ toggleTaskTag: toggle });
+    render(<TagPalette />);
+
+    fireEvent.keyDown(screen.getByTestId("tag-palette-input"), { key: "Enter", keyCode: 229 });
+
+    expect(toggle).not.toHaveBeenCalled();
   });
 });

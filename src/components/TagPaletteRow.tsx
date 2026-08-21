@@ -92,7 +92,11 @@ export function TagPaletteRow({
           onKeyDown={(event) => {
             // 親(dialogコンテナ)や、その先のwindow側ハンドラへ漏らさない
             event.stopPropagation();
-            // IMEが処理中のキーには触らない(本格的なIME防御はTask 16で入れる)
+            // IMEが処理中のキーには触らない。keyCode 229 は isComposing を立てない環境の合図。
+            // この欄は検索欄(TagPalette.tsx)のような swallowEnter 方式を持たない。
+            // 代わりに「素のEnterでは確定させない(⌘Enter必須)」で守っているため、
+            // 変換確定のEnterが漏れても改名が走ることはない。
+            // ⚠ ここを「Enterで確定」に変えるなら、検索欄と同じ compositionend→swallow を必ず入れること。
             if (event.nativeEvent.isComposing || event.keyCode === 229) return;
             if (event.key === "Escape") {
               event.preventDefault();
