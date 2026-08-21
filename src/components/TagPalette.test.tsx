@@ -434,7 +434,10 @@ describe("TagPalette: IME防御", () => {
     expect(screen.getByTestId("tag-palette-create")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /バグ/ })).toBeInTheDocument();
 
-    fireEvent.compositionStart(input);
+    // ここで compositionStart は撃たない。撃つとハイライトが外れて(変換中は着地点を消す層)
+    // highlightIndex が -1 になり、⌘⌫ が「IMEガード」ではなく「対象行が無い」で止まってしまう。
+    // それだとガードを外しても赤くならず、アサーションが空振りする。
+    // 変換中であることは keydown の isComposing で表現する(実機のWebKitもこの形で届く)。
     fireEvent.keyDown(input, { key: "Enter", metaKey: true, isComposing: true });
     expect(create).not.toHaveBeenCalled();
 
