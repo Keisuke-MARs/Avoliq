@@ -2,6 +2,8 @@
 //!
 //! 並び順は「整数positionの全件再採番方式」で管理する。レーン内の件数は少ない前提。
 
+use std::collections::HashMap;
+
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 use uuid::Uuid;
 
@@ -66,6 +68,8 @@ fn tag_by_id(conn: &Connection, id: &str) -> Result<Tag> {
     .ok_or_else(|| RepoError::NotFound(format!("タグ {id}")))
 }
 
+/// 行→Task。tag_ids は行に含まれないので空で作る。
+/// **Task を外へ返す経路は task_by_id と tasks_list の2つだけ**で、そこで必ず tag_ids を埋める。
 fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
     Ok(Task {
         id: row.get("id")?,
@@ -76,6 +80,7 @@ fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
         position: row.get("position")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
+        tag_ids: Vec::new(),
     })
 }
 
@@ -174,16 +179,19 @@ fn renumber_lane(tx: &Transaction<'_>, status_id: &str) -> Result<()> {
     Ok(())
 }
 
-/// IDでタスクを1件引く（削除済みも引ける）
+/// IDでタスクを1件引く（削除済みも引ける、tag_ids も埋める）
 fn task_by_id(conn: &Connection, id: &str) -> Result<Task> {
-    conn.query_row(
-        "SELECT id, board_id, status_id, title, content_md, position, created_at, updated_at
-         FROM tasks WHERE id = ?1",
-        params![id],
-        row_to_task,
-    )
-    .optional()?
-    .ok_or_else(|| RepoError::NotFound(format!("タスク {id}")))
+    let mut task = conn
+        .query_row(
+            "SELECT id, board_id, status_id, title, content_md, position, created_at, updated_at
+             FROM tasks WHERE id = ?1",
+            params![id],
+            row_to_task,
+        )
+        .optional()?
+        .ok_or_else(|| RepoError::NotFound(format!("タスク {id}")))?;
+    task.tag_ids = load_tag_ids(conn, id)?;
+    Ok(task)
 }
 
 /// ボード内のステータス一覧（position昇順）
@@ -198,17 +206,25 @@ pub fn statuses_list(conn: &mut Connection, board_id: &str) -> Result<Vec<Status
     Ok(statuses)
 }
 
-/// ボード内の生存タスク一覧（position昇順）
+/// ボード内の生存タスク一覧（position昇順・tag_ids 込み）
 pub fn tasks_list(conn: &mut Connection, board_id: &str) -> Result<Vec<Task>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, board_id, status_id, title, content_md, position, created_at, updated_at
-         FROM tasks
-         WHERE board_id = ?1 AND deleted_at IS NULL
-         ORDER BY position, rowid",
-    )?;
-    let tasks = stmt
-        .query_map(params![board_id], row_to_task)?
-        .collect::<rusqlite::Result<Vec<Task>>>()?;
+    let mut tasks = {
+        let mut stmt = conn.prepare(
+            "SELECT id, board_id, status_id, title, content_md, position, created_at, updated_at
+             FROM tasks
+             WHERE board_id = ?1 AND deleted_at IS NULL
+             ORDER BY position, rowid",
+        )?;
+        let mapped = stmt.query_map(params![board_id], row_to_task)?;
+        let collected: rusqlite::Result<Vec<Task>> = mapped.collect();
+        collected?
+    };
+
+    // N+1 を避け、ボード分の task_tags を1クエリでまとめて引く
+    let by_task = load_tag_ids_for_board(conn, board_id)?;
+    for task in tasks.iter_mut() {
+        task.tag_ids = by_task.get(&task.id).cloned().unwrap_or_default();
+    }
     Ok(tasks)
 }
 
@@ -638,6 +654,70 @@ pub fn tag_delete(conn: &mut Connection, id: &str) -> Result<()> {
         return Err(RepoError::NotFound(format!("タグ {id}")));
     }
     Ok(())
+}
+
+/// 1タスクに付いているタグidを tags.position 昇順で返す
+fn load_tag_ids(conn: &Connection, task_id: &str) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT tt.tag_id
+         FROM task_tags tt
+         JOIN tags t ON t.id = tt.tag_id
+         WHERE tt.task_id = ?1
+         ORDER BY t.position, t.rowid",
+    )?;
+    let ids = stmt
+        .query_map(params![task_id], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()?;
+    Ok(ids)
+}
+
+/// ボード内の全タスクについて タスクid → タグid列 を1クエリで引く
+fn load_tag_ids_for_board(
+    conn: &Connection,
+    board_id: &str,
+) -> Result<HashMap<String, Vec<String>>> {
+    let mut stmt = conn.prepare(
+        "SELECT tt.task_id, tt.tag_id
+         FROM task_tags tt
+         JOIN tags t  ON t.id = tt.tag_id
+         JOIN tasks k ON k.id = tt.task_id
+         WHERE k.board_id = ?1
+         ORDER BY t.position, t.rowid",
+    )?;
+    let rows = stmt.query_map(params![board_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut map: HashMap<String, Vec<String>> = HashMap::new();
+    for row in rows {
+        let (task_id, tag_id) = row?;
+        map.entry(task_id).or_default().push(tag_id);
+    }
+    Ok(map)
+}
+
+/// タスクのタグを付け外しする（トグル）。戻り値はトグル後の tag_ids。
+pub fn task_tag_toggle(conn: &mut Connection, task_id: &str, tag_id: &str) -> Result<Vec<String>> {
+    let tx = conn.transaction()?;
+    let attached: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM task_tags WHERE task_id = ?1 AND tag_id = ?2",
+        params![task_id, tag_id],
+        |row| row.get(0),
+    )?;
+    if attached > 0 {
+        tx.execute(
+            "DELETE FROM task_tags WHERE task_id = ?1 AND tag_id = ?2",
+            params![task_id, tag_id],
+        )?;
+    } else {
+        // 存在しない task_id / tag_id はここで外部キー制約に弾かれる
+        tx.execute(
+            "INSERT INTO task_tags (task_id, tag_id) VALUES (?1, ?2)",
+            params![task_id, tag_id],
+        )?;
+    }
+    tx.commit()?;
+
+    load_tag_ids(conn, task_id)
 }
 
 #[cfg(test)]
@@ -1293,6 +1373,87 @@ mod tests {
         let result = super::tag_delete(&mut conn, "no-such-tag");
 
         assert!(result.is_err());
+    }
+
+    /// テスト用: ボード・先頭ステータス・タスク1件を作って (conn, board_id, task_id) を返す
+    fn setup_board_with_task() -> (rusqlite::Connection, String, String) {
+        let (mut conn, board_id) = setup_board();
+        let statuses = super::statuses_list(&mut conn, &board_id).expect("ステータス一覧");
+        let task = super::task_create(&mut conn, &board_id, &statuses[0].id, "タスク")
+            .expect("タスクを作れること");
+        (conn, board_id, task.id)
+    }
+
+    #[test]
+    fn タグの付け外しはトグルになる() {
+        let (mut conn, board_id, task_id) = setup_board_with_task();
+        let tag = super::tag_create(&mut conn, &board_id, "バグ").expect("タグを作れること");
+
+        let attached =
+            super::task_tag_toggle(&mut conn, &task_id, &tag.id).expect("付けられること");
+        assert_eq!(attached, vec![tag.id.clone()]);
+
+        let detached = super::task_tag_toggle(&mut conn, &task_id, &tag.id).expect("外せること");
+        assert!(detached.is_empty());
+    }
+
+    #[test]
+    fn tasks_listのtagIdsはタグのposition昇順になる() {
+        let (mut conn, board_id, task_id) = setup_board_with_task();
+        let first = super::tag_create(&mut conn, &board_id, "一").expect("1件目");
+        let second = super::tag_create(&mut conn, &board_id, "二").expect("2件目");
+        // わざと position の降順に付ける
+        super::task_tag_toggle(&mut conn, &task_id, &second.id).expect("二を付ける");
+        super::task_tag_toggle(&mut conn, &task_id, &first.id).expect("一を付ける");
+
+        let tasks = super::tasks_list(&mut conn, &board_id).expect("一覧を引けること");
+
+        assert_eq!(tasks[0].tag_ids, vec![first.id, second.id]);
+    }
+
+    #[test]
+    fn task_updateの戻り値にもtagIdsが入る() {
+        let (mut conn, board_id, task_id) = setup_board_with_task();
+        let tag = super::tag_create(&mut conn, &board_id, "バグ").expect("タグを作れること");
+        super::task_tag_toggle(&mut conn, &task_id, &tag.id).expect("付けられること");
+
+        let updated = super::task_update(&mut conn, &task_id, Some("新タイトル"), None)
+            .expect("更新できること");
+
+        assert_eq!(updated.tag_ids, vec![tag.id]);
+    }
+
+    #[test]
+    fn 存在しないタグは付けられない() {
+        let (mut conn, _board_id, task_id) = setup_board_with_task();
+
+        let result = super::task_tag_toggle(&mut conn, &task_id, "no-such-tag");
+
+        assert!(result.is_err(), "外部キー制約で弾かれること");
+    }
+
+    #[test]
+    fn タグを消すとタスクからも外れる() {
+        let (mut conn, board_id, task_id) = setup_board_with_task();
+        let tag = super::tag_create(&mut conn, &board_id, "バグ").expect("タグを作れること");
+        super::task_tag_toggle(&mut conn, &task_id, &tag.id).expect("付けられること");
+
+        super::tag_delete(&mut conn, &tag.id).expect("タグを消せること");
+
+        let tasks = super::tasks_list(&mut conn, &board_id).expect("一覧を引けること");
+        assert!(tasks[0].tag_ids.is_empty());
+    }
+
+    #[test]
+    fn タスクをソフトデリートしてもタグは残る() {
+        let (mut conn, board_id, task_id) = setup_board_with_task();
+        let tag = super::tag_create(&mut conn, &board_id, "バグ").expect("タグを作れること");
+        super::task_tag_toggle(&mut conn, &task_id, &tag.id).expect("付けられること");
+
+        super::task_delete(&mut conn, &task_id).expect("削除できること");
+        let restored = super::task_restore(&mut conn, &task_id).expect("復元できること");
+
+        assert_eq!(restored.tag_ids, vec![tag.id], "復元後もタグ付きであること");
     }
 
     #[test]

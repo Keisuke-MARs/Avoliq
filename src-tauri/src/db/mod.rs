@@ -99,6 +99,8 @@ pub struct Task {
     pub position: i64,
     pub created_at: String,
     pub updated_at: String,
+    /// 付いているタグのid。tags.position 昇順。DBの行には無いので後から埋める。
+    pub tag_ids: Vec<String>,
 }
 
 /// タグ（ボードごとのラベル）
