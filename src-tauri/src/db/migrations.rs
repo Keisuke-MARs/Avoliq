@@ -39,8 +39,29 @@ CREATE TABLE settings (
 );
 "#;
 
+/// マイグレーション v2: タグ（tags / task_tags）
+const V2: &str = r#"
+CREATE TABLE tags (
+  id         TEXT PRIMARY KEY,
+  board_id   TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  color      TEXT NOT NULL,
+  position   INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX idx_tags_board_name ON tags(board_id, name);
+
+CREATE TABLE task_tags (
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  tag_id  TEXT NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
+  PRIMARY KEY (task_id, tag_id)
+);
+CREATE INDEX idx_task_tags_tag ON task_tags(tag_id);
+"#;
+
 /// (バージョン, SQL) の一覧。将来のマイグレーションは末尾に足すだけでよい。
-pub const MIGRATIONS: &[(i64, &str)] = &[(1, V1)];
+pub const MIGRATIONS: &[(i64, &str)] = &[(1, V1), (2, V2)];
 
 /// 未適用のマイグレーションを順に適用する。何度呼んでも安全（冪等）。
 pub fn migrate(conn: &mut Connection) -> Result<()> {
@@ -114,15 +135,6 @@ mod tests {
     }
 
     #[test]
-    fn 適用後のスキーマバージョンは1になる() {
-        let conn = db::open_in_memory().expect("インメモリDBを開けること");
-
-        let version = super::current_version(&conn).expect("バージョンを取得できること");
-
-        assert_eq!(version, 1);
-    }
-
-    #[test]
     fn migrateを二度呼んでもエラーにならない() {
         let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
 
@@ -131,7 +143,7 @@ mod tests {
         let applied: i64 = conn
             .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| row.get(0))
             .expect("件数を数えられること");
-        assert_eq!(applied, 1, "同じバージョンが二重に記録されてはいけない");
+        assert_eq!(applied, 2, "同じバージョンが二重に記録されてはいけない");
     }
 
     #[test]
@@ -155,5 +167,44 @@ mod tests {
         );
 
         assert!(result.is_err(), "外部キー制約で弾かれること");
+    }
+
+    #[test]
+    fn v2でタグのテーブルが作られる() {
+        let conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        assert!(table_exists(&conn, "tags"));
+        assert!(table_exists(&conn, "task_tags"));
+    }
+
+    #[test]
+    fn 適用後のスキーマバージョンは2になる() {
+        let conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        let version = super::current_version(&conn).expect("バージョンを取得できること");
+
+        assert_eq!(version, 2);
+    }
+
+    #[test]
+    fn 同じボードに同名のタグは入れられない() {
+        let conn = db::open_in_memory().expect("インメモリDBを開けること");
+        conn.execute(
+            "INSERT INTO boards (id, name, position) VALUES ('b1', 'メイン', 0)",
+            [],
+        )
+        .expect("ボードを作れること");
+        conn.execute(
+            "INSERT INTO tags (id, board_id, name, color, position) VALUES ('g1', 'b1', 'バグ', '#7EA9E8', 0)",
+            [],
+        )
+        .expect("1件目のタグを作れること");
+
+        let result = conn.execute(
+            "INSERT INTO tags (id, board_id, name, color, position) VALUES ('g2', 'b1', 'バグ', '#E8B478', 1)",
+            [],
+        );
+
+        assert!(result.is_err(), "UNIQUE制約で弾かれること");
     }
 }
