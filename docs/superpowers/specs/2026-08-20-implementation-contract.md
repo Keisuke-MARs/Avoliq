@@ -171,7 +171,7 @@ CREATE TABLE schema_migrations (
 
 - `src/lib/boardNav.ts`: カーソル移動・レーン跨ぎの純関数置き場（ストアを太らせない）
 - `src/store/appStore.ts` は `initialAppState` もexport（テストのリセット用。AppStateの形は不変）
-- 検索バーのDOM id: `SEARCH_INPUT_ID = "smarttask-search"`
+- 検索バーのDOM id: `SEARCH_INPUT_ID = "avoliq-search"`
 - `src/store/appStore.ts` は `NEW_TASK_TITLE = "新しいタスク"` もexport（⌘Nの既定タイトル文字列。
   タイトル入力欄の初期値・作成時の引数として使うのみで、「新規作成直後か」の判定には使わない。
   既存タスクがたまたま同名だった場合の誤爆を避けるため、判定はAppStateの`pendingNewTaskId`
