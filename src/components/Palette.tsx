@@ -47,7 +47,7 @@ export function Palette() {
   return (
     <div
       data-testid="palette"
-      className="st-palette flex h-screen w-screen flex-col overflow-hidden"
+      className="av-glass flex h-screen w-screen flex-col overflow-hidden"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", sans-serif',

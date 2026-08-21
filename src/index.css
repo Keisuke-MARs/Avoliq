@@ -225,16 +225,47 @@ body {
   }
 }
 
-.st-palette {
-  background: var(--st-palette-bg);
-  border: 0.5px solid var(--st-palette-border);
+/* ============ パレットの器（ガラス） ============
+   ネイティブの NSVisualEffectView（tauri.conf.json の windowEffects）が敷いたぼかしの上に、
+   色味・スペキュラーハイライト・屈折を重ねる二層構成の上側。
+   border-radius は panel.rs の PANEL_CORNER_RADIUS と必ず揃えること。 */
+.av-glass {
   border-radius: 16px;
-  box-shadow: var(--st-shadow);
-  /* backdrop-filterはここでは使わない。WKWebViewのbackdrop-filterはページ内の描画しか
-     ぼかせず、透過ウィンドウの向こう側(デスクトップ)には効かないため、素通しになってしまう。
-     背後のぼかしはNSVisualEffectView(windowEffects)に任せている */
-  color: var(--st-text-primary);
-  animation: st-palette-in 180ms var(--st-ease) both;
+  border: 0.5px solid var(--av-glass-edge);
+  color: var(--av-text-primary);
+  /* 上ほど厚く見えるのが実物のガラスの挙動。可読性の床は下端アルファで決まる */
+  background: linear-gradient(
+    180deg,
+    color-mix(
+        in srgb,
+        var(--av-glass-tint) calc(var(--av-glass-alpha-top) * 100%),
+        transparent
+      )
+      0%,
+    color-mix(
+        in srgb,
+        var(--av-glass-tint) calc(var(--av-glass-alpha-bottom) * 100%),
+        transparent
+      )
+      100%
+  );
+  box-shadow:
+    /* 上端の細い白のスペキュラーハイライト */
+    inset 0 0.5px 0 0 var(--av-glass-specular),
+    /* 縁のごく薄い Glass Azure の屈折 */
+    inset 0 1px 12px -6px var(--av-glass-refract-azure),
+    /* 底の Glass Violet による奥行き */
+    inset 0 -24px 44px -28px var(--av-glass-refract-violet),
+    var(--av-shadow);
+  animation: st-palette-in 180ms var(--av-ease) both;
+}
+
+/* vibrancy が使えない環境ではぼかしが無い。半透明のままだと壁紙が素通しになり
+   文字が読めなくなる（Slateが1.61:1まで落ちる）ので、実質不透明へ退避する。
+   これは装飾ではなく可読性の安全装置。 */
+[data-vibrancy="off"] {
+  --av-glass-alpha-top: 0.96;
+  --av-glass-alpha-bottom: 0.94;
 }
 
 /* ============ ドリルイン遷移(ボード⇄詳細など) ============ */
@@ -370,7 +401,7 @@ body {
 
 /* OSの視差効果を減らす設定を尊重する */
 @media (prefers-reduced-motion: reduce) {
-  .st-palette,
+  .av-glass,
   .st-view-forward,
   .st-view-back {
     animation: none;
