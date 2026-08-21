@@ -142,13 +142,19 @@ pub fn board_rename(conn: &mut Connection, id: &str, name: &str) -> Result<Board
     board_by_id(conn, id)
 }
 
-/// ボードを物理削除する。所属するステータスとタスクも消える。
+/// ボードを物理削除する。所属するステータス・タスク・タグ・タスクタグも消える。
 ///
 /// スキーマ上は ON DELETE CASCADE が付いているが、tasks.status_id → statuses(id) の
 /// 外部キーがカスケードの処理順によっては先に破られてしまう。順序を自分で決めて消す。
+/// task_tags は tasks と tags の両方を参照する中間テーブルなので、一番先に消す。
 pub fn board_delete(conn: &mut Connection, id: &str) -> Result<()> {
     let tx = conn.transaction()?;
+    tx.execute(
+        "DELETE FROM task_tags WHERE task_id IN (SELECT id FROM tasks WHERE board_id = ?1)",
+        params![id],
+    )?;
     tx.execute("DELETE FROM tasks WHERE board_id = ?1", params![id])?;
+    tx.execute("DELETE FROM tags WHERE board_id = ?1", params![id])?;
     tx.execute("DELETE FROM statuses WHERE board_id = ?1", params![id])?;
     let changed = tx.execute("DELETE FROM boards WHERE id = ?1", params![id])?;
     if changed == 0 {
@@ -824,6 +830,28 @@ mod tests {
             0
         );
         assert_eq!(tasks_list(&mut conn, &board.id).expect("タスク一覧").len(), 0);
+    }
+
+    #[test]
+    fn ボードを消すとタグとタスクタグも消える() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        let board = board_create(&mut conn, "メイン").expect("ボードを作れること");
+        let statuses = statuses_list(&mut conn, &board.id).expect("ステータス一覧を取れること");
+        let task = task_create(&mut conn, &board.id, &statuses[0].id, "作業")
+            .expect("タスクを作れること");
+        let tag = super::tag_create(&mut conn, &board.id, "バグ").expect("タグを作れること");
+        super::task_tag_toggle(&mut conn, &task.id, &tag.id).expect("タグを付けられること");
+
+        board_delete(&mut conn, &board.id).expect("ボードを削除できること");
+
+        let tags: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))
+            .expect("件数を数えられること");
+        let links: i64 = conn
+            .query_row("SELECT COUNT(*) FROM task_tags", [], |row| row.get(0))
+            .expect("件数を数えられること");
+        assert_eq!(tags, 0);
+        assert_eq!(links, 0);
     }
 
     /// テスト用: インメモリDB + ボード1枚（デフォルトステータス4つ付き）を用意する
