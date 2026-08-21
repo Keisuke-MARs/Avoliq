@@ -1,12 +1,23 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskCard } from "@/components/TaskCard";
+import { useChipOverflow } from "@/hooks/useChipOverflow";
 import { useAppStore, initialAppState } from "@/store/appStore";
 import { makeTask, tags as tagFixtures } from "@/test/fixtures";
+
+// 実装本体はそのまま使いつつ、TaskCardがどんな引数(特にresetKey)で
+// useChipOverflowを呼んでいるかを検証できるようにラップする
+vi.mock("@/hooks/useChipOverflow", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useChipOverflow")>();
+  return { ...actual, useChipOverflow: vi.fn(actual.useChipOverflow) };
+});
+
+const mockedUseChipOverflow = vi.mocked(useChipOverflow);
 
 describe("TaskCard のタグ表示", () => {
   beforeEach(() => {
     useAppStore.setState({ ...initialAppState, tags: tagFixtures });
+    mockedUseChipOverflow.mockClear();
   });
 
   it("タグ名をチップで表示する", () => {
@@ -41,5 +52,27 @@ describe("TaskCard のタグ表示", () => {
 
     const chip = screen.getByText("バグ");
     expect(chip).toHaveStyle({ color: "#fff" });
+  });
+
+  it("タグを改名すると測定のやり直しキーが変わる(回帰テスト: idだけでなく名前もキーに含めること)", () => {
+    // タグidの並びは変わらず、名前だけが変わるケース(renameTag相当)を再現する。
+    // idだけをキーにすると、この操作では再測定がトリガーされずチップ幅が古いまま固定されてしまう
+    const task = makeTask("t-x", "st-todo", "タスク", 0, ["tag-bug"]);
+
+    const { rerender } = render(
+      <TaskCard task={task} statusColor="#007AFF" selected={false} />,
+    );
+    const callsBefore = mockedUseChipOverflow.mock.calls;
+    const keyBefore = callsBefore[callsBefore.length - 1]?.[1];
+
+    const renamed = tagFixtures.map((t) =>
+      t.id === "tag-bug" ? { ...t, name: "不具合" } : t,
+    );
+    useAppStore.setState({ tags: renamed });
+    rerender(<TaskCard task={task} statusColor="#007AFF" selected={false} />);
+    const callsAfter = mockedUseChipOverflow.mock.calls;
+    const keyAfter = callsAfter[callsAfter.length - 1]?.[1];
+
+    expect(keyBefore).not.toBe(keyAfter);
   });
 });
