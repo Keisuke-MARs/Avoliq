@@ -115,6 +115,28 @@ function isTaskStillVisible(
 }
 
 /**
+ * deleteTag/renameTagはtoggleTaskTagと違って楽観的更新を持たず、tags/tasksの反映が
+ * IPC応答を待った後(await の後)にしか起きない。そのため「応答待ち中にEscでタグパレットを
+ * 閉じる」タイミングが挟まると、closeTagPaletteが見るtags/tasksはまだ改名/削除前の古いもの
+ * になり、isTaskStillVisibleの判定がすり抜けてしまう。ここで反映直後にもう一度同じ判定を
+ * やり直す(既にパレットが閉じていた場合だけでよい。開いたままなら、閉じるときに
+ * closeTagPaletteが最新のtags/tasksで判定してくれる)。
+ * closeTagPalette/setViewと同じ理由で、board以外(detail等)では選択=表示中のタスク
+ * そのものなので触らない。
+ */
+function dropStaleSelectionAfterTagMutation(): void {
+  const state = useAppStore.getState();
+  if (state.tagPaletteOpen || state.view !== "board" || state.selectedTaskId === null) return;
+  const stillVisible = isTaskStillVisible(
+    state.selectedTaskId,
+    state.tasks,
+    state.searchQuery,
+    state.tags,
+  );
+  if (!stillVisible) useAppStore.setState({ selectedTaskId: null });
+}
+
+/**
  * 楽観的更新の失敗時に呼ぶ復旧処理。
  * 古いsnapshot全体で巻き戻すと待機中の他操作まで巻き戻してしまうので、
  * DBの実状態を読み直して合わせる。読み直し自体も失敗したらsnapshotへ戻す。
@@ -207,6 +229,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   setView(view) {
+    // 詳細から盤面へ戻るときは、closeTagPaletteと同じ「まだ絞り込みに見えているか」の
+    // 判定をやり直す。詳細画面でタグを外して選択中カードが絞り込みから外れていた場合、
+    // ここで選択を解除しておかないと、盤面に見えていないカードがEnterで開いてしまう
+    // (board側は「選択=カーソル位置」なので、この判定はboardへ入るときだけでよい。
+    // detailへ入る/switcher・settingsへ行く場合は「選択=表示中のタスクそのもの」なので
+    // 触らない)。
+    if (view === "board") {
+      const { tasks, tags, searchQuery, selectedTaskId } = get();
+      const stillVisible =
+        selectedTaskId !== null && isTaskStillVisible(selectedTaskId, tasks, searchQuery, tags);
+      set({ view, selectedTaskId: stillVisible ? selectedTaskId : null });
+      return;
+    }
     set({ view });
   },
 
@@ -454,11 +489,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   closeTagPalette() {
-    // タグの付け外し/削除で選択中のカードが絞り込みから外れていたら、
-    // setSearchQueryと同じ判定をやり直して選択を解除する(残したままだと、見えていない
-    // カードの詳細が開いてしまう)。toggleTaskTag/deleteTag側で選択を外すと、パレットが
-    // 開いたままの間に対象タスクがnullになり以後トグルできなくなるため、ここで一括してやる
-    const { tasks, tags, searchQuery, selectedTaskId } = get();
+    // board上での「選択」は絞り込み結果の中のカーソル位置なので、タグの付け外し/削除で
+    // 選択中のカードが絞り込みから外れていたら、setSearchQueryと同じ判定をやり直して
+    // 選択を解除する(残したままだと、見えていないカードがEnterで開いてしまう)。
+    // toggleTaskTag/deleteTag側で選択を外すと、パレットが開いたままの間に対象タスクが
+    // nullになり以後トグルできなくなるため、ここで一括してやる。
+    //
+    // detail(や switcher/settings)では「選択」＝今まさに表示しているタスクそのものなので、
+    // ここで外すとTaskDetailが「タスクが選択されていません」に化けて本文が消える事故になる
+    // (かつ selectedTaskId が変わるとTaskDetailのkeyが変わり再マウントされるため、C-1の
+    // フォーカス復帰(旧DOMノードを覚えている)も巻き添えで無効化される)。
+    // detailで外れた選択は、盤面へ戻るとき(setView("board"))に改めて判定する。
+    const { view, tasks, tags, searchQuery, selectedTaskId } = get();
+    if (view !== "board") {
+      set({ tagPaletteOpen: false });
+      return;
+    }
     const stillVisible =
       selectedTaskId !== null && isTaskStillVisible(selectedTaskId, tasks, searchQuery, tags);
     set({ tagPaletteOpen: false, selectedTaskId: stillVisible ? selectedTaskId : null });
@@ -545,6 +591,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const updated = await api.tagRename(id, trimmed);
       if (epoch !== boardEpoch) return;
       set((s) => ({ tags: s.tags.map((t) => (t.id === id ? updated : t)) }));
+      // 改名でタグ名が変わると#タグ名の絞り込み結果も変わりうるので判定し直す(m-1)
+      dropStaleSelectionAfterTagMutation();
     } catch (e) {
       if (epoch !== boardEpoch) return;
       toast.error(`タグの改名に失敗しました: ${String(e)}`);
@@ -567,6 +615,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         tags: s.tags.filter((t) => t.id !== id),
         tasks: s.tasks.map((t) => ({ ...t, tagIds: t.tagIds.filter((tid) => tid !== id) })),
       }));
+      // 削除でタグが外れると絞り込み結果も変わりうるので判定し直す(m-1)
+      dropStaleSelectionAfterTagMutation();
     } catch (e) {
       if (epoch !== boardEpoch) return;
       toast.error(`タグの削除に失敗しました: ${String(e)}`);

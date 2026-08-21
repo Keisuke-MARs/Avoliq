@@ -338,6 +338,29 @@ describe("appStore: closeTagPalette と絞り込み", () => {
 
     expect(useAppStore.getState().selectedTaskId).toBe("t-a");
   });
+
+  // N-1回帰: 詳細画面では「選択」＝表示中のタスクそのものなので、ここで外すと
+  // TaskDetailが「タスクが選択されていません」に化けて本文が消える事故になる。
+  // board側の穴を塞いだ修正が、detail側に新しい穴を開けていないかを確認する。
+  it("detail画面では絞り込みから外れていても選択とviewをどちらも保つ", () => {
+    // 検索欄が#バグの状態でt-a(バグ持ち)の詳細を開いた後、パレットでバグを外した状況を再現する
+    useAppStore.setState({
+      view: "detail",
+      searchQuery: "#バグ",
+      selectedTaskId: "t-a",
+      tagPaletteOpen: true,
+      tasks: useAppStore
+        .getState()
+        .tasks.map((t) => (t.id === "t-a" ? { ...t, tagIds: t.tagIds.filter((id) => id !== "tag-bug") } : t)),
+    });
+
+    useAppStore.getState().closeTagPalette();
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(false);
+    // 選択もviewも変えない(詳細画面のまま、本文は消えない)
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+    expect(useAppStore.getState().view).toBe("detail");
+  });
 });
 
 describe("appStore: setView / setSelectedTask", () => {
@@ -351,6 +374,37 @@ describe("appStore: setView / setSelectedTask", () => {
     expect(useAppStore.getState().selectedTaskId).toBe("t-a");
     useAppStore.getState().setSelectedTask(null);
     expect(useAppStore.getState().selectedTaskId).toBeNull();
+  });
+
+  // N-1回帰: detailでタグを外して絞り込みから外れたカードは、closeTagPaletteでは
+  // 選択を残す(本文を消さないため)ので、盤面へ戻るこのタイミングで改めて判定する。
+  // ここで解除しないと、盤面に見えていないカードがEnterで開いてしまう。
+  it("detail → board で絞り込みから外れた選択が解除される", async () => {
+    await loadFixtureBoard();
+    // 検索欄が#バグの状態で、t-aは既にバグを外されて絞り込みから外れている
+    useAppStore.setState({
+      view: "detail",
+      searchQuery: "#バグ",
+      selectedTaskId: "t-a",
+      tasks: useAppStore
+        .getState()
+        .tasks.map((t) => (t.id === "t-a" ? { ...t, tagIds: t.tagIds.filter((id) => id !== "tag-bug") } : t)),
+    });
+
+    useAppStore.getState().setView("board");
+
+    expect(useAppStore.getState().view).toBe("board");
+    expect(useAppStore.getState().selectedTaskId).toBeNull();
+  });
+
+  it("detail → board でも絞り込みに残っていれば選択を維持する", async () => {
+    await loadFixtureBoard();
+    // t-c はバグを持ったまま(絞り込みに残る)
+    useAppStore.setState({ view: "detail", searchQuery: "#バグ", selectedTaskId: "t-c" });
+
+    useAppStore.getState().setView("board");
+
+    expect(useAppStore.getState().selectedTaskId).toBe("t-c");
   });
 });
 
@@ -1286,5 +1340,99 @@ describe("appStore: タグ系ミューテーション", () => {
 
     expect(mocked.tagRename).toHaveBeenCalledTimes(2);
     expect(useAppStore.getState().tags[0]).toEqual(renamed);
+  });
+
+  // m-1: renameTag/deleteTagはtoggleTaskTagと違って楽観的更新を持たないため、
+  // 応答待ち中にEscでパレットを閉じると、closeTagPaletteは改名/削除前の古いtags/tasksで
+  // 判定してしまう。応答が返った後に改めて判定し直すことを確認する。
+  it("renameTagの応答待ち中にパレットを閉じても、応答後に絞り込みから外れた選択を解除する(m-1)", async () => {
+    const renamed: Tag = {
+      id: "tag-bug",
+      boardId: "board-1",
+      name: "不具合",
+      color: "#7EA9E8",
+      position: 0,
+    };
+    let resolveRename: (value: Tag) => void = () => {};
+    mocked.tagRename.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRename = resolve;
+      }),
+    );
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+      searchQuery: "#バグ",
+      selectedTaskId: "t-a", // t-aはバグを持つので、改名前はまだ絞り込みに見えている
+      tagPaletteOpen: true,
+    });
+
+    const renamePromise = useAppStore.getState().renameTag("tag-bug", "不具合");
+    // 応答待ち中にEscで閉じる。まだtagsは古い(バグのまま)ので、この時点の判定では選択は残る
+    useAppStore.getState().closeTagPalette();
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+
+    resolveRename(renamed);
+    await renamePromise;
+
+    // 改名後は「#バグ」に一致するタグが無くなるので、選択は解除されるべき
+    expect(useAppStore.getState().selectedTaskId).toBeNull();
+  });
+
+  it("deleteTagの応答待ち中にパレットを閉じても、応答後に絞り込みから外れた選択を解除する(m-1)", async () => {
+    let resolveDelete: (value: void) => void = () => {};
+    mocked.tagDelete.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+      searchQuery: "#バグ",
+      selectedTaskId: "t-a",
+      tagPaletteOpen: true,
+    });
+
+    const deletePromise = useAppStore.getState().deleteTag("tag-bug");
+    useAppStore.getState().closeTagPalette();
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+
+    resolveDelete(undefined);
+    await deletePromise;
+
+    expect(useAppStore.getState().selectedTaskId).toBeNull();
+  });
+
+  it("m-1の判定はdetail画面では選択もviewも変えない", async () => {
+    let resolveDelete: (value: void) => void = () => {};
+    mocked.tagDelete.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+      searchQuery: "#バグ",
+      selectedTaskId: "t-a",
+      tagPaletteOpen: true,
+      view: "detail",
+    });
+
+    const deletePromise = useAppStore.getState().deleteTag("tag-bug");
+    useAppStore.getState().closeTagPalette();
+    resolveDelete(undefined);
+    await deletePromise;
+
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+    expect(useAppStore.getState().view).toBe("detail");
+
+    // このdescribe内の以降のテストに影響しないようboardへ戻しておく
+    // (このファイルはテスト間でstoreを明示リセットしない流儀のため)
+    useAppStore.setState({ view: "board" });
   });
 });

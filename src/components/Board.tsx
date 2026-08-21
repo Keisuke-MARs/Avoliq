@@ -40,7 +40,10 @@ export function Board() {
   // filterTasksは「存在しないタグ」や「タグを削除して候補が0件になった」場合も[]を返すため、
   // ここで案内を出さないと盤面がただ真っ白になり、何が起きたのかユーザーに伝わらない
   // (tasks.length === 0のときの空状態とは原因が違うので、文言・アイコンを分けている)。
-  const isFilteredEmpty = lanes.every((lane) => lane.tasks.length === 0);
+  // lanes.length > 0 も見ているのは、lanes.every は空配列に対してtrueを返すため
+  // (statusesが0個でlanesが[]のとき、tasks.length > 0でも誤って絞り込み空状態に
+  // 落ちてしまう事故を防ぐ。現状はstatusが最低1つ保証される作りだが、意図を明確にしておく)。
+  const isFilteredEmpty = lanes.length > 0 && lanes.every((lane) => lane.tasks.length === 0);
   if (isFilteredEmpty) {
     return (
       <div

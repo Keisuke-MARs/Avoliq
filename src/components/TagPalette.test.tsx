@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TagPalette } from "@/components/TagPalette";
 import { initialAppState, useAppStore } from "@/store/appStore";
@@ -151,6 +152,26 @@ describe("TagPalette: フォーカスの復帰(C-1)", () => {
     const { unmount } = render(<TagPalette />);
 
     expect(() => unmount()).not.toThrow();
+  });
+
+  it("StrictMode下(effectが2回走る)でもフォーカス復帰が壊れない", () => {
+    // StrictModeはマウント時のeffectを「実行→cleanup→再実行」の順で2回走らせる。
+    // このeffectのcleanupは「捕まえた要素へfocus()を戻す」処理なので、1回目のcleanupで
+    // 一瞬editorStandInへ戻り、2回目のマウントでまた入力欄が奪う…という往復が起きても
+    // 最終的な状態(入力欄にフォーカス)が壊れないことを確認する。
+    const editorStandIn = document.createElement("div");
+    editorStandIn.tabIndex = -1;
+    document.body.appendChild(editorStandIn);
+    editorStandIn.focus();
+
+    const { unmount } = render(<TagPalette />, { wrapper: StrictMode });
+
+    expect(screen.getByTestId("tag-palette-input")).toHaveFocus();
+
+    unmount();
+
+    expect(editorStandIn).toHaveFocus();
+    editorStandIn.remove();
   });
 });
 
