@@ -83,15 +83,19 @@ export function AppSettings() {
           aria-checked={autostartOn}
           onClick={() => void toggleAutostart()}
           className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
-            autostartOn ? "bg-[#34C759]" : "av-toggle-off"
+            autostartOn ? "" : "av-toggle-off"
           }`}
+          style={
+            autostartOn ? { backgroundColor: "var(--av-success)" } : undefined
+          }
         >
           {/* left-0 は必須。省くとbutton既定のtext-align:centerで基準位置がトラック中央になり、
               translate-xの分だけつまみが右へはみ出す */}
           <span
-            className={`absolute top-0.5 left-0 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            className={`absolute top-0.5 left-0 h-5 w-5 rounded-full bg-white transition-transform ${
               autostartOn ? "translate-x-[18px]" : "translate-x-0.5"
             }`}
+            style={{ boxShadow: "0 1px 2px oklch(0 0 0 / 0.22)" }}
           />
         </button>
       </div>
@@ -112,10 +116,16 @@ export function AppSettings() {
           }}
           onKeyDown={capturing ? (event) => void handleCaptureKeyDown(event) : undefined}
           className={`rounded-md px-2 py-1 text-xs transition-colors ${
-            capturing
-              ? "bg-[#007AFF] text-white"
-              : "av-text-2 av-btn-ghost"
+            capturing ? "" : "av-text-2 av-btn-ghost"
           }`}
+          style={
+            capturing
+              ? {
+                  backgroundColor: "var(--av-accent-solid)",
+                  color: "var(--av-text-on-accent)",
+                }
+              : undefined
+          }
         >
           {capturing ? "キーを押してください" : "変更"}
         </button>
@@ -124,7 +134,11 @@ export function AppSettings() {
       {error !== null && (
         <p
           role="alert"
-          className="mx-3 mt-1 rounded-md bg-[#FF3B30]/10 px-3 py-2 text-xs leading-relaxed text-[#FF3B30]"
+          className="mx-3 mt-1 rounded-md px-3 py-2 text-xs leading-relaxed"
+          style={{
+            backgroundColor: "var(--av-danger-subtle)",
+            color: "var(--av-danger)",
+          }}
         >
           {error}
         </p>

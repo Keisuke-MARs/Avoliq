@@ -362,6 +362,12 @@ body {
 .av-text-3 {
   color: var(--av-text-muted);
 }
+.av-surface-raised {
+  background-color: var(--av-surface-raised);
+}
+.av-danger-text {
+  color: var(--av-danger);
+}
 .av-row-selected {
   background-color: var(--av-surface-selected);
 }
@@ -374,9 +380,9 @@ body {
 .av-input::placeholder {
   color: var(--av-text-muted);
 }
-/* トグルスイッチOFF時のトラック(AppleのsystemGray相当。両モード共通) */
+/* トグルOFF時のトラック。地の明るさに合わせて分岐させる */
 .av-toggle-off {
-  background-color: rgba(120, 120, 128, 0.32);
+  background-color: var(--av-toggle-off);
 }
 
 /* ホバーで薄く反応する汎用ボタン */
@@ -384,45 +390,51 @@ body {
   background-color: var(--av-surface-hover);
 }
 
-/* BlockNoteの配色をパレットに合わせる */
+/* BlockNoteの配色をパレットに合わせる。
+   data-color-scheme は TaskDetail の theme prop（= useColorScheme の値）が駆動する。
+   .dark が documentElement に付いているので、var() は自動的に正しい側を引く */
+.bn-root[data-color-scheme="light"],
 .bn-root[data-color-scheme="dark"] {
   --bn-colors-editor-background: transparent;
-  --bn-colors-editor-text: #f5f5f7;
-  --bn-colors-menu-background: #2c2c2e;
-  --bn-colors-menu-text: #f5f5f7;
-  --bn-colors-border: rgba(255, 255, 255, 0.12);
-}
-
-.bn-root[data-color-scheme="light"] {
-  --bn-colors-editor-background: transparent;
-  --bn-colors-editor-text: #1c1c1e;
-  --bn-colors-border: rgba(0, 0, 0, 0.08);
+  --bn-colors-editor-text: var(--av-text-primary);
+  --bn-colors-menu-background: var(--av-surface-raised);
+  --bn-colors-menu-text: var(--av-text-primary);
+  --bn-colors-tooltip-background: var(--av-surface-raised);
+  --bn-colors-tooltip-text: var(--av-text-secondary);
+  --bn-colors-hovered-background: var(--av-surface-hover);
+  --bn-colors-hovered-text: var(--av-text-primary);
+  --bn-colors-selected-background: var(--av-accent-solid);
+  --bn-colors-selected-text: var(--av-text-on-accent);
+  --bn-colors-disabled-background: var(--av-surface-hover);
+  --bn-colors-disabled-text: var(--av-text-muted);
+  --bn-colors-border: var(--av-hairline);
+  --bn-colors-side-menu: var(--av-text-muted);
 }
 
 /* ============ スラッシュメニュー(BlockNoteのサジェスト) ============
-   shadcn既定の選択色(bg-accent = ほぼ白)は、半透明白のパレット上では
-   選択行が背景と見分けられない。macOSのメニューに合わせてシステムブルーで塗る。
+   shadcn既定の選択色(bg-accent)は、半透明のパレット上では選択行が背景と見分けられない。
+   macOSのメニューに合わせてブランド青で塗る。
    Tailwindのユーティリティは@layer内なので、レイヤー外のこの指定が優先される */
 .bn-suggestion-menu [aria-selected="true"] {
-  background-color: #007aff;
+  background-color: var(--av-accent-solid);
   border-radius: 8px;
 }
 
 /* 選択行の中身(タイトル・説明文・アイコン)は白に統一して可読性を保つ */
 .bn-suggestion-menu [aria-selected="true"],
 .bn-suggestion-menu [aria-selected="true"] * {
-  color: #ffffff;
+  color: var(--av-text-on-accent);
 }
 
 .bn-suggestion-menu [aria-selected="true"] svg {
-  color: #ffffff;
+  color: var(--av-text-on-accent);
 }
 
 /* ショートカットのバッジは青地に埋もれるので、半透明白の地に置き換える */
 .bn-suggestion-menu [aria-selected="true"] kbd,
 .bn-suggestion-menu [aria-selected="true"] [class*="badge"],
 .bn-suggestion-menu [aria-selected="true"] [data-slot="badge"] {
-  background-color: rgba(255, 255, 255, 0.22);
+  background-color: oklch(1 0 0 / 0.22);
   border-color: transparent;
 }
 

@@ -367,7 +367,7 @@ export function StatusSettings() {
               aria-selected={i === colorIndex}
               className={`h-5 w-5 rounded-full transition-transform ${
                 i === colorIndex
-                  ? "scale-110 ring-2 ring-[var(--av-text-secondary)] ring-offset-2"
+                  ? "scale-110 outline-2 outline-offset-2 outline-[var(--av-focus-ring)]"
                   : ""
               }`}
               style={{ backgroundColor: color.value }}
