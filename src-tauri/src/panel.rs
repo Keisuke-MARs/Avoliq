@@ -22,7 +22,7 @@ pub const MAIN_WINDOW_LABEL: &str = "main";
 // is_floating_panel: 他アプリのウィンドウより手前に浮かせる
 // hides_on_deactivate: 勝手に消えると操作しづらいので false（明示的なEsc/ホットキーで閉じる）
 tauri_panel! {
-    panel!(SmartTaskPanel {
+    panel!(AvoliqPanel {
         config: {
             can_become_key_window: true,
             can_become_main_window: false,
@@ -32,7 +32,7 @@ tauri_panel! {
     })
 
     // パネルのNSWindowDelegate。キーウィンドウでなくなったことを検知する。
-    panel_event!(SmartTaskPanelEvents {
+    panel_event!(AvoliqPanelEvents {
         window_did_resign_key(notification: &NSNotification) -> ()
     })
 }
@@ -43,7 +43,7 @@ pub fn init_panel(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .get_webview_window(MAIN_WINDOW_LABEL)
         .ok_or("メインウィンドウが見つかりません")?;
 
-    let panel = window.to_panel::<SmartTaskPanel>()?;
+    let panel = window.to_panel::<AvoliqPanel>()?;
 
     // 非アクティブ化パネル: アプリをアクティブにせずキー入力だけ受け取る（＝フォーカスを奪わない）
     // borderless: タイトルバーなし
@@ -74,7 +74,7 @@ pub fn init_panel(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     // パレット外のクリック等でキーウィンドウでなくなったら、Spotlightと同様に自動で閉じる。
     // 非アクティブ化パネルは hides_on_deactivate では拾えないため、resignKey で検知する。
     // ハンドラは set_event_handler 側が retain して保持する。
-    let events = SmartTaskPanelEvents::new();
+    let events = AvoliqPanelEvents::new();
     let app_handle = window.app_handle().clone();
     events.window_did_resign_key(move |_notification| {
         hide_panel(&app_handle);

@@ -6,7 +6,7 @@ import { useAppStore } from "@/store/appStore";
 import type { AppState } from "@/store/appStore";
 
 /** 検索入力欄のDOM id。window の keydown ハンドラからフォーカスを移すために使う。 */
-export const SEARCH_INPUT_ID = "smarttask-search";
+export const SEARCH_INPUT_ID = "avoliq-search";
 
 /** 検索入力欄にフォーカスし、キャレットを末尾に置く */
 function focusSearchInput(): void {

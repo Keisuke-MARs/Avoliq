@@ -6,6 +6,10 @@ use std::sync::Mutex;
 
 use tauri::Manager;
 
+fn avoliq_database_path(data_dir: &std::path::Path) -> std::path::PathBuf {
+    data_dir.join("Avoliq").join("avoliq.db")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -41,13 +45,9 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // ~/Library/Application Support/smartTask/smart-task.db
+            // ~/Library/Application Support/Avoliq/avoliq.db
             // app_data_dir() だとバンドル識別子のディレクトリになるので data_dir() を使う
-            let db_path = app
-                .path()
-                .data_dir()?
-                .join("smartTask")
-                .join("smart-task.db");
+            let db_path = avoliq_database_path(&app.path().data_dir()?);
             let mut conn = db::open_at(&db_path).map_err(|e| e.to_string())?;
             db::repo::seed_if_empty(&mut conn).map_err(|e| e.to_string())?;
             app.manage(commands::DbState(Mutex::new(conn)));
@@ -75,4 +75,18 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::avoliq_database_path;
+    use std::path::Path;
+
+    #[test]
+    fn database_path_is_scoped_to_avoliq() {
+        assert_eq!(
+            avoliq_database_path(Path::new("/tmp/application-support")),
+            Path::new("/tmp/application-support/Avoliq/avoliq.db"),
+        );
+    }
 }

@@ -78,7 +78,7 @@ describe("Palette: 初期表示", () => {
 
   it("検索バーに最初からフォーカスがある", async () => {
     await renderPalette();
-    expect(document.activeElement?.id).toBe("smarttask-search");
+    expect(document.activeElement?.id).toBe("avoliq-search");
   });
 
   it("フッターにキーボードヒントを常時表示する", async () => {
@@ -98,7 +98,7 @@ describe("Palette: カーソル移動", () => {
   it("カードを選ぶと検索バーからフォーカスが外れる", async () => {
     const user = await renderPalette();
     await user.keyboard("{ArrowDown}");
-    expect(document.activeElement?.id).not.toBe("smarttask-search");
+    expect(document.activeElement?.id).not.toBe("avoliq-search");
   });
 
   it("↓↓で同レーンを下へ進む", async () => {
@@ -117,7 +117,7 @@ describe("Palette: カーソル移動", () => {
     const user = await renderPalette();
     await user.keyboard("{ArrowDown}{ArrowUp}");
     expect(selectedCardId()).toBeNull();
-    expect(document.activeElement?.id).toBe("smarttask-search");
+    expect(document.activeElement?.id).toBe("avoliq-search");
   });
 
   it("→で右隣のレーンへ移り、行番号を維持する", async () => {
@@ -160,7 +160,7 @@ describe("Palette: 検索と新規作成", () => {
 
     await user.keyboard("r");
 
-    expect(document.activeElement?.id).toBe("smarttask-search");
+    expect(document.activeElement?.id).toBe("avoliq-search");
     expect(useAppStore.getState().searchQuery).toBe("r");
     expect(selectedCardId()).toBeNull();
   });
@@ -243,7 +243,7 @@ describe("Palette: 検索と新規作成", () => {
 
     expect(useAppStore.getState().searchQuery).toBe("");
     expect(selectedCardId()).toBeNull();
-    expect(document.activeElement?.id).toBe("smarttask-search");
+    expect(document.activeElement?.id).toBe("avoliq-search");
   });
 
   it("⌘Nでボード先頭ステータスへ新しいタスクを作成し、詳細画面へ遷移する", async () => {
@@ -317,7 +317,7 @@ describe("Palette: 詳細画面での⌘N・⌘P", () => {
       expect(screen.getByTestId("board")).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(document.activeElement?.id).toBe("smarttask-search");
+      expect(document.activeElement?.id).toBe("avoliq-search");
     });
   });
 });
