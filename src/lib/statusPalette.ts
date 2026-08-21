@@ -11,5 +11,3 @@ import presets from "../../design/status-presets.json";
  * #007AFF は入れない（選択状態とステータスが混同されるため）。
  */
 export const STATUS_COLORS: readonly { name: string; value: string }[] = presets;
-
-export type StatusColor = string;

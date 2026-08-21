@@ -9,11 +9,11 @@ use super::{Board, RepoError, Result, Status, Task};
 
 /// ステータス色プリセット（design/status-presets.json）の1件。
 /// TS側の STATUS_COLORS と同じファイルを読むことで、色のズレを構造的に防ぐ。
+/// JSONには表示用の name もあるが、Rust側で使うのは色だけ。
+/// serdeはデフォルトで未知フィールドを無視してパースするので、
+/// 使わない name はこの構造体に定義しなくてよい。
 #[derive(serde::Deserialize)]
 struct StatusPreset {
-    /// TS側の色ピッカーのラベルに使う。Rust側では色だけ使うので読み捨てる
-    #[allow(dead_code)]
-    name: String,
     value: String,
 }
 
