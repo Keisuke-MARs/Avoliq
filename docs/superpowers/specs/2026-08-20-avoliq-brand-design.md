@@ -1,7 +1,7 @@
 # Avoliq ブランドデザイン設計書
 
 作成日: 2026-08-20  
-ステータス: ユーザー承認済み（画像生成前の設計）
+ステータス: ユーザー承認済み（完全改名の実装計画前）
 
 ## 1. ブランドの核
 
@@ -89,19 +89,55 @@ AppleのLiquid Glassに倣い、ガラス素材はコンテンツより前面に
 - アプリの画面写真または静かな抽象光を使い、人物のストック写真や生産性を誇張するグラフは使わない
 - カンバンのステータス色はプロダクトUI内でのみ使い、ブランドの主パレットへ持ち出さない
 
-## 6. 今回の成果物
+## 6. 完全改名の方針
+
+`smartTask` を `Avoliq` へ完全に改名する。見た目だけを変える互換重視の改名にはせず、新しいアプリ識別子と保存先を持つ別アプリとして配布する。
+
+### 変更する名称
+
+| 区分 | 変更前 | 変更後 |
+|---|---|---|
+| リポジトリの親フォルダ | `smartTaskManagement` | `Avoliq` |
+| アプリ表示名・ウィンドウ名・HTMLタイトル | `smartTask` | `Avoliq` |
+| npm パッケージ名 | `smart-task` | `avoliq` |
+| Cargo パッケージ・ライブラリ名 | `smart-task` / `smart_task_lib` | `avoliq` / `avoliq_lib` |
+| Tauri識別子 | `com.kei06.smarttask` | `com.kei06.avoliq` |
+| アプリデータ保存先 | `~/Library/Application Support/smartTask/smart-task.db` | `~/Library/Application Support/Avoliq/avoliq.db` |
+| 検索欄のDOM ID・パネル型名 | `smarttask-*` / `SmartTaskPanel` | `avoliq-*` / `AvoliqPanel` |
+
+### データ互換性
+
+- 旧アプリのデータベースは自動移行しない。
+- `Avoliq` は旧 `smartTask` と別アプリとして起動し、初回は新しい空のデータベースを作成する。
+- 旧データの削除・変更は行わない。手動移行機能も今回の対象外とする。
+- この方針により、既存の配布済みアプリのアップデート経路とデータを変換する責務は負わない。
+
+### アイコン
+
+- ブランドの正式な元画像 `design/avoliq-app-icon.png` を唯一の入力として使う。
+- Tauri が参照する `src-tauri/icons/` の macOS・Windows・汎用PNGアイコンを、この元画像から全サイズ生成して置き換える。
+- `design/avoliq-logo.png` はブランド資産として維持するが、既存のタスク操作UIへロゴ表示を新設しない。
+
+## 7. 今回の成果物
 
 | ファイル | 内容 |
 |---|---|
 | `design/avoliq-app-icon.png` | 1024pxの正方形アイコン。Liquid Glassの青いチェックマーク |
 | `design/avoliq-logo.png` | 透明背景。ガラスのマークとAvoliqの横組みロゴ |
+| `src-tauri/icons/` | 元画像から生成したTauriバンドル用アイコン一式 |
+| Tauri・npm・Cargo・HTML・Rust・テスト・READMEの名称参照 | `Avoliq` に統一した設定と実装 |
 
-今回はデザイン資産のみを追加し、既存のTauriアイコン、実装、設定ファイルは変更しない。
+リポジトリの親フォルダも `Avoliq` へ変更する。`src-tauri` など、アプリが前提とする技術ディレクトリ名は変更しない。
 
-## 7. 受け入れ基準
+## 8. 受け入れ基準
 
 - アイコンは小さい表示でもチェックが一読できる
 - ガラスの表現は一つのマークに集約され、過剰な半透明装飾がない
 - ロゴの表記は正確に `Avoliq` となっている
 - アイコン、ロゴ、LPのコンセプトは「直感的に、自然に思考を整え、次へ進める」と矛盾しない
 - 操作キーやキーキャップはブランドの主ビジュアルに含まれない
+- アプリの表示名、バンドル名、HTMLタイトル、npm/Cargoパッケージ名、Rust内部名に `smartTask` / `smart-task` が残らない
+- Tauri識別子が `com.kei06.avoliq` であり、データベースは `~/Library/Application Support/Avoliq/avoliq.db` を使う
+- `src-tauri/icons/` のTauri設定に列挙されたアイコンがすべて存在し、`design/avoliq-app-icon.png` に由来する
+- 旧 `smartTask` のアプリデータを読み書き・削除しない
+- 対象ユニットテスト、型検査、フロントエンドビルドが成功する
