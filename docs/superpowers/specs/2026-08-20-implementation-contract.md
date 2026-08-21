@@ -248,7 +248,12 @@ interface AppState {
 
 - フォント: `-apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", sans-serif`
 - アイコンは絵文字禁止、lucide-reactのみ
-- パレット: 角丸16px・半透明白 `rgba(250,250,252,0.92)` + backdrop-blur・大きめシャドウ
+- パレット: 角丸16px・半透明白 `rgba(250,250,252,0.6)` ＋ 背後のぼかし・大きめシャドウ
+  - 背後のぼかしは `tauri.conf.json` の `windowEffects`（NSVisualEffectView / material=popover,
+    radius=16）が担う。CSSの `backdrop-filter` はWKWebViewではページ内しかぼかせず、
+    透過ウィンドウの向こう側には効かないので使わない
+  - `state` は `active` 固定。非アクティブ化パネルはkeyWindowにならないため、既定の
+    `followsWindowActiveState` だと常に非アクティブ表示（くすんだ色）になる
 - アクセントカラーはステータス色（上表）
 - フッターに常時キーボードヒント表示
 - 保存ボタンは存在しない（全操作即時保存）

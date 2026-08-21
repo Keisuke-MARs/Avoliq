@@ -151,7 +151,9 @@ body {
 
 /* ============ Avoliq デザイントークン ============ */
 :root {
-  --st-palette-bg: rgba(250, 250, 252, 0.92);
+  /* 背後のぼかしはネイティブ側(tauri.conf.jsonのwindowEffects=NSVisualEffectView)が担う。
+     ここはその上に乗せる色味だけなので、ぼかしが見える程度に薄くしておく */
+  --st-palette-bg: rgba(250, 250, 252, 0.6);
   --st-palette-border: rgba(0, 0, 0, 0.08);
   --st-text-primary: #1c1c1e;
   --st-text-secondary: #6e6e73;
@@ -167,7 +169,7 @@ body {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --st-palette-bg: rgba(28, 28, 30, 0.9);
+    --st-palette-bg: rgba(28, 28, 30, 0.55);
     --st-palette-border: rgba(255, 255, 255, 0.1);
     --st-text-primary: #f5f5f7;
     --st-text-secondary: #a1a1a6;
@@ -197,8 +199,9 @@ body {
   border: 0.5px solid var(--st-palette-border);
   border-radius: 16px;
   box-shadow: var(--st-shadow);
-  backdrop-filter: saturate(180%) blur(30px);
-  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  /* backdrop-filterはここでは使わない。WKWebViewのbackdrop-filterはページ内の描画しか
+     ぼかせず、透過ウィンドウの向こう側(デスクトップ)には効かないため、素通しになってしまう。
+     背後のぼかしはNSVisualEffectView(windowEffects)に任せている */
   color: var(--st-text-primary);
   animation: st-palette-in 180ms var(--st-ease) both;
 }
