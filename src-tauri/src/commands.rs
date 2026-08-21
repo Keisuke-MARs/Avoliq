@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use tauri::AppHandle;
 use tauri::State;
 
-use crate::db::{repo, Board, Status, Task};
+use crate::db::{repo, Board, Status, Tag, Task};
 use crate::panel;
 
 /// DB接続をアプリ全体で共有するための状態。
@@ -142,6 +142,44 @@ pub fn task_delete(state: State<'_, DbState>, id: String) -> Result<Task, String
 pub fn task_restore(state: State<'_, DbState>, id: String) -> Result<Task, String> {
     let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
     repo::task_restore(&mut conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tags_list(state: State<'_, DbState>, board_id: String) -> Result<Vec<Tag>, String> {
+    let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
+    repo::tags_list(&mut conn, &board_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tag_create(
+    state: State<'_, DbState>,
+    board_id: String,
+    name: String,
+) -> Result<Tag, String> {
+    let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
+    repo::tag_create(&mut conn, &board_id, &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tag_rename(state: State<'_, DbState>, id: String, name: String) -> Result<Tag, String> {
+    let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
+    repo::tag_rename(&mut conn, &id, &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tag_delete(state: State<'_, DbState>, id: String) -> Result<(), String> {
+    let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
+    repo::tag_delete(&mut conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn task_tag_toggle(
+    state: State<'_, DbState>,
+    task_id: String,
+    tag_id: String,
+) -> Result<Vec<String>, String> {
+    let mut conn = state.0.lock().map_err(|_| LOCK_ERROR.to_string())?;
+    repo::task_tag_toggle(&mut conn, &task_id, &tag_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
