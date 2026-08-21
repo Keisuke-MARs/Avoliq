@@ -179,6 +179,8 @@ Slate は現行 secondary より**暗い**（L .4922 対 .5399）。
 | `--av-accent-text` | 青い文字 | `var(--av-blue-700)` | `var(--av-blue-300)` | 選択カードのタイトル |
 | `--av-accent-mix` | 選択面の混色比 | `12%` | `16%` | `.av-card[data-selected]` |
 | `--av-focus-ring` | フォーカスリング | `var(--av-blue-500)` | `var(--av-blue-500)` | 全フォーカス可視化 |
+| `--av-status-chip-mix` | ステータスチップ面の混色比 | `14%` | `22%` | `.av-status-chip` |
+| `--av-status-chip-ink` | ステータスチップ文字の混色相手 | `var(--av-text-primary)` | `var(--av-text-on-accent)` | `.av-status-chip` |
 | `--av-danger` | 危険（文字・アイコン） | `oklch(0.5439 0.2049 28.61)` `#CC211B` | `oklch(0.7073 0.1847 25.94)` `#FF6961` | AlertTriangle, エラー文 |
 | `--av-danger-solid` | 危険（白文字の塗り） | `oklch(0.5439 0.2049 28.61)` `#CC211B` | `oklch(0.5439 0.2049 28.61)` `#CC211B` | ConfirmDialog 破棄ボタン |
 | `--av-danger-subtle` | 危険の淡面 | `color-mix(in srgb, var(--av-danger) 12%, transparent)` | 同左 | エラーボックス地 |
@@ -470,14 +472,27 @@ WCAG 1.4.11（非文字の UI 状態は 3:1）を満たさない。リングは�
 
 ### 6.4 ステータスチップ
 
+混色比はモードで変わる値なので、`--av-accent-mix` と同じくカスタムプロパティの上書きに揃える
+（ルールをモードごとに複製しない）。
+
+```css
+/* :root */
+--av-status-chip-mix: 14%;
+--av-status-chip-ink: var(--av-text-primary);
+
+/* .dark */
+--av-status-chip-mix: 22%;
+--av-status-chip-ink: var(--av-text-on-accent);
+```
+
 ```css
 .av-status-chip {
-  background-color: color-mix(in srgb, var(--av-status) 14%, var(--av-surface-card));
-  color: color-mix(in srgb, var(--av-status) 45%, var(--av-text-primary));
-}
-.dark .av-status-chip {
-  background-color: color-mix(in srgb, var(--av-status) 22%, var(--av-surface-card));
-  color: color-mix(in srgb, var(--av-status) 45%, #fff);
+  background-color: color-mix(
+    in srgb,
+    var(--av-status) var(--av-status-chip-mix),
+    var(--av-surface-card)
+  );
+  color: color-mix(in srgb, var(--av-status) 45%, var(--av-status-chip-ink));
 }
 ```
 

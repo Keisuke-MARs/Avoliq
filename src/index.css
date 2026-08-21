@@ -93,6 +93,11 @@
   --av-accent-mix: 12%;
   --av-focus-ring: var(--av-blue-500);
 
+  /* ステータスチップの混色比。モードで変わる値なのでトークンに出す
+     (--av-accent-mix と同じパターン) */
+  --av-status-chip-mix: 14%;
+  --av-status-chip-ink: var(--av-text-primary);
+
   --av-danger: oklch(0.5439 0.2049 28.61); /* #CC211B */
   --av-danger-solid: oklch(0.5439 0.2049 28.61);
   --av-danger-subtle: color-mix(in srgb, var(--av-danger) 12%, transparent);
@@ -160,6 +165,9 @@
 
   --av-accent-text: var(--av-blue-300);
   --av-accent-mix: 16%;
+
+  --av-status-chip-mix: 22%;
+  --av-status-chip-ink: var(--av-text-on-accent);
 
   --av-danger: oklch(0.7073 0.1847 25.94); /* #FF6961 */
   /* danger-solid は白文字を載せるのでライトと同じ暗い赤のまま */
@@ -331,15 +339,16 @@ body {
   box-shadow: inset 0 0 0 0.5px oklch(0 0 0 / 0.15);
 }
 
-/* ============ ステータスチップ(詳細画面) ============ */
+/* ============ ステータスチップ(詳細画面) ============
+   面と文字の両方をステータス色から混色で作る。現行の「文字＝生のステータス色、
+   面＝12%」は最小1.63:1で破綻していた。混色比はモードで変わるのでトークンに出す */
 .av-status-chip {
-  background-color: color-mix(in srgb, var(--av-status) 14%, var(--av-surface-card));
-  color: color-mix(in srgb, var(--av-status) 45%, var(--av-text-primary));
-}
-
-.dark .av-status-chip {
-  background-color: color-mix(in srgb, var(--av-status) 22%, var(--av-surface-card));
-  color: color-mix(in srgb, var(--av-status) 45%, #fff);
+  background-color: color-mix(
+    in srgb,
+    var(--av-status) var(--av-status-chip-mix),
+    var(--av-surface-card)
+  );
+  color: color-mix(in srgb, var(--av-status) 45%, var(--av-status-chip-ink));
 }
 
 /* ============ トークンのユーティリティクラス ============
