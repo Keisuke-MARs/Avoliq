@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SearchBar } from "@/components/SearchBar";
@@ -173,7 +173,7 @@ describe("SearchBar: 常時マウントされていることによる副作用�
     // view側で絞らないと詳細画面の上にドロップダウンが浮いたまま残ってしまう
     useAppStore.setState({ view: "detail" });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByTestId("tag-suggest")).not.toBeInTheDocument();
     });
   });
@@ -197,7 +197,7 @@ describe("SearchBar: 常時マウントされていることによる副作用�
     // ここで待たずに次の操作へ進むと、refs のリセットが間に合う前にアサーションしてしまい
     // 「リセットされたかどうか」を正しく検証できない。DOM側の反映(入力欄が空になったこと)を
     // 待つことで、useEffectのリセットも確実に完了させてから次へ進む
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(input).toHaveValue("");
     });
 
@@ -209,7 +209,7 @@ describe("SearchBar: 常時マウントされていることによる副作用�
     // 同様に、store直呼びの反映(再描画)を待ってから keyDown を発火する。
     // 待たずに発火すると、input の onKeyDown ハンドラが「#」反映前の古い描画に
     // 紐づいたクロージャのままになり、isTagToken が false のTab押下として空振りする
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(input).toHaveValue("#");
     });
     fireEvent.keyDown(input, { key: "Tab" });
