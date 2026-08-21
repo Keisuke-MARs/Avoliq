@@ -1160,6 +1160,40 @@ describe("appStore: タグ系ミューテーション", () => {
     expect(s.tasks.every((t) => !t.tagIds.includes("tag-bug"))).toBe(true);
   });
 
+  it("ボード切替の読込中はタグの付け外しを受け付けない", async () => {
+    // resolve関数を握っておき、アサーション後に明示的に解決させる。boardLoadingを
+    // trueのまま放置すると後続テストに影響するため(このファイルの既存の流儀に合わせる)。
+    let resolveStatuses: (value: Status[]) => void = () => {};
+    let resolveTasks: (value: Task[]) => void = () => {};
+    let resolveTags: (value: Tag[]) => void = () => {};
+    mocked.statusesList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStatuses = resolve;
+      }),
+    );
+    mocked.tasksList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTasks = resolve;
+      }),
+    );
+    mocked.tagsList.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTags = resolve;
+      }),
+    );
+    useAppStore.setState({ tasks, tags, selectedTaskId: "t-b" });
+    const selectPromise = useAppStore.getState().selectBoard("board-2");
+
+    await useAppStore.getState().toggleTaskTag("tag-bug");
+
+    expect(mocked.taskTagToggle).not.toHaveBeenCalled();
+
+    resolveStatuses([]);
+    resolveTasks([]);
+    resolveTags([]);
+    await selectPromise;
+  });
+
   it("応答保留中に連打しても、tagCreateは1回しか呼ばれない(tagSubmittingを共有する二重実行防止)", async () => {
     const created: Tag = {
       id: "tag-new",
@@ -1207,21 +1241,5 @@ describe("appStore: タグ系ミューテーション", () => {
 
     expect(mocked.tagRename).toHaveBeenCalledTimes(2);
     expect(useAppStore.getState().tags[0]).toEqual(renamed);
-  });
-
-  // このテストはselectBoardの応答を意図的に解決させず、boardLoadingがtrueのまま
-  // 終わる。以降にこの状態へ依存しないテストが続かないよう、このdescribeブロックの
-  // 最後に置くこと(module-scopeのboardLoadingはvitestのclearMocks/beforeEachでは
-  // リセットされない)。
-  it("ボード切替の読込中はタグの付け外しを受け付けない", async () => {
-    mocked.statusesList.mockImplementation(() => new Promise(() => {}));
-    mocked.tasksList.mockImplementation(() => new Promise(() => {}));
-    mocked.tagsList.mockImplementation(() => new Promise(() => {}));
-    useAppStore.setState({ tasks, tags, selectedTaskId: "t-b" });
-    void useAppStore.getState().selectBoard("board-2");
-
-    await useAppStore.getState().toggleTaskTag("tag-bug");
-
-    expect(mocked.taskTagToggle).not.toHaveBeenCalled();
   });
 });
