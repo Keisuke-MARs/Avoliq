@@ -86,8 +86,10 @@ export function AppSettings() {
             autostartOn ? "bg-[#34C759]" : "st-toggle-off"
           }`}
         >
+          {/* left-0 は必須。省くとbutton既定のtext-align:centerで基準位置がトラック中央になり、
+              translate-xの分だけつまみが右へはみ出す */}
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            className={`absolute top-0.5 left-0 h-5 w-5 rounded-full bg-white shadow transition-transform ${
               autostartOn ? "translate-x-[18px]" : "translate-x-0.5"
             }`}
           />
