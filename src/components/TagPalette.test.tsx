@@ -319,4 +319,28 @@ describe("TagPalette: 作成・改名・削除", () => {
     expect(screen.queryByTestId("tag-palette-create")).not.toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
   });
+
+  it("改名中に同じ行の入力欄以外(件数など)をクリックしてもフォーカスが外れず、Escapeで改名を取り消せる", async () => {
+    const user = userEvent.setup();
+    render(<TagPalette />);
+
+    await user.keyboard("{Meta>}r{/Meta}"); // バグを改名モードへ
+    const input = screen.getByTestId("tag-palette-rename-input");
+    expect(input).toHaveFocus();
+
+    // 改名中の行自身の、入力欄ではない部分(末尾の件数span)をクリックする
+    const row = input.closest('[data-testid="tag-palette-row"]');
+    const countSpan = row?.querySelector("span:last-child");
+    if (countSpan === null || countSpan === undefined) {
+      throw new Error("件数spanが見つからない");
+    }
+    await user.click(countSpan);
+
+    // フォーカスが改名入力欄に残っていること
+    expect(input).toHaveFocus();
+
+    // フォーカスが残っていれば、Escapeで改名を取り消せる
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("tag-palette-rename-input")).not.toBeInTheDocument();
+  });
 });

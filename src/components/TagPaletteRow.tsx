@@ -57,8 +57,15 @@ export function TagPaletteRow({
       data-testid="tag-palette-row"
       data-highlighted={highlighted ? "true" : "false"}
       // mousedownのデフォルト動作(フォーカス移動)を止め、今のフォーカス(検索入力欄 or 改名入力欄)を死守する。
-      // 自分自身が改名中の行のときだけ外し、改名入力欄へ普通にクリック・カーソル移動できるようにする。
-      onMouseDown={isRenaming ? undefined : (e) => e.preventDefault()}
+      // 「改名中の行かどうか」ではなく「クリックした対象が改名入力欄そのものかどうか」で判定する。
+      // isRenamingだけで行全体(色スウォッチ・チェックアイコン・件数など非入力要素も含む)を
+      // 無条件に外してしまうと、改名中でも入力欄の外側をクリックしたときにフォーカスが
+      // 抜けてしまい、以後Escなどのキー操作が改名入力欄に届かなくなる。
+      onMouseDown={(e) => {
+        // 改名入力欄そのものへのクリックだけは邪魔しない(カーソル移動・範囲選択のため)
+        if (isRenaming && e.target === renameInputRef.current) return;
+        e.preventDefault();
+      }}
       // クリックでのトグルは list モードのときだけ(改名中は自分の行も他の行も反応しない)
       onClick={clickable ? onActivate : undefined}
       className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1 text-[12px] ${
