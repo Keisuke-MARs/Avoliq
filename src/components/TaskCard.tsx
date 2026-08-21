@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useChipOverflow } from "@/hooks/useChipOverflow";
+import { CHIP_GAP, useChipOverflow } from "@/hooks/useChipOverflow";
 import { usePrefersDark } from "@/hooks/usePrefersDark";
 import { tagChipStyle } from "@/lib/tagPalette";
 import { useAppStore } from "@/store/appStore";
@@ -69,11 +69,14 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
     >
       {task.title}
       {/* タグを持たないカードは行そのものを描画しない（可視カード数を減らさないため） */}
+      {/* 隙間は useChipOverflow の測定式が使う値と必ず一致していなければならないので、
+          Tailwindのクラスではなく CHIP_GAP をそのまま style で当てて二重管理をなくす */}
       {tags.length > 0 && (
         <div
           ref={rowRef}
           data-testid="task-card-tags"
-          className="mt-1 flex gap-[3px] overflow-hidden whitespace-nowrap"
+          style={{ gap: CHIP_GAP }}
+          className="mt-1 flex overflow-hidden whitespace-nowrap"
         >
           {shown.map((tag) => (
             <span
