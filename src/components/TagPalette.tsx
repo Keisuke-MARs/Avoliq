@@ -1,15 +1,9 @@
-import { Check, Tag as TagIcon } from "lucide-react";
+import { Tag as TagIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { TagPaletteRow, type TagRow } from "@/components/TagPaletteRow";
 import { useAppStore } from "@/store/appStore";
 import type { Tag } from "@/types";
-
-/** 1行分の表示データ */
-interface TagRow {
-  tag: Tag;
-  attached: boolean;
-  count: number;
-}
 
 /** フォーカス制御の分岐に使うモード（BoardSwitcher/StatusSettingsと同じ作法） */
 type Mode = "list" | "rename" | "confirm-delete";
@@ -246,78 +240,27 @@ export function TagPalette() {
         />
 
         <div role="listbox" aria-label="タグ候補" className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-1.5">
-          {rows.map((row) => {
-            const highlighted = row.tag.id === highlightId;
-            return (
-              <div
-                key={row.tag.id}
-                id={`tag-palette-option-${row.tag.id}`}
-                role="option"
-                // aria-selectedはキーボードカーソルの位置(BoardSwitcher等と同じ意味)。
-                // 付与済みかどうかはaria-checkedで別途表す。
-                aria-selected={highlighted}
-                aria-checked={row.attached}
-                data-testid="tag-palette-row"
-                data-highlighted={highlighted ? "true" : "false"}
-                // mousedownのデフォルト動作(フォーカス移動)を止め、今のフォーカス
-                // (検索入力欄 or 改名入力欄)を死守する。自分自身が改名中の行のときだけ外し、
-                // 改名入力欄へ普通にクリック・カーソル移動できるようにする。
-                onMouseDown={renamingId === row.tag.id ? undefined : (e) => e.preventDefault()}
-                // クリックでのトグルは list モードのときだけ。
-                // 「自分が改名中の行か」ではなく「今何らかの行が改名中か」で止めるのが重要
-                // (でないと改名中に別の行をクリックしてトグルが走ってしまう)。
-                onClick={mode === "list" ? () => handleRowActivate(row.tag.id) : undefined}
-                className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1 text-[12px] ${
-                  highlighted ? "st-row-selected" : ""
-                }`}
-                style={{ color: "var(--st-text-primary)" }}
-              >
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: row.tag.color }}
-                />
-                <span className="flex w-3 shrink-0 items-center justify-center">
-                  {row.attached && (
-                    <Check size={11} style={{ color: "var(--st-text-secondary)" }} />
-                  )}
-                </span>
-                {renamingId === row.tag.id ? (
-                  <input
-                    ref={renameInputRef}
-                    data-testid="tag-palette-rename-input"
-                    aria-label="タグ名を変更"
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onKeyDown={(event) => {
-                      // 親(dialogコンテナ)や、その先のwindow側ハンドラへ漏らさない
-                      event.stopPropagation();
-                      // IMEが処理中のキーには触らない(本格的なIME防御はTask 16で入れる)
-                      if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        setRenamingId(null);
-                        return;
-                      }
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        // 素のEnterは変換確定と区別できないので確定させない
-                        if (!event.metaKey) return;
-                        void renameTag(row.tag.id, renameValue);
-                        setRenamingId(null);
-                      }
-                    }}
-                    className="st-input min-w-0 flex-1 bg-transparent outline-none"
-                    style={{ color: "var(--st-text-primary)" }}
-                  />
-                ) : (
-                  <span className="min-w-0 flex-1 truncate">{row.tag.name}</span>
-                )}
-                <span className="shrink-0 tabular-nums text-[10px]" style={{ color: "var(--st-text-tertiary)" }}>
-                  {row.count}
-                </span>
-              </div>
-            );
-          })}
+          {rows.map((row) => (
+            <TagPaletteRow
+              key={row.tag.id}
+              row={row}
+              highlighted={row.tag.id === highlightId}
+              isRenaming={renamingId === row.tag.id}
+              renameValue={renameValue}
+              onRenameValueChange={setRenameValue}
+              renameInputRef={renameInputRef}
+              // list以外(rename中/confirm-delete中)は、どの行のクリックもトグルに繋げない。
+              // 「自分が改名中の行か」ではなく「今リスト操作モードか」で止めるのが重要
+              // (でないと改名中に別の行をクリックしてトグルが走ってしまう)。
+              clickable={mode === "list"}
+              onActivate={() => handleRowActivate(row.tag.id)}
+              onRenameCommit={() => {
+                void renameTag(row.tag.id, renameValue);
+                setRenamingId(null);
+              }}
+              onRenameCancel={() => setRenamingId(null)}
+            />
+          ))}
         </div>
 
         {canCreate && mode === "list" && (
