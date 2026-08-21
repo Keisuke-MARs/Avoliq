@@ -174,9 +174,11 @@ describe("Palette: 検索と新規作成", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("task-card")).toHaveLength(2);
     });
+    // フィクスチャの牛乳を買う/牛丼を食べるにはタグが付いているため、
+    // タイトルに続けてタグチップの文字列も textContent に含まれる
     expect(screen.getAllByTestId("task-card").map((c) => c.textContent)).toEqual([
-      "牛乳を買う",
-      "牛丼を食べる",
+      "牛乳を買うバグ",
+      "牛丼を食べるバグ緊急",
     ]);
   });
 
