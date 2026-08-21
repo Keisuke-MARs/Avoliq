@@ -17,6 +17,11 @@ use crate::db::repo;
 /// メインウィンドウのラベル（tauri.conf.json の windows[].label と一致させる）
 pub const MAIN_WINDOW_LABEL: &str = "main";
 
+/// パネルの角丸半径。
+/// tauri.conf.json の windowEffects.radius と CSS の .av-glass の border-radius が
+/// 同じ値である必要がある。ズレると効果ビューだけ四角くなり、影も角丸に沿わなくなる。
+pub const PANEL_CORNER_RADIUS: f64 = 16.0;
+
 // NSPanelのサブクラスを定義する。
 // can_become_key_window: 装飾なしウィンドウでもキーボード入力を受け取れるようにする
 // is_floating_panel: 他アプリのウィンドウより手前に浮かせる
@@ -67,7 +72,7 @@ pub fn init_panel(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 角丸はネイティブ側にも伝える（透過ウィンドウの影を角丸に合わせるため）
-    panel.set_corner_radius(16.0);
+    panel.set_corner_radius(PANEL_CORNER_RADIUS);
     panel.set_transparent(true);
     panel.set_has_shadow(true);
 

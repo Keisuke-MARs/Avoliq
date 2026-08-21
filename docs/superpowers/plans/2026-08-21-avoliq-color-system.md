@@ -706,6 +706,12 @@ grep -rl "st-" src | xargs sed -i '' 's/\bst-text-1\b/av-text-1/g; s/\bst-text-2
 
 `st-search-input` は `st-input` と完全に同じ定義だったため、`av-input` に統合している。
 
+> **実行時に判明した罠（macOS）**: BSD sed（`/usr/bin/sed`）は `\b`（単語境界）を**サポートしていない**。
+> 上の sed をそのまま実行すると**エラーも出さずに1件もマッチしない**。
+> `gsed` を入れるか、`\b` を外したリテラル置換に切り替えること。
+> 後者の場合は部分一致の危険があるので（`st-input` が `st-search-input` の一部にヒットする等）、
+> 実行後に必ず `git diff` と `grep -rn "search" src` で破壊がないか目視すること。
+
 - [ ] **Step 5: `index.css` のエイリアスとユーティリティ定義を整理する**
 
 Task 2 の Step 1 で入れた「旧トークンのエイリアス」ブロック（`--st-palette-border` から `--st-ease` までの10行）を**削除する**。

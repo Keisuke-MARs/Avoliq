@@ -229,10 +229,10 @@ export function BoardSwitcher() {
             role="option"
             aria-selected={i === index}
             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-              i === index ? "st-row-selected" : ""
+              i === index ? "av-row-selected" : ""
             }`}
           >
-            <span className="w-5 shrink-0 text-xs st-text-3">
+            <span className="w-5 shrink-0 text-xs av-text-3">
               {i < 9 ? `⌘${i + 1}` : ""}
             </span>
             {mode === "rename" && i === index ? (
@@ -242,18 +242,18 @@ export function BoardSwitcher() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleInputKeyDown}
-                className="flex-1 bg-transparent st-text-1 outline-none"
+                className="flex-1 bg-transparent av-text-1 outline-none"
               />
             ) : (
-              <span className="flex-1 truncate st-text-1">
+              <span className="flex-1 truncate av-text-1">
                 {board.name}
               </span>
             )}
             {board.id === currentBoardId && (
-              <Check size={14} className="st-text-2" />
+              <Check size={14} className="av-text-2" />
             )}
             {i === index && mode === "list" && (
-              <Pencil size={12} className="st-text-3" />
+              <Pencil size={12} className="av-text-3" />
             )}
           </div>
         ))}
@@ -261,8 +261,8 @@ export function BoardSwitcher() {
         <div
           role="option"
           aria-selected={index === boards.length}
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm st-text-2 transition-colors ${
-            index === boards.length ? "st-row-selected" : ""
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm av-text-2 transition-colors ${
+            index === boards.length ? "av-row-selected" : ""
           }`}
         >
           <span className="w-5 shrink-0" />
@@ -275,7 +275,7 @@ export function BoardSwitcher() {
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleInputKeyDown}
               placeholder="ボード名を入力"
-              className="flex-1 bg-transparent st-text-1 outline-none st-input"
+              className="flex-1 bg-transparent av-text-1 outline-none av-input"
             />
           ) : (
             <span>新規ボード</span>

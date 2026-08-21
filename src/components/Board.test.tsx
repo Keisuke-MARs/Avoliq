@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Board } from "./Board";
 import { useAppStore } from "@/store/appStore";
@@ -39,12 +39,14 @@ describe("Board", () => {
     expect(lanes[2].querySelector("[data-testid='lane-count']")?.textContent).toBe("0");
   });
 
-  it("レーンヘッダーのアイコンをステータス色で塗る", () => {
+  it("レーンヘッダーの点をステータス色で塗る", () => {
+    // Circleアイコン(svg)からspan+CSSカスタムプロパティへ移行したため、
+    // 見るのは塗りの実値ではなく--av-statusへの注入になった
     setupBoard();
     render(<Board />);
-    const icon = screen.getAllByTestId("lane")[1].querySelector("svg");
-    expect(icon?.getAttribute("fill")).toBe("#007AFF");
-    expect(icon?.getAttribute("stroke")).toBe("#007AFF");
+    const dot = screen.getAllByTestId("lane")[1].querySelector(".av-status-dot");
+    expect(dot).not.toBeNull();
+    expect((dot as HTMLElement).style.getPropertyValue("--av-status")).toBe("#5AC8FA");
   });
 
   it("カードをposition順に並べる", () => {
@@ -69,14 +71,25 @@ describe("Board", () => {
     expect(selected[0].getAttribute("data-task-id")).toBe("t-b");
   });
 
-  it("選択中のカードの背景色をステータス色で塗る", () => {
+  it("選択カードはステータス色でベタ塗りされず、白文字固定にもならない", async () => {
+    // 選択は「いまどこにいるか」という状態であってステータス(データ)ではないため、
+    // 選択の色はブランド青(CSS側の.av-card[data-selected])に固定し、
+    // インラインstyleにはステータス色をカスタムプロパティとして渡すだけにする
     setupBoard();
     useAppStore.setState({ selectedTaskId: "t-d" });
     render(<Board />);
     const card = screen
       .getAllByTestId("task-card")
-      .find((c) => c.getAttribute("data-task-id") === "t-d");
-    expect(card?.getAttribute("style")).toContain("#007AFF");
+      .find((c) => c.getAttribute("data-task-id") === "t-d") as HTMLElement;
+
+    await waitFor(() => expect(card).toHaveAttribute("data-selected", "true"));
+
+    // インラインstyleにステータス色や#fffが直接入っていないこと。
+    // 選択の見た目は.av-card[data-selected]のCSS側が持つ。
+    expect(card.style.backgroundColor).toBe("");
+    expect(card.style.color).toBe("");
+    // ステータス色は装飾用のカスタムプロパティとしてだけ注入される
+    expect(card.style.getPropertyValue("--av-status")).not.toBe("");
   });
 
   it("検索クエリでカードを絞り込む", () => {

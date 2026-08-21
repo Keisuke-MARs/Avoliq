@@ -9,12 +9,12 @@ export function SearchBar() {
   return (
     <div
       className="flex h-14 shrink-0 items-center gap-2.5 border-b px-4"
-      style={{ borderColor: "var(--st-palette-border)" }}
+      style={{ borderColor: "var(--av-hairline)" }}
     >
       <Search
         size={18}
         className="shrink-0"
-        style={{ color: "var(--st-text-tertiary)" }}
+        style={{ color: "var(--av-text-muted)" }}
       />
       <input
         id={SEARCH_INPUT_ID}
@@ -27,8 +27,8 @@ export function SearchBar() {
         placeholder="タスクを検索、または入力して新規作成"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="st-search-input w-full bg-transparent text-[17px] outline-none"
-        style={{ color: "var(--st-text-primary)" }}
+        className="av-input w-full bg-transparent text-[17px] outline-none"
+        style={{ color: "var(--av-text-primary)" }}
       />
     </div>
   );

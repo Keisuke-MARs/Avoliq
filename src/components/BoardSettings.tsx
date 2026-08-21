@@ -60,8 +60,8 @@ export function BoardSettings() {
           onClick={() => setTab("board")}
           className={`rounded-md px-3 py-1 text-xs transition-colors ${
             tab === "board"
-              ? "st-row-selected st-text-1"
-              : "st-text-2"
+              ? "av-row-selected av-text-1"
+              : "av-text-2"
           }`}
         >
           ボード{boardName === "" ? "" : `（${boardName}）`}
@@ -73,8 +73,8 @@ export function BoardSettings() {
           onClick={() => setTab("app")}
           className={`rounded-md px-3 py-1 text-xs transition-colors ${
             tab === "app"
-              ? "st-row-selected st-text-1"
-              : "st-text-2"
+              ? "av-row-selected av-text-1"
+              : "av-text-2"
           }`}
         >
           アプリ

@@ -3,17 +3,22 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useDebouncedSave } from "../hooks/useDebouncedSave";
-import { usePrefersDark } from "../hooks/usePrefersDark";
 import { registerDetailBridge } from "../lib/detailBridge";
 import { reflowStrayMarkdownTables } from "../lib/markdownTableFix";
 import { useAppStore } from "../store/appStore";
+
+interface TaskDetailProps {
+  /** OSのカラースキーム。購読はPalette側で行い、ここでは受け取るだけ */
+  isDark: boolean;
+}
 
 /**
  * タスク詳細画面。BlockNoteでNotion風にMarkdownを編集し、500msデバウンスで自動保存する。
  * 保存ボタンは無く、Escでボードへ戻る前に保留分をフラッシュする。
  */
-export function TaskDetail() {
+export function TaskDetail({ isDark }: TaskDetailProps) {
   const tasks = useAppStore((state) => state.tasks);
   const statuses = useAppStore((state) => state.statuses);
   const selectedTaskId = useAppStore((state) => state.selectedTaskId);
@@ -38,7 +43,6 @@ export function TaskDetail() {
    * 間に入力(変換確定を含む)や他のキーが挟まったら、また1回目からやり直す。
    */
   const titleEnterArmedRef = useRef(false);
-  const isDark = usePrefersDark();
 
   // エディタのUI文言(スラッシュメニュー・プレースホルダ等)を日本語にする
   const editor = useCreateBlockNote({ dictionary: ja });
@@ -129,7 +133,7 @@ export function TaskDetail() {
 
   if (task === null) {
     return (
-      <div className="flex h-full items-center justify-center text-sm st-text-2">
+      <div className="flex h-full items-center justify-center text-sm av-text-2">
         タスクが選択されていません
       </div>
     );
@@ -142,7 +146,7 @@ export function TaskDetail() {
           type="button"
           aria-label="ボードに戻る (Esc)"
           onClick={handleBack}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-sm st-text-2 transition-colors st-btn-ghost"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-sm av-text-2 transition-colors av-btn-ghost"
         >
           <ArrowLeft size={16} />
           <span>ボード</span>
@@ -153,16 +157,15 @@ export function TaskDetail() {
             type="button"
             aria-label="前のステータスへ (⌘←)"
             onClick={() => void moveSelectedTask("left")}
-            className="rounded-md p-1 st-text-2 transition-colors st-btn-ghost"
+            className="rounded-md p-1 av-text-2 transition-colors av-btn-ghost"
           >
             <ChevronLeft size={16} />
           </button>
           <span
-            className="rounded-full px-3 py-1 text-xs font-medium"
-            style={{
-              backgroundColor: `${status?.color ?? "#8E8E93"}1F`,
-              color: status?.color ?? "#8E8E93",
-            }}
+            className="av-status-chip rounded-full px-3 py-1 text-xs font-medium"
+            style={
+              { "--av-status": status?.color ?? "#8E8E93" } as CSSProperties
+            }
           >
             {status?.name ?? "未分類"}
           </span>
@@ -170,7 +173,7 @@ export function TaskDetail() {
             type="button"
             aria-label="次のステータスへ (⌘→)"
             onClick={() => void moveSelectedTask("right")}
-            className="rounded-md p-1 st-text-2 transition-colors st-btn-ghost"
+            className="rounded-md p-1 av-text-2 transition-colors av-btn-ghost"
           >
             <ChevronRight size={16} />
           </button>
@@ -230,7 +233,7 @@ export function TaskDetail() {
         }}
         aria-label="タスクのタイトル"
         placeholder="タイトルを入力"
-        className="mx-8 mb-3 bg-transparent text-xl font-semibold st-text-1 outline-none st-input"
+        className="mx-8 mb-3 bg-transparent text-xl font-semibold av-text-1 outline-none av-input"
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-4">

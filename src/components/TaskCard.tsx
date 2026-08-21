@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import { useAppStore } from "@/store/appStore";
 import type { Task } from "@/types";
 
@@ -35,20 +36,14 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
       }}
       className={
         selected
-          ? "st-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug"
-          : "st-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug shadow-sm"
+          ? "av-card flex cursor-default items-center gap-2 rounded-xl px-3 py-2 text-[13px] leading-snug"
+          : "av-card flex cursor-default items-center gap-2 rounded-xl px-3 py-2 text-[13px] leading-snug shadow-sm"
       }
-      style={
-        selected
-          ? {
-              backgroundColor: statusColor,
-              color: "#fff",
-              boxShadow: `0 4px 12px ${statusColor}59`,
-            }
-          : { color: "var(--st-text-primary)" }
-      }
+      // 色そのものはCSS側が決める。ここはステータス色を渡すだけ
+      style={{ "--av-status": statusColor } as CSSProperties}
     >
-      {task.title}
+      <span className="av-status-dot h-1.5 w-1.5 shrink-0 rounded-full" />
+      <span className="min-w-0 truncate">{task.title}</span>
     </div>
   );
 }

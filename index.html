@@ -3,7 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>Avoliq</title>
+    <!--
+      Reactのマウント前に .dark を確定させる。バンドルの読み込みを待つと、
+      ダーク環境でパレットが一瞬白く光る（Spotlight風の即時表示では目立つ）。
+      以降の追従は useColorScheme が担当する。
+    -->
+    <script>
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
   </head>
 
   <body>

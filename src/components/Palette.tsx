@@ -6,6 +6,7 @@ import { BoardSwitcher } from "./BoardSwitcher";
 import { FooterHints } from "./FooterHints";
 import { SearchBar } from "./SearchBar";
 import { TaskDetail } from "./TaskDetail";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { useFlushOnHide } from "@/hooks/useFlushOnHide";
 import { useHotkeyErrorToast } from "@/hooks/useHotkeyErrorToast";
 import { useKeyboard } from "@/hooks/useKeyboard";
@@ -20,6 +21,8 @@ export function Palette() {
   useKeyboard();
   useFlushOnHide();
   useHotkeyErrorToast();
+  // カラースキームの購読はここ1箇所だけ。値は子へpropsで渡す
+  const isDark = useColorScheme();
 
   useEffect(() => {
     void loadBoards();
@@ -44,7 +47,7 @@ export function Palette() {
   return (
     <div
       data-testid="palette"
-      className="st-palette flex h-screen w-screen flex-col overflow-hidden"
+      className="av-glass flex h-screen w-screen flex-col overflow-hidden"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", sans-serif',
@@ -55,18 +58,20 @@ export function Palette() {
       <div
         key={view}
         className={`flex min-h-0 flex-1 flex-col ${
-          direction === "forward" ? "st-view-forward" : "st-view-back"
+          direction === "forward" ? "av-view-forward" : "av-view-back"
         }`}
       >
         {view === "board" && <Board />}
-        {view === "detail" && <TaskDetail key={selectedTaskId ?? "none"} />}
+        {view === "detail" && (
+          <TaskDetail key={selectedTaskId ?? "none"} isDark={isDark} />
+        )}
         {view === "switcher" && <BoardSwitcher />}
         {view === "settings" && <BoardSettings />}
       </div>
 
       <FooterHints view={view} />
 
-      <Toaster />
+      <Toaster isDark={isDark} />
     </div>
   );
 }
