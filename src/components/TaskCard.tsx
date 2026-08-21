@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import { CHIP_GAP, useChipOverflow } from "@/hooks/useChipOverflow";
-import { usePrefersDark } from "@/hooks/usePrefersDark";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { tagChipStyle } from "@/lib/tagPalette";
 import { useAppStore } from "@/store/appStore";
 import type { Tag, Task } from "@/types";
@@ -16,7 +17,7 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
   const setSelectedTask = useAppStore((s) => s.setSelectedTask);
   const setView = useAppStore((s) => s.setView);
   const allTags = useAppStore((s) => s.tags);
-  const isDark = usePrefersDark();
+  const isDark = useColorScheme();
   const ref = useRef<HTMLDivElement>(null);
 
   // キーボードで選択が移動したとき、カードが画面外なら見える位置までスクロールする
@@ -54,20 +55,16 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
       }}
       className={
         selected
-          ? "st-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug"
-          : "st-card cursor-default rounded-xl px-3 py-2 text-[13px] leading-snug shadow-sm"
+          ? "av-card flex cursor-default flex-col gap-1 rounded-xl px-3 py-2 text-[13px] leading-snug"
+          : "av-card flex cursor-default flex-col gap-1 rounded-xl px-3 py-2 text-[13px] leading-snug shadow-sm"
       }
-      style={
-        selected
-          ? {
-              backgroundColor: statusColor,
-              color: "#fff",
-              boxShadow: `0 4px 12px ${statusColor}59`,
-            }
-          : { color: "var(--st-text-primary)" }
-      }
+      // 色そのものはCSS側が決める。ここはステータス色を渡すだけ
+      style={{ "--av-status": statusColor } as CSSProperties}
     >
-      {task.title}
+      <div className="flex items-center gap-2">
+        <span className="av-status-dot h-1.5 w-1.5 shrink-0 rounded-full" />
+        <span className="min-w-0 truncate">{task.title}</span>
+      </div>
       {/* タグを持たないカードは行そのものを描画しない（可視カード数を減らさないため） */}
       {/* 隙間は useChipOverflow の測定式が使う値と必ず一致していなければならないので、
           Tailwindのクラスではなく CHIP_GAP をそのまま style で当てて二重管理をなくす */}
@@ -76,7 +73,7 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
           ref={rowRef}
           data-testid="task-card-tags"
           style={{ gap: CHIP_GAP }}
-          className="mt-1 flex overflow-hidden whitespace-nowrap"
+          className="flex overflow-hidden whitespace-nowrap"
         >
           {shown.map((tag) => (
             <span
@@ -94,7 +91,7 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
               style={
                 selected
                   ? { backgroundColor: "rgba(255,255,255,0.22)", color: "#fff" }
-                  : { backgroundColor: "var(--st-tag-bg)", color: "var(--st-tag-fg)" }
+                  : { backgroundColor: "var(--av-tag-bg)", color: "var(--av-tag-fg)" }
               }
             >
               +{hidden}

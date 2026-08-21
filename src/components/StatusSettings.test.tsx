@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Status } from "../types";
@@ -30,7 +30,7 @@ const statuses: Status[] = [
     id: "st-2",
     boardId: "b1",
     name: "進行中",
-    color: "#007AFF",
+    color: "#5AC8FA",
     position: 1,
   },
 ];
@@ -99,7 +99,7 @@ describe("StatusSettings", () => {
   it("Cキーで色選択に入り、→とEnterで色を変更する", async () => {
     vi.mocked(api.statusUpdate).mockResolvedValue({
       ...statuses[0],
-      color: "#007AFF",
+      color: "#5AC8FA",
     });
     const user = userEvent.setup();
     render(<StatusSettings />);
@@ -109,7 +109,7 @@ describe("StatusSettings", () => {
 
     await user.keyboard("{ArrowRight}{Enter}");
 
-    expect(api.statusUpdate).toHaveBeenCalledWith("st-1", null, "#007AFF");
+    expect(api.statusUpdate).toHaveBeenCalledWith("st-1", null, "#5AC8FA");
   });
 
   it("Nキーで追加入力に入り、Enterで末尾にステータスを追加する", async () => {
@@ -303,6 +303,26 @@ describe("StatusSettings", () => {
     });
 
     expect(api.statusCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("プリセットに無い色を持つステータスでも色ピッカーが開ける", async () => {
+    // 旧プリセットの#007AFFは現在のプリセット(design/status-presets.json)に存在しない。
+    // 現在色から逆引きできない場合でも例外を出さず、先頭(グレー)が選択された状態で
+    // ピッカーが開くことを確認する回帰テスト。既存ボードには#007AFFが残り続けるため。
+    useAppStore.setState({
+      statuses: [
+        { id: "st-1", boardId: "b1", name: "進行中", color: "#007AFF", position: 0 },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<StatusSettings />);
+
+    await user.keyboard("c");
+
+    const listbox = screen.getByRole("listbox", { name: "色を選択" });
+    expect(listbox).toBeInTheDocument();
+    const options = within(listbox).getAllByRole("option");
+    expect(options[0]).toHaveAttribute("aria-selected", "true");
   });
 
   it("最後の1つのステータスは削除できない", async () => {

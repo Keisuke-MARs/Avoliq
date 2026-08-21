@@ -274,20 +274,18 @@ export function TagPalette() {
         onKeyDown={mode === "list" ? handleKeyDown : undefined}
         // relative: ConfirmDialog(absolute inset-0)をこのカードの範囲だけに重ねるため
         // (無指定だと外側のscrim(absolute inset-0)を基準にしてしまい、画面全体を覆ってしまう)
-        className="relative flex max-h-[260px] w-[300px] flex-col overflow-hidden rounded-xl shadow-xl"
-        style={{
-          backgroundColor: "var(--st-palette-bg)",
-          border: "0.5px solid var(--st-palette-border)",
-        }}
+        // ガラス(Palette本体)の上に浮くカードなので、ガラスの二重掛けを避けて
+        // ConfirmDialog / トースト / BlockNoteメニューと同じ不透明面(av-surface-raised)にする
+        className="av-surface-raised relative flex max-h-[260px] w-[300px] flex-col overflow-hidden rounded-xl shadow-xl"
       >
         <header
           className="flex items-center gap-1.5 border-b px-3 py-2"
-          style={{ borderColor: "var(--st-palette-border)" }}
+          style={{ borderColor: "var(--av-hairline)" }}
         >
-          <TagIcon size={13} style={{ color: "var(--st-text-tertiary)" }} />
+          <TagIcon size={13} style={{ color: "var(--av-text-muted)" }} />
           <span
             className="truncate text-[11px]"
-            style={{ color: "var(--st-text-secondary)" }}
+            style={{ color: "var(--av-text-secondary)" }}
           >
             {task?.title ?? ""}
           </span>
@@ -314,8 +312,8 @@ export function TagPalette() {
           autoComplete="off"
           spellCheck={false}
           placeholder="タグ名を入力"
-          className="st-input bg-transparent px-3 py-2 text-[13px] outline-none"
-          style={{ color: "var(--st-text-primary)" }}
+          className="av-input bg-transparent px-3 py-2 text-[13px] outline-none"
+          style={{ color: "var(--av-text-primary)" }}
         />
 
         <div role="listbox" aria-label="タグ候補" className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-1.5">
@@ -352,8 +350,8 @@ export function TagPalette() {
             }}
             className="flex cursor-default items-center gap-2 border-t px-3 py-1.5 text-[12px]"
             style={{
-              borderColor: "var(--st-palette-border)",
-              color: "var(--st-text-secondary)",
+              borderColor: "var(--av-hairline)",
+              color: "var(--av-text-secondary)",
             }}
           >
             <span className="min-w-0 flex-1 truncate">＋「{trimmedQuery}」を作成</span>
@@ -364,8 +362,8 @@ export function TagPalette() {
         <footer
           className="flex flex-wrap gap-x-2.5 gap-y-1 border-t px-3 py-1.5 text-[9.5px]"
           style={{
-            borderColor: "var(--st-palette-border)",
-            color: "var(--st-text-tertiary)",
+            borderColor: "var(--av-hairline)",
+            color: "var(--av-text-muted)",
           }}
         >
           <span>⏎ 付け外し</span>

@@ -69,9 +69,9 @@ export function TagPaletteRow({
       // クリックでのトグルは list モードのときだけ(改名中は自分の行も他の行も反応しない)
       onClick={clickable ? onActivate : undefined}
       className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1 text-[12px] ${
-        highlighted ? "st-row-selected" : ""
+        highlighted ? "av-row-selected" : ""
       }`}
-      style={{ color: "var(--st-text-primary)" }}
+      style={{ color: "var(--av-text-primary)" }}
     >
       <span
         className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -79,7 +79,7 @@ export function TagPaletteRow({
       />
       <span className="flex w-3 shrink-0 items-center justify-center">
         {row.attached && (
-          <Check size={11} style={{ color: "var(--st-text-secondary)" }} />
+          <Check size={11} style={{ color: "var(--av-text-secondary)" }} />
         )}
       </span>
       {isRenaming ? (
@@ -110,13 +110,13 @@ export function TagPaletteRow({
               onRenameCommit();
             }
           }}
-          className="st-input min-w-0 flex-1 bg-transparent outline-none"
-          style={{ color: "var(--st-text-primary)" }}
+          className="av-input min-w-0 flex-1 bg-transparent outline-none"
+          style={{ color: "var(--av-text-primary)" }}
         />
       ) : (
         <span className="min-w-0 flex-1 truncate">{row.tag.name}</span>
       )}
-      <span className="shrink-0 tabular-nums text-[10px]" style={{ color: "var(--st-text-tertiary)" }}>
+      <span className="shrink-0 tabular-nums text-[10px]" style={{ color: "var(--av-text-muted)" }}>
         {row.count}
       </span>
     </div>

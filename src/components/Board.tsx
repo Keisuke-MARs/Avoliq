@@ -24,12 +24,12 @@ export function Board() {
         <Inbox
           size={28}
           strokeWidth={1.5}
-          style={{ color: "var(--st-text-tertiary)" }}
+          style={{ color: "var(--av-text-muted)" }}
         />
-        <p className="text-sm" style={{ color: "var(--st-text-secondary)" }}>
+        <p className="text-sm" style={{ color: "var(--av-text-secondary)" }}>
           タスクはまだありません
         </p>
-        <p className="text-xs" style={{ color: "var(--st-text-tertiary)" }}>
+        <p className="text-xs" style={{ color: "var(--av-text-secondary)" }}>
           タスク名を入力して Enter で作成できます
         </p>
       </div>
@@ -53,12 +53,12 @@ export function Board() {
         <SearchX
           size={28}
           strokeWidth={1.5}
-          style={{ color: "var(--st-text-tertiary)" }}
+          style={{ color: "var(--av-text-muted)" }}
         />
-        <p className="text-sm" style={{ color: "var(--st-text-secondary)" }}>
+        <p className="text-sm" style={{ color: "var(--av-text-secondary)" }}>
           該当するタスクがありません
         </p>
-        <p className="text-xs" style={{ color: "var(--st-text-tertiary)" }}>
+        <p className="text-xs" style={{ color: "var(--av-text-muted)" }}>
           検索条件を変えてお試しください
         </p>
       </div>

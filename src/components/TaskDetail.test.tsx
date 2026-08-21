@@ -41,7 +41,7 @@ const statuses: Status[] = [
     id: "st-2",
     boardId: "board-1",
     name: "進行中",
-    color: "#007AFF",
+    color: "#5AC8FA",
     position: 1,
   },
 ];
@@ -83,14 +83,14 @@ describe("TaskDetail", () => {
   });
 
   it("タイトルとステータス名を表示する", () => {
-    render(<TaskDetail />);
+    render(<TaskDetail isDark={false} />);
 
     expect(screen.getByDisplayValue("設計書を書く")).toBeInTheDocument();
     expect(screen.getByText("進行中")).toBeInTheDocument();
   });
 
   it("ボードに戻るヘッダーボタンがEscラベル付きで表示される", () => {
-    render(<TaskDetail />);
+    render(<TaskDetail isDark={false} />);
 
     expect(
       screen.getByRole("button", { name: "ボードに戻る (Esc)" }),
@@ -98,7 +98,7 @@ describe("TaskDetail", () => {
   });
 
   it("エディタが描画される", () => {
-    render(<TaskDetail />);
+    render(<TaskDetail isDark={false} />);
 
     expect(screen.getByTestId("blocknote-view")).toBeInTheDocument();
   });
@@ -108,7 +108,7 @@ describe("TaskDetail", () => {
       tasks: [{ ...task, tagIds: ["tag-bug", "tag-urgent", "tag-design"] }],
     });
 
-    render(<TaskDetail />);
+    render(<TaskDetail isDark={false} />);
 
     const row = screen.getByTestId("task-detail-tags");
     expect(row).toHaveTextContent("バグ");
@@ -117,14 +117,14 @@ describe("TaskDetail", () => {
   });
 
   it("タグが無いときは追加を促す文言を出す", () => {
-    render(<TaskDetail />);
+    render(<TaskDetail isDark={false} />);
 
     expect(screen.getByText("⌘K でタグを追加")).toBeInTheDocument();
   });
 
   it("タイトルを編集すると500ms後に保存される", async () => {
     const user = userEvent.setup();
-    render(<TaskDetail />);
+    render(<TaskDetail isDark={false} />);
 
     const input = screen.getByDisplayValue("設計書を書く");
     await user.clear(input);
@@ -140,7 +140,7 @@ describe("TaskDetail", () => {
 
   it("ステータスチップの右矢印ボタンでステータスが右へ移動する", async () => {
     const user = userEvent.setup();
-    render(<TaskDetail />);
+    render(<TaskDetail isDark={false} />);
 
     await user.click(
       screen.getByRole("button", { name: "次のステータスへ (⌘→)" }),
@@ -151,7 +151,7 @@ describe("TaskDetail", () => {
 
   describe("開いた瞬間の自動フォーカス", () => {
     it("pendingNewTaskIdと一致しないなら本文エディタへフォーカスする", () => {
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       expect(editorFocus).toHaveBeenCalledTimes(1);
     });
 
@@ -159,7 +159,7 @@ describe("TaskDetail", () => {
       useAppStore.setState({
         pendingNewTaskId: "task-1",
       });
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
 
       const input = screen.getByDisplayValue("設計書を書く") as HTMLInputElement;
       expect(document.activeElement).toBe(input);
@@ -172,7 +172,7 @@ describe("TaskDetail", () => {
       useAppStore.setState({
         pendingNewTaskId: "task-1",
       });
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
 
       expect(useAppStore.getState().pendingNewTaskId).toBeNull();
     });
@@ -182,7 +182,7 @@ describe("TaskDetail", () => {
         tasks: [{ ...task, title: NEW_TASK_TITLE }],
         pendingNewTaskId: null,
       });
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
 
       const input = screen.getByDisplayValue(NEW_TASK_TITLE) as HTMLInputElement;
       expect(document.activeElement).not.toBe(input);
@@ -193,7 +193,7 @@ describe("TaskDetail", () => {
   describe("タイトル入力でのEnter/Tab", () => {
     it("Enter1回では本文へ移らない(日本語入力の変換確定Enter対策)", async () => {
       const user = userEvent.setup();
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く");
@@ -206,7 +206,7 @@ describe("TaskDetail", () => {
 
     it("Enter2回で本文エディタへフォーカスが移る", async () => {
       const user = userEvent.setup();
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く");
@@ -218,7 +218,7 @@ describe("TaskDetail", () => {
 
     it("1回目のEnterのあとに文字を打ったら、また1回目からやり直しになる", async () => {
       const user = userEvent.setup();
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く");
@@ -232,7 +232,7 @@ describe("TaskDetail", () => {
     });
 
     it("IME変換中のEnterは1回目にも数えない", async () => {
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く");
@@ -249,7 +249,7 @@ describe("TaskDetail", () => {
     });
 
     it("1回目のEnterのあとIME変換を挟んだら(取り消して値が変わらなくても)やり直しになる", async () => {
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く") as HTMLInputElement;
@@ -264,7 +264,7 @@ describe("TaskDetail", () => {
     });
 
     it("1回目のEnterのあとタイトル欄から離れて戻ったら、また1回目からやり直しになる", async () => {
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く") as HTMLInputElement;
@@ -279,7 +279,7 @@ describe("TaskDetail", () => {
     });
 
     it("キーリピート(押しっぱなし)のEnterは2回目として扱わない", async () => {
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く");
@@ -292,7 +292,7 @@ describe("TaskDetail", () => {
 
     it("Tabで本文エディタへフォーカスが移る", async () => {
       const user = userEvent.setup();
-      render(<TaskDetail />);
+      render(<TaskDetail isDark={false} />);
       editorFocus.mockClear();
 
       const input = screen.getByDisplayValue("設計書を書く");

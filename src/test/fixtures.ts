@@ -5,7 +5,7 @@ export const board2: Board = { id: "board-2", name: "私用", position: 1 };
 
 export const statuses: Status[] = [
   { id: "st-todo", boardId: "board-1", name: "未着手", color: "#8E8E93", position: 0 },
-  { id: "st-doing", boardId: "board-1", name: "進行中", color: "#007AFF", position: 1 },
+  { id: "st-doing", boardId: "board-1", name: "進行中", color: "#5AC8FA", position: 1 },
   { id: "st-check", boardId: "board-1", name: "確認中", color: "#FF9500", position: 2 },
   { id: "st-done", boardId: "board-1", name: "完了", color: "#34C759", position: 3 },
 ];

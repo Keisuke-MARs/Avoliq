@@ -113,10 +113,15 @@ export function SearchBar() {
 
   return (
     <div
+      // relative: 下のタグ候補ドロップダウン(absolute)をこのバーの範囲だけに重ねるための基準
       className="relative flex h-14 shrink-0 items-center gap-2.5 border-b px-4"
-      style={{ borderColor: "var(--st-palette-border)" }}
+      style={{ borderColor: "var(--av-hairline)" }}
     >
-      <Search size={18} className="shrink-0" style={{ color: "var(--st-text-tertiary)" }} />
+      <Search
+        size={18}
+        className="shrink-0"
+        style={{ color: "var(--av-text-muted)" }}
+      />
       <input
         id={SEARCH_INPUT_ID}
         data-testid="search-input"
@@ -143,8 +148,8 @@ export function SearchBar() {
           setFocused(false);
         }}
         onKeyDown={handleKeyDown}
-        className="st-search-input w-full bg-transparent text-[17px] outline-none"
-        style={{ color: "var(--st-text-primary)" }}
+        className="av-input w-full bg-transparent text-[17px] outline-none"
+        style={{ color: "var(--av-text-primary)" }}
       />
 
       {/*
@@ -156,24 +161,23 @@ export function SearchBar() {
       {focused && view === "board" && isTagToken && suggestions.length > 0 && (
         <div
           data-testid="tag-suggest"
-          className="absolute left-11 top-[52px] z-20 w-56 overflow-hidden rounded-lg py-1 shadow-lg"
-          style={{
-            backgroundColor: "var(--st-palette-bg)",
-            border: "0.5px solid var(--st-palette-border)",
-          }}
+          // ガラス(Palette本体)の上に浮くポップオーバーなので、ガラスの二重掛けを避けて
+          // ConfirmDialog / BlockNoteメニューと同じ不透明面(av-surface-raised)にする
+          className="av-surface-raised absolute left-11 top-[52px] z-20 w-56 overflow-hidden rounded-lg py-1 shadow-lg"
+          style={{ border: "0.5px solid var(--av-hairline)" }}
         >
           {suggestions.map((tag) => (
             <div
               key={tag.id}
               className="flex items-center gap-2 px-2.5 py-1 text-[12px]"
-              style={{ color: "var(--st-text-primary)" }}
+              style={{ color: "var(--av-text-primary)" }}
             >
               <span
                 className="h-1.5 w-1.5 shrink-0 rounded-full"
                 style={{ backgroundColor: tag.color }}
               />
               <span className="min-w-0 flex-1 truncate">{tag.name}</span>
-              <span className="shrink-0 text-[10px]" style={{ color: "var(--st-text-tertiary)" }}>
+              <span className="shrink-0 text-[10px]" style={{ color: "var(--av-text-muted)" }}>
                 Tab
               </span>
             </div>

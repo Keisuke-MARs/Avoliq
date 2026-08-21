@@ -1,4 +1,4 @@
-import { Circle } from "lucide-react";
+import type { CSSProperties } from "react";
 import { TaskCard } from "./TaskCard";
 import type { Status, Task } from "@/types";
 
@@ -17,21 +17,24 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
     >
       <header className="mb-2 flex items-center gap-1.5 px-1">
         {/*
-          ステータスのアイコンは常に Circle 1種類で、色だけをステータス色に塗る。
+          ステータスのアイコンは常に丸1種類で、色だけをステータス色に塗る。
           ユーザーがステータスを自由に追加・改名できるため、
           名前やposition順でアイコンを出し分けるとカスタムステータスで破綻するため。
         */}
-        <Circle size={10} stroke={status.color} fill={status.color} strokeWidth={2} />
+        <span
+          className="av-status-dot h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ "--av-status": status.color } as CSSProperties}
+        />
         <span
           className="text-[12px] font-semibold"
-          style={{ color: "var(--st-text-secondary)" }}
+          style={{ color: "var(--av-text-secondary)" }}
         >
           {status.name}
         </span>
         <span
           data-testid="lane-count"
           className="ml-auto text-[11px] tabular-nums"
-          style={{ color: "var(--st-text-tertiary)" }}
+          style={{ color: "var(--av-text-secondary)" }}
         >
           {tasks.length}
         </span>
@@ -41,8 +44,8 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
           <div
             className="rounded-lg border border-dashed px-3 py-4 text-center text-xs"
             style={{
-              borderColor: "var(--st-palette-border)",
-              color: "var(--st-text-tertiary)",
+              borderColor: "var(--av-hairline)",
+              color: "var(--av-text-muted)",
             }}
           >
             なし

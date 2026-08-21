@@ -29,11 +29,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -51,73 +46,149 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ============================================================
+   Avoliq カラートークン
+
+   色の実値（hex / oklch リテラル）はこのブロックにだけ置く。
+   shadcn 変数・BlockNote 変数・各コンポーネントは var(--av-*) を参照するだけにする。
+   設計書: docs/superpowers/specs/2026-08-21-avoliq-color-system-design.md
+   ============================================================ */
+
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* ---- 原色層（モード非依存。.dark でも上書きしない） ---- */
+  /* ブランド設計書3節のカラーシステム。hexは正典の値 */
+  --av-blue-300: oklch(0.7748 0.1179 252.36); /* #7DBAFF ダークでの青文字 */
+  --av-blue-500: oklch(0.6243 0.2056 255.49); /* #0A84FF Avoliq Blue（正典）文字を載せない塗り */
+  --av-blue-600: oklch(0.5615 0.1958 256.54); /* #0070E4 白文字を載せる塗り */
+  --av-blue-700: oklch(0.4947 0.1750 256.92); /* #005DC2 ライトでの青文字 */
+  /* Glass Azure / Glass Violet は屈折にしか使わず、light/dark でアルファだけが変わる。
+     成分（L C H）をトークンに持たせることで、色相を調整したときに
+     4箇所の屈折値が自動で追随する。color-mix を使うと非対応環境向けの
+     フォールバックが「不透明な原色」になってしまうため、この形にしている */
+  --av-azure-lch: 0.7730 0.1263 242.75; /* #66BEFF Glass Azure */
+  --av-violet-lch: 0.5818 0.2316 277.23; /* #615EFF Glass Violet */
+
+  /* ---- 意味層（ライト） ---- */
+  --av-text-primary: oklch(0.2488 0.0542 259.67); /* #11213B Ink */
+  --av-text-secondary: oklch(0.4922 0.0434 258.35); /* #52627A Slate */
+  --av-text-muted: oklch(0.5764 0.0260 258.37); /* #707A89 装飾のみ。AAは保証しない */
+  --av-text-on-accent: oklch(1 0 0);
+
+  --av-glass-tint: oklch(0.9844 0.0045 258.32); /* #F8FAFD */
+  --av-glass-alpha-top: 0.64;
+  --av-glass-alpha-bottom: 0.56;
+  --av-glass-edge: oklch(0.2488 0.0542 259.67 / 0.10);
+  --av-glass-specular: oklch(1 0 0 / 0.75);
+  --av-glass-refract-azure: oklch(var(--av-azure-lch) / 0.14);
+  --av-glass-refract-violet: oklch(var(--av-violet-lch) / 0.10);
+
+  --av-hairline: oklch(0.2488 0.0542 259.67 / 0.10);
+  --av-surface-card: oklch(1 0 0 / 0.72);
+  --av-surface-card-hover: oklch(0.9546 0.0087 264.52 / 0.80);
+  --av-surface-raised: oklch(0.9909 0.0029 264.54); /* #FBFCFE 不透明 */
+  --av-surface-hover: oklch(0.2488 0.0542 259.67 / 0.05);
+  --av-surface-selected: oklch(0.2488 0.0542 259.67 / 0.08);
+
+  --av-accent: var(--av-blue-500);
+  --av-accent-solid: var(--av-blue-600);
+  --av-accent-text: var(--av-blue-700);
+  --av-accent-mix: 12%;
+  --av-focus-ring: var(--av-blue-500);
+
+  /* ステータスチップの混色比。モードで変わる値なのでトークンに出す
+     (--av-accent-mix と同じパターン) */
+  --av-status-chip-mix: 14%;
+  --av-status-chip-ink: var(--av-text-primary);
+
+  /* タグの「+n」チップ(未選択時)の配色。個別のタグ色は tagPalette.ts が動的に計算するので、
+     ここは中立な chip としての面・文字色だけを持つ。値は av-chip / av-text-2 と同じ意味層を参照する
+     (新規の生値は持たせない) */
+  --av-tag-fg: var(--av-text-secondary);
+  --av-tag-bg: var(--av-surface-hover);
+
+  --av-danger: oklch(0.5439 0.2049 28.61); /* #CC211B */
+  --av-danger-solid: oklch(0.5439 0.2049 28.61);
+  --av-danger-subtle: color-mix(in srgb, var(--av-danger) 12%, transparent);
+  --av-success: oklch(0.6000 0.1550 147.50); /* #2B9845 */
+  --av-toggle-off: oklch(0.2488 0.0542 259.67 / 0.20);
+  --av-scrim: oklch(0.2488 0.0542 259.67 / 0.28);
+
+  --av-shadow:
+    0 24px 64px oklch(0.2488 0.0542 259.67 / 0.22),
+    0 2px 8px oklch(0.2488 0.0542 259.67 / 0.08);
+
+  /* Apple純正のイージング(macOSのウィンドウアニメーションに近い) */
+  --av-ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---- shadcn 変数（すべて --av-* への参照。実値は持たせない） ---- */
+  /* ウィンドウが透過なので背景は器（.av-glass）が持つ */
+  --background: transparent;
+  --foreground: var(--av-text-primary);
+  --card: var(--av-surface-raised);
+  --card-foreground: var(--av-text-primary);
+  --popover: var(--av-surface-raised);
+  --popover-foreground: var(--av-text-primary);
+  --primary: var(--av-accent-solid);
+  --primary-foreground: var(--av-text-on-accent);
+  --secondary: var(--av-surface-selected);
+  --secondary-foreground: var(--av-text-primary);
+  --muted: var(--av-surface-selected);
+  --muted-foreground: var(--av-text-secondary);
+  --accent: var(--av-surface-selected);
+  --accent-foreground: var(--av-text-primary);
+  --destructive: var(--av-danger);
+  --destructive-foreground: var(--av-text-on-accent);
+  --border: var(--av-hairline);
+  --input: var(--av-hairline);
+  --ring: var(--av-focus-ring);
+  --sidebar: var(--av-surface-raised);
+  --sidebar-foreground: var(--av-text-primary);
+  --sidebar-primary: var(--av-accent-solid);
+  --sidebar-primary-foreground: var(--av-text-on-accent);
+  --sidebar-accent: var(--av-surface-selected);
+  --sidebar-accent-foreground: var(--av-text-primary);
+  --sidebar-border: var(--av-hairline);
+  --sidebar-ring: var(--av-focus-ring);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --av-text-primary: oklch(0.9660 0.0062 255.48); /* #F1F4F8 */
+  --av-text-secondary: oklch(0.7741 0.0175 259.42); /* #AFB6C1 */
+  --av-text-muted: oklch(0.6606 0.0201 258.37); /* #8B939F */
+
+  --av-glass-tint: oklch(0.2160 0.0200 258.34); /* #141A23 */
+  --av-glass-alpha-top: 0.68;
+  --av-glass-alpha-bottom: 0.58;
+  --av-glass-edge: oklch(1 0 0 / 0.12);
+  --av-glass-specular: oklch(1 0 0 / 0.16);
+  /* ダークでは Azure を薄く、Violet を濃くして奥行きを出す（ライトと逆） */
+  --av-glass-refract-azure: oklch(var(--av-azure-lch) / 0.10);
+  --av-glass-refract-violet: oklch(var(--av-violet-lch) / 0.14);
+
+  --av-hairline: oklch(1 0 0 / 0.12);
+  --av-surface-card: oklch(0.3076 0.0199 260.64 / 0.62);
+  --av-surface-card-hover: oklch(0.3503 0.0214 259.39 / 0.72);
+  --av-surface-raised: oklch(0.2790 0.0187 258.37); /* #232932 不透明 */
+  --av-surface-hover: oklch(1 0 0 / 0.07);
+  --av-surface-selected: oklch(1 0 0 / 0.11);
+
+  --av-accent-text: var(--av-blue-300);
+  --av-accent-mix: 16%;
+
+  --av-status-chip-mix: 22%;
+  --av-status-chip-ink: var(--av-text-on-accent);
+
+  --av-danger: oklch(0.7073 0.1847 25.94); /* #FF6961 */
+  /* danger-solid は白文字を載せるのでライトと同じ暗い赤のまま */
+  --av-danger-solid: oklch(0.5439 0.2049 28.61);
+  --av-toggle-off: oklch(1 0 0 / 0.22);
+  --av-scrim: oklch(0 0 0 / 0.50);
+
+  --av-shadow:
+    0 24px 64px oklch(0 0 0 / 0.55),
+    0 2px 8px oklch(0 0 0 / 0.35);
 }
 
 @layer base {
@@ -149,45 +220,8 @@ body {
   overflow: hidden;
 }
 
-/* ============ Avoliq デザイントークン ============ */
-:root {
-  /* 背後のぼかしはネイティブ側(tauri.conf.jsonのwindowEffects=NSVisualEffectView)が担う。
-     ここはその上に乗せる色味だけなので、ぼかしが見える程度に薄くしておく */
-  --st-palette-bg: rgba(250, 250, 252, 0.6);
-  --st-palette-border: rgba(0, 0, 0, 0.08);
-  --st-text-primary: #1c1c1e;
-  --st-text-secondary: #6e6e73;
-  --st-text-tertiary: #a1a1a6;
-  --st-surface-hover: rgba(0, 0, 0, 0.04);
-  --st-surface-selected: rgba(0, 0, 0, 0.07);
-  --st-card-bg: #ffffff;
-  --st-card-hover-bg: #f5f5f7;
-  --st-shadow: 0 24px 64px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.08);
-  /* Apple純正のイージング(macOSのウィンドウアニメーションに近い) */
-  --st-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --st-tag-fg: #6e6e73;
-  --st-tag-bg: rgba(0, 0, 0, 0.055);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --st-palette-bg: rgba(28, 28, 30, 0.55);
-    --st-palette-border: rgba(255, 255, 255, 0.1);
-    --st-text-primary: #f5f5f7;
-    --st-text-secondary: #a1a1a6;
-    --st-text-tertiary: #6e6e73;
-    --st-surface-hover: rgba(255, 255, 255, 0.06);
-    --st-surface-selected: rgba(255, 255, 255, 0.1);
-    --st-card-bg: #2c2c2e;
-    --st-card-hover-bg: #3a3a3c;
-    --st-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-    --st-tag-fg: #a1a1a6;
-    --st-tag-bg: rgba(255, 255, 255, 0.09);
-  }
-}
-
 /* ============ パレットの出現/消失 ============ */
-@keyframes st-palette-in {
+@keyframes av-palette-in {
   from {
     opacity: 0;
     transform: scale(0.96) translateY(-6px);
@@ -198,20 +232,51 @@ body {
   }
 }
 
-.st-palette {
-  background: var(--st-palette-bg);
-  border: 0.5px solid var(--st-palette-border);
+/* ============ パレットの器（ガラス） ============
+   ネイティブの NSVisualEffectView（tauri.conf.json の windowEffects）が敷いたぼかしの上に、
+   色味・スペキュラーハイライト・屈折を重ねる二層構成の上側。
+   border-radius は panel.rs の PANEL_CORNER_RADIUS と必ず揃えること。 */
+.av-glass {
   border-radius: 16px;
-  box-shadow: var(--st-shadow);
-  /* backdrop-filterはここでは使わない。WKWebViewのbackdrop-filterはページ内の描画しか
-     ぼかせず、透過ウィンドウの向こう側(デスクトップ)には効かないため、素通しになってしまう。
-     背後のぼかしはNSVisualEffectView(windowEffects)に任せている */
-  color: var(--st-text-primary);
-  animation: st-palette-in 180ms var(--st-ease) both;
+  border: 0.5px solid var(--av-glass-edge);
+  color: var(--av-text-primary);
+  /* 上ほど厚く見えるのが実物のガラスの挙動。可読性の床は下端アルファで決まる */
+  background: linear-gradient(
+    180deg,
+    color-mix(
+        in srgb,
+        var(--av-glass-tint) calc(var(--av-glass-alpha-top) * 100%),
+        transparent
+      )
+      0%,
+    color-mix(
+        in srgb,
+        var(--av-glass-tint) calc(var(--av-glass-alpha-bottom) * 100%),
+        transparent
+      )
+      100%
+  );
+  box-shadow:
+    /* 上端の細い白のスペキュラーハイライト */
+    inset 0 0.5px 0 0 var(--av-glass-specular),
+    /* 縁のごく薄い Glass Azure の屈折 */
+    inset 0 1px 12px -6px var(--av-glass-refract-azure),
+    /* 底の Glass Violet による奥行き */
+    inset 0 -24px 44px -28px var(--av-glass-refract-violet),
+    var(--av-shadow);
+  animation: av-palette-in 180ms var(--av-ease) both;
+}
+
+/* vibrancy が使えない環境ではぼかしが無い。半透明のままだと壁紙が素通しになり
+   文字が読めなくなる（Slateが1.61:1まで落ちる）ので、実質不透明へ退避する。
+   これは装飾ではなく可読性の安全装置。 */
+[data-vibrancy="off"] {
+  --av-glass-alpha-top: 0.96;
+  --av-glass-alpha-bottom: 0.94;
 }
 
 /* ============ ドリルイン遷移(ボード⇄詳細など) ============ */
-@keyframes st-drill-in {
+@keyframes av-drill-in {
   from {
     opacity: 0;
     transform: translateX(16px);
@@ -222,7 +287,7 @@ body {
   }
 }
 
-@keyframes st-drill-back {
+@keyframes av-drill-back {
   from {
     opacity: 0;
     transform: translateX(-16px);
@@ -233,122 +298,177 @@ body {
   }
 }
 
-.st-view-forward {
-  animation: st-drill-in 200ms var(--st-ease) both;
+.av-view-forward {
+  animation: av-drill-in 200ms var(--av-ease) both;
 }
 
-.st-view-back {
-  animation: st-drill-back 200ms var(--st-ease) both;
+.av-view-back {
+  animation: av-drill-back 200ms var(--av-ease) both;
 }
 
-/* ============ カードのマイクロインタラクション ============
-   選択カードの背景色はステータス色をインラインstyleで塗る(承認済み仕様)ため、
-   ここでは背景の既定値・ホバー・浮きだけを受け持つ */
-.st-card {
-  background-color: var(--st-card-bg);
+/* ============ タスクカード ============
+   カードはガラスにしない(ガラス×ガラスは屈折が二乗になって濁る)。
+   ただし完全不透明にすると盤面の大半でガラスが消えるので、高アルファの面にする。 */
+.av-card {
+  background-color: var(--av-surface-card);
+  color: var(--av-text-primary);
   transition:
-    background-color 120ms var(--st-ease),
-    color 120ms var(--st-ease),
-    transform 120ms var(--st-ease),
-    box-shadow 120ms var(--st-ease);
+    background-color 120ms var(--av-ease),
+    color 120ms var(--av-ease),
+    transform 120ms var(--av-ease),
+    box-shadow 120ms var(--av-ease);
 }
 
-.st-card[data-selected="true"] {
+.av-card:hover:not([data-selected="true"]) {
+  background-color: var(--av-surface-card-hover);
+}
+
+/* 選択は「いまどこにいるか」という状態であって、ステータス(データ)ではない。
+   だから選択の色はブランド青ひとつに固定し、ステータスの識別は
+   レーンの所属とカード左の点が担う。
+   ステータス色に何が入っても選択表示のコントラストが壊れないのが、この設計の要点。 */
+.av-card[data-selected="true"] {
+  background-color: color-mix(
+    in srgb,
+    var(--av-accent) var(--av-accent-mix),
+    var(--av-surface-card)
+  );
+  color: var(--av-accent-text);
+  font-weight: 600;
+  /* 2pxのリングは装飾ではない。淡面だけでは隣接カードとの面コントラストが
+     1.15:1 しかなく、WCAG 1.4.11(非文字のUI状態は3:1)を満たせない */
+  box-shadow:
+    inset 0 0 0 2px var(--av-accent),
+    0 4px 12px color-mix(in srgb, var(--av-accent) 30%, transparent);
   transform: translateY(-1px);
 }
 
-.st-card:hover:not([data-selected="true"]) {
-  background-color: var(--st-card-hover-bg);
+/* ステータス識別用の点。ティール・オレンジは面コントラストが2:1前後しかなく
+   単独では縁が溶けるため、必ず内側の輪郭を添える */
+.av-status-dot {
+  background-color: var(--av-status);
+  box-shadow: inset 0 0 0 0.5px oklch(0 0 0 / 0.15);
 }
 
-/* 検索バーのプレースホルダー(ダークモードでも可読に) */
-.st-search-input::placeholder {
-  color: var(--st-text-tertiary);
+/* ============ ステータスチップ(詳細画面) ============
+   面と文字の両方をステータス色から混色で作る。現行の「文字＝生のステータス色、
+   面＝12%」は最小1.63:1で破綻していた。混色比はモードで変わるのでトークンに出す */
+.av-status-chip {
+  background-color: color-mix(
+    in srgb,
+    var(--av-status) var(--av-status-chip-mix),
+    var(--av-surface-card)
+  );
+  color: color-mix(in srgb, var(--av-status) 45%, var(--av-status-chip-ink));
 }
 
 /* ============ トークンのユーティリティクラス ============
    Tailwindのneutral系ハードコードはダークモードで破綻するため、こちらを使う */
-.st-text-1 {
-  color: var(--st-text-primary);
+.av-text-1 {
+  color: var(--av-text-primary);
 }
-.st-text-2 {
-  color: var(--st-text-secondary);
+.av-text-2 {
+  color: var(--av-text-secondary);
 }
-.st-text-3 {
-  color: var(--st-text-tertiary);
+.av-text-3 {
+  color: var(--av-text-muted);
 }
-.st-row-selected {
-  background-color: var(--st-surface-selected);
+.av-surface-raised {
+  background-color: var(--av-surface-raised);
 }
-.st-border {
-  border-color: var(--st-palette-border);
+.av-danger-text {
+  color: var(--av-danger);
 }
-.st-chip {
-  background-color: var(--st-surface-hover);
+.av-row-selected {
+  background-color: var(--av-surface-selected);
 }
-.st-input::placeholder {
-  color: var(--st-text-tertiary);
+.av-border {
+  border-color: var(--av-hairline);
 }
-/* トグルスイッチOFF時のトラック(AppleのsystemGray相当。両モード共通) */
-.st-toggle-off {
-  background-color: rgba(120, 120, 128, 0.32);
+.av-chip {
+  background-color: var(--av-surface-hover);
+}
+.av-input::placeholder {
+  color: var(--av-text-muted);
+}
+/* トグルOFF時のトラック。地の明るさに合わせて分岐させる */
+.av-toggle-off {
+  background-color: var(--av-toggle-off);
 }
 
 /* ホバーで薄く反応する汎用ボタン */
-.st-btn-ghost:hover {
-  background-color: var(--st-surface-hover);
+.av-btn-ghost:hover {
+  background-color: var(--av-surface-hover);
 }
 
-/* BlockNoteの配色をパレットに合わせる */
+/* BlockNoteの配色をパレットに合わせる。
+   data-color-scheme は TaskDetail の theme prop（= useColorScheme の値）が駆動する。
+   .dark が documentElement に付いているので、var() は自動的に正しい側を引く。
+   属性セレクタは「.bn-root だけで十分では」と削られがちだが消してはいけない。
+   BlockNote自身(@blocknote/react/style.css)が .bn-root { --bn-colors-editor-text: #3f3f3f; ... }（詳細度0,1,0）と
+   .bn-root[data-color-scheme="dark"] { ... }（詳細度0,2,0）の2段構えで既定値を持っており、
+   dark側は詳細度0,2,0でしか勝てない。ここを .bn-root 単独(0,1,0)まで落とすと、
+   ダークモードで本家の .bn-root[data-color-scheme="dark"] に上書きされて配色が効かなくなる。
+   light側と詳細度を揃える意味でもあえて両方に属性セレクタを付けている */
+.bn-root[data-color-scheme="light"],
 .bn-root[data-color-scheme="dark"] {
   --bn-colors-editor-background: transparent;
-  --bn-colors-editor-text: #f5f5f7;
-  --bn-colors-menu-background: #2c2c2e;
-  --bn-colors-menu-text: #f5f5f7;
-  --bn-colors-border: rgba(255, 255, 255, 0.12);
-}
-
-.bn-root[data-color-scheme="light"] {
-  --bn-colors-editor-background: transparent;
-  --bn-colors-editor-text: #1c1c1e;
-  --bn-colors-border: rgba(0, 0, 0, 0.08);
+  --bn-colors-editor-text: var(--av-text-primary);
+  --bn-colors-menu-background: var(--av-surface-raised);
+  --bn-colors-menu-text: var(--av-text-primary);
+  --bn-colors-tooltip-background: var(--av-surface-raised);
+  --bn-colors-tooltip-text: var(--av-text-secondary);
+  --bn-colors-hovered-background: var(--av-surface-hover);
+  --bn-colors-hovered-text: var(--av-text-primary);
+  --bn-colors-selected-background: var(--av-accent-solid);
+  --bn-colors-selected-text: var(--av-text-on-accent);
+  --bn-colors-disabled-background: var(--av-surface-hover);
+  --bn-colors-disabled-text: var(--av-text-muted);
+  --bn-colors-border: var(--av-hairline);
+  --bn-colors-side-menu: var(--av-text-muted);
 }
 
 /* ============ スラッシュメニュー(BlockNoteのサジェスト) ============
-   shadcn既定の選択色(bg-accent = ほぼ白)は、半透明白のパレット上では
-   選択行が背景と見分けられない。macOSのメニューに合わせてシステムブルーで塗る。
+   shadcn既定の選択色(bg-accent)は、半透明のパレット上では選択行が背景と見分けられない。
+   macOSのメニューに合わせてブランド青で塗る。
    Tailwindのユーティリティは@layer内なので、レイヤー外のこの指定が優先される */
 .bn-suggestion-menu [aria-selected="true"] {
-  background-color: #007aff;
+  background-color: var(--av-accent-solid);
   border-radius: 8px;
 }
 
 /* 選択行の中身(タイトル・説明文・アイコン)は白に統一して可読性を保つ */
 .bn-suggestion-menu [aria-selected="true"],
 .bn-suggestion-menu [aria-selected="true"] * {
-  color: #ffffff;
+  color: var(--av-text-on-accent);
 }
 
 .bn-suggestion-menu [aria-selected="true"] svg {
-  color: #ffffff;
+  color: var(--av-text-on-accent);
 }
 
 /* ショートカットのバッジは青地に埋もれるので、半透明白の地に置き換える */
 .bn-suggestion-menu [aria-selected="true"] kbd,
 .bn-suggestion-menu [aria-selected="true"] [class*="badge"],
 .bn-suggestion-menu [aria-selected="true"] [data-slot="badge"] {
-  background-color: rgba(255, 255, 255, 0.22);
+  background-color: oklch(1 0 0 / 0.22);
   border-color: transparent;
+}
+
+/* BlockNoteのツールチップは text-background を使うが、Avoliqの通常背景は透過。
+   そのままでは説明文が透明になるため、暗いツールチップ面には白文字を明示する。 */
+.bn-root [data-slot="tooltip-content"] {
+  color: var(--av-text-on-accent);
 }
 
 /* OSの視差効果を減らす設定を尊重する */
 @media (prefers-reduced-motion: reduce) {
-  .st-palette,
-  .st-view-forward,
-  .st-view-back {
+  .av-glass,
+  .av-view-forward,
+  .av-view-back {
     animation: none;
   }
-  .st-card {
+  .av-card {
     transition: none;
   }
 }
