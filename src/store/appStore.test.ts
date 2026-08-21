@@ -3,7 +3,7 @@ import * as api from "@/lib/api";
 import { toast } from "sonner";
 import { NEW_TASK_TITLE, isBoardLoading, useAppStore } from "./appStore";
 import { board, board2, statuses, tags, tasks } from "@/test/fixtures";
-import type { Status, Task } from "@/types";
+import type { Status, Tag, Task } from "@/types";
 
 vi.mock("@/lib/api", () => ({
   boardsList: vi.fn(),
@@ -16,6 +16,10 @@ vi.mock("@/lib/api", () => ({
   taskRestore: vi.fn(),
   hidePalette: vi.fn(),
   tagsList: vi.fn(),
+  tagCreate: vi.fn(),
+  tagRename: vi.fn(),
+  tagDelete: vi.fn(),
+  taskTagToggle: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -1049,5 +1053,122 @@ describe("appStore: updateTaskTitle / updateTaskContent", () => {
       "DBに残っている牛乳を買う",
     );
     expect(toast.error).toHaveBeenCalled();
+  });
+});
+
+describe("appStore: タグ系ミューテーション", () => {
+  it("toggleTaskTag は付いていないタグを付ける", async () => {
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+      selectedTaskId: "t-b",
+    });
+    mocked.taskTagToggle.mockResolvedValue(["tag-bug"]);
+
+    await useAppStore.getState().toggleTaskTag("tag-bug");
+
+    const task = useAppStore.getState().tasks.find((t) => t.id === "t-b");
+    expect(task?.tagIds).toEqual(["tag-bug"]);
+    expect(mocked.taskTagToggle).toHaveBeenCalledWith("t-b", "tag-bug");
+  });
+
+  it("toggleTaskTag は付いているタグを外す", async () => {
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+      selectedTaskId: "t-a",
+    });
+    mocked.taskTagToggle.mockResolvedValue([]);
+
+    await useAppStore.getState().toggleTaskTag("tag-bug");
+
+    const task = useAppStore.getState().tasks.find((t) => t.id === "t-a");
+    expect(task?.tagIds).toEqual([]);
+  });
+
+  it("toggleTaskTag は失敗したらDBの実状態へ戻す", async () => {
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+      selectedTaskId: "t-b",
+    });
+    mocked.taskTagToggle.mockRejectedValue(new Error("失敗"));
+    mocked.tasksList.mockResolvedValue(tasks);
+
+    await useAppStore.getState().toggleTaskTag("tag-bug");
+
+    const task = useAppStore.getState().tasks.find((t) => t.id === "t-b");
+    expect(task?.tagIds).toEqual([]);
+  });
+
+  it("createTagAndAttach は作ってから選択中タスクへ付ける", async () => {
+    const created: Tag = {
+      id: "tag-new",
+      boardId: "board-1",
+      name: "新規",
+      color: "#E88A85",
+      position: 3,
+    };
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+      selectedTaskId: "t-b",
+    });
+    mocked.tagCreate.mockResolvedValue(created);
+    mocked.taskTagToggle.mockResolvedValue(["tag-new"]);
+
+    await useAppStore.getState().createTagAndAttach("  新規  ");
+
+    expect(mocked.tagCreate).toHaveBeenCalledWith("board-1", "新規");
+    expect(useAppStore.getState().tags).toContainEqual(created);
+    const task = useAppStore.getState().tasks.find((t) => t.id === "t-b");
+    expect(task?.tagIds).toEqual(["tag-new"]);
+  });
+
+  it("renameTag は一覧の該当タグを差し替える", async () => {
+    const renamed: Tag = {
+      id: "tag-bug",
+      boardId: "board-1",
+      name: "不具合",
+      color: "#7EA9E8",
+      position: 0,
+    };
+    useAppStore.setState({ currentBoardId: "board-1", tags });
+    mocked.tagRename.mockResolvedValue(renamed);
+
+    await useAppStore.getState().renameTag("tag-bug", "不具合");
+
+    expect(useAppStore.getState().tags[0]).toEqual(renamed);
+  });
+
+  it("deleteTag はタグ一覧からも全タスクからも外す", async () => {
+    useAppStore.setState({
+      currentBoardId: "board-1",
+      tasks,
+      tags,
+    });
+    mocked.tagDelete.mockResolvedValue(undefined);
+
+    await useAppStore.getState().deleteTag("tag-bug");
+
+    const s = useAppStore.getState();
+    expect(s.tags.map((t) => t.id)).toEqual(["tag-urgent", "tag-design"]);
+    expect(s.tasks.every((t) => !t.tagIds.includes("tag-bug"))).toBe(true);
+  });
+
+  it("ボード切替の読込中はタグの付け外しを受け付けない", async () => {
+    mocked.statusesList.mockImplementation(() => new Promise(() => {}));
+    mocked.tasksList.mockImplementation(() => new Promise(() => {}));
+    mocked.tagsList.mockImplementation(() => new Promise(() => {}));
+    useAppStore.setState({ tasks, tags, selectedTaskId: "t-b" });
+    void useAppStore.getState().selectBoard("board-2");
+
+    await useAppStore.getState().toggleTaskTag("tag-bug");
+
+    expect(mocked.taskTagToggle).not.toHaveBeenCalled();
   });
 });

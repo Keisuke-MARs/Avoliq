@@ -45,6 +45,10 @@ export interface AppState {
   updateTaskTitle(id: string, title: string): Promise<void>;
   openTagPalette(): void;
   closeTagPalette(): void;
+  toggleTaskTag(tagId: string): Promise<void>;
+  createTagAndAttach(name: string): Promise<void>;
+  renameTag(id: string, name: string): Promise<void>;
+  deleteTag(id: string): Promise<void>;
 }
 
 /** ⌘Nで新規タスクを作るときの既定タイトル。TaskDetailはこの値と一致するかで
@@ -87,6 +91,13 @@ export function isBoardLoading(): boolean {
  * 巻き込まれないようにするため)。
  */
 let taskCreating = false;
+
+/**
+ * タグの作成・改名・削除の二重実行防止フラグ。
+ * UI側の submittingRef と同じ発想で、応答待ち中の再実行を丸ごと拒否する。
+ * ストアの外に置くのはテストの set/getState リセットに巻き込まれないようにするため。
+ */
+let tagSubmitting = false;
 
 /**
  * 楽観的更新の失敗時に呼ぶ復旧処理。
@@ -429,5 +440,110 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   closeTagPalette() {
     set({ tagPaletteOpen: false });
+  },
+
+  async toggleTaskTag(tagId) {
+    if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
+    const { tasks, selectedTaskId, currentBoardId } = get();
+    if (selectedTaskId === null) return;
+    const target = tasks.find((t) => t.id === selectedTaskId);
+    if (target === undefined) return;
+
+    const snapshot = tasks;
+    const epoch = boardEpoch;
+    const attached = target.tagIds.includes(tagId);
+    // 楽観的更新: 押した瞬間にチップが増減する
+    set({
+      tasks: tasks.map((t) =>
+        t.id === selectedTaskId
+          ? {
+              ...t,
+              tagIds: attached
+                ? t.tagIds.filter((id) => id !== tagId)
+                : [...t.tagIds, tagId],
+            }
+          : t,
+      ),
+    });
+
+    try {
+      const tagIds = await api.taskTagToggle(selectedTaskId, tagId);
+      if (epoch !== boardEpoch) return;
+      // 並び順(tags.position昇順)はRust側の返り値を正とする
+      set((s) => ({
+        tasks: s.tasks.map((t) => (t.id === selectedTaskId ? { ...t, tagIds } : t)),
+      }));
+    } catch (e) {
+      await recoverTasks(currentBoardId, snapshot, epoch);
+      if (epoch !== boardEpoch) return;
+      toast.error(`タグの変更に失敗しました: ${String(e)}`);
+    }
+  },
+
+  async createTagAndAttach(name) {
+    if (boardLoading) return;
+    if (tagSubmitting) return; // 応答待ち中の⌘Enter連打による二重作成を防ぐ
+    const { currentBoardId, selectedTaskId } = get();
+    const trimmed = name.trim();
+    if (currentBoardId === null || trimmed === "") return;
+
+    const epoch = boardEpoch;
+    tagSubmitting = true;
+    try {
+      const created = await api.tagCreate(currentBoardId, trimmed);
+      if (epoch !== boardEpoch) return;
+      set((s) => ({ tags: [...s.tags, created] }));
+      // 作ったらそのまま選択中タスクへ付ける（作るだけで終わらせない）
+      if (selectedTaskId !== null) {
+        await get().toggleTaskTag(created.id);
+      }
+    } catch (e) {
+      if (epoch !== boardEpoch) return;
+      toast.error(`タグの作成に失敗しました: ${String(e)}`);
+    } finally {
+      tagSubmitting = false;
+    }
+  },
+
+  async renameTag(id, name) {
+    if (boardLoading) return;
+    if (tagSubmitting) return;
+    const trimmed = name.trim();
+    if (trimmed === "") return;
+
+    const epoch = boardEpoch;
+    tagSubmitting = true;
+    try {
+      const updated = await api.tagRename(id, trimmed);
+      if (epoch !== boardEpoch) return;
+      set((s) => ({ tags: s.tags.map((t) => (t.id === id ? updated : t)) }));
+    } catch (e) {
+      if (epoch !== boardEpoch) return;
+      toast.error(`タグの改名に失敗しました: ${String(e)}`);
+    } finally {
+      tagSubmitting = false;
+    }
+  },
+
+  async deleteTag(id) {
+    if (boardLoading) return;
+    if (tagSubmitting) return;
+
+    const epoch = boardEpoch;
+    tagSubmitting = true;
+    try {
+      await api.tagDelete(id);
+      if (epoch !== boardEpoch) return;
+      // Rust側は task_tags を CASCADE で消すので、手元のタスクからも外す
+      set((s) => ({
+        tags: s.tags.filter((t) => t.id !== id),
+        tasks: s.tasks.map((t) => ({ ...t, tagIds: t.tagIds.filter((tid) => tid !== id) })),
+      }));
+    } catch (e) {
+      if (epoch !== boardEpoch) return;
+      toast.error(`タグの削除に失敗しました: ${String(e)}`);
+    } finally {
+      tagSubmitting = false;
+    }
   },
 }));
