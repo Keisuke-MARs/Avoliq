@@ -1,7 +1,9 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hidePalette } from "@/lib/api";
-import { useAppStore } from "@/store/appStore";
+import { registerDetailBridge } from "@/lib/detailBridge";
+import { initialAppState, useAppStore } from "@/store/appStore";
+import { statuses, tags, tasks } from "@/test/fixtures";
 import { SEARCH_INPUT_ID, useKeyboard } from "./useKeyboard";
 
 vi.mock("@/lib/api", () => ({
@@ -75,5 +77,88 @@ describe("useKeyboard: ⌘P (detail画面)", () => {
     );
 
     expect(hidePalette).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useKeyboard: ⌘K (タグパレット)", () => {
+  afterEach(() => {
+    useAppStore.setState(initialAppState);
+    registerDetailBridge(null);
+  });
+
+  it("board で ⌘K はタグパレットを開く", () => {
+    useAppStore.setState({ ...initialAppState, tasks, statuses, tags, selectedTaskId: "t-a" });
+    renderHook(() => useKeyboard());
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(true);
+  });
+
+  it("board でカード未選択の ⌘K は何も起きない", () => {
+    useAppStore.setState({ ...initialAppState, tasks, statuses, tags, selectedTaskId: null });
+    renderHook(() => useKeyboard());
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(false);
+  });
+
+  it("detail画面でBlockNoteが先に処理した⌘K(defaultPrevented)は横取りしない", () => {
+    // CreateLinkButtonがeditorDOMElement上でpreventDefaultした状況を再現する。
+    // この競合はBlockNoteが実際に動く detail 画面でのみ起こりうるので、board ではなく
+    // detail の状態で検証する(board側のhandleMetaKeyにはBlockNoteと衝突する相手がいないため
+    // defaultPreventedガードを持たない)。
+    useAppStore.setState({
+      ...initialAppState,
+      tasks,
+      statuses,
+      tags,
+      selectedTaskId: "t-a",
+      view: "detail",
+    });
+    renderHook(() => useKeyboard());
+    const event = new KeyboardEvent("keydown", { key: "k", metaKey: true, cancelable: true });
+    event.preventDefault();
+
+    window.dispatchEvent(event);
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(false);
+  });
+
+  it("タグパレット表示中は board のキーを処理しない", () => {
+    useAppStore.setState({
+      ...initialAppState,
+      tasks,
+      statuses,
+      tags,
+      selectedTaskId: "t-a",
+      tagPaletteOpen: true,
+    });
+    renderHook(() => useKeyboard());
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+
+    // タグパレット側が処理するので、盤面のカーソルは動かない
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+  });
+
+  it("detail で ⌘K は flushDetail を呼んでからタグパレットを開く", () => {
+    const flush = vi.fn<() => void>();
+    registerDetailBridge({ flush, focusTitle: vi.fn<() => void>() });
+    useAppStore.setState({
+      ...initialAppState,
+      tasks,
+      statuses,
+      tags,
+      selectedTaskId: "t-a",
+      view: "detail",
+    });
+    renderHook(() => useKeyboard());
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().tagPaletteOpen).toBe(true);
   });
 });

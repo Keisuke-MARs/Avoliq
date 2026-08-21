@@ -67,6 +67,11 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
       s.setSearchQuery("");
       focusSearchInput();
       return true;
+    case "k":
+    case "K":
+      // タグパレットを開く。カード未選択なら openTagPalette 側で無反応になる
+      s.openTagPalette();
+      return true;
     case "b":
     case "B":
       // 遷移先の BoardSwitcher の中身は計画書3の担当
@@ -166,6 +171,19 @@ function handleDetailKey(event: KeyboardEvent): void {
     return;
   }
 
+  if (event.metaKey && (event.key === "k" || event.key === "K")) {
+    // @blocknote/react の CreateLinkButton が editorDOMElement に ⌘K のリスナを張っており、
+    // 本文にテキスト選択があるときだけ preventDefault してリンク作成UIを出す
+    // (stopPropagationはしていないので、このイベントはここまで届く)。
+    // その場合はタグパレットを開かずリンク作成に譲る。
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    // 保留中の自動保存を確定してからタグパレットを開く
+    flushDetail();
+    store.openTagPalette();
+    return;
+  }
+
   if (event.metaKey && event.key === "ArrowLeft") {
     event.preventDefault();
     void store.moveSelectedTask("left");
@@ -223,6 +241,10 @@ export function useKeyboard(): void {
       if (e.isComposing || e.key === "Process") return;
 
       const state = useAppStore.getState();
+
+      // タグパレット表示中は TagPalette 自身が全キーを処理する（二重発火の防止）
+      if (state.tagPaletteOpen) return;
+
       if (state.view === "board") {
         handleBoardKey(e, state);
         return;

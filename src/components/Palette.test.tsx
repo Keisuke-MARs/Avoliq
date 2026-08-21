@@ -511,3 +511,29 @@ describe("Palette: Escとビュー切替", () => {
     expect(useAppStore.getState().currentBoardId).toBe("board-1");
   });
 });
+
+describe("Palette: ⌘Kでタグパレットを開閉する", () => {
+  it("初期状態ではTagPaletteはDOMに存在しない", async () => {
+    await renderPalette();
+    expect(screen.queryByTestId("tag-palette-scrim")).not.toBeInTheDocument();
+  });
+
+  it("カード選択中に⌘Kを押すとTagPaletteが現れる", async () => {
+    const user = await renderPalette();
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Meta>}k{/Meta}");
+
+    expect(screen.getByTestId("tag-palette-scrim")).toBeInTheDocument();
+  });
+
+  it("Escで閉じるとTagPaletteがDOMから消える(アンマウントされる)", async () => {
+    const user = await renderPalette();
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Meta>}k{/Meta}");
+    expect(screen.getByTestId("tag-palette-scrim")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByTestId("tag-palette-scrim")).not.toBeInTheDocument();
+  });
+});

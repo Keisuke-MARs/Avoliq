@@ -5,6 +5,7 @@ import { BoardSettings } from "./BoardSettings";
 import { BoardSwitcher } from "./BoardSwitcher";
 import { FooterHints } from "./FooterHints";
 import { SearchBar } from "./SearchBar";
+import { TagPalette } from "./TagPalette";
 import { TaskDetail } from "./TaskDetail";
 import { useFlushOnHide } from "@/hooks/useFlushOnHide";
 import { useHotkeyErrorToast } from "@/hooks/useHotkeyErrorToast";
@@ -16,6 +17,7 @@ export function Palette() {
   const view = useAppStore((s) => s.view);
   const loadBoards = useAppStore((s) => s.loadBoards);
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
+  const tagPaletteOpen = useAppStore((s) => s.tagPaletteOpen);
 
   useKeyboard();
   useFlushOnHide();
@@ -44,7 +46,7 @@ export function Palette() {
   return (
     <div
       data-testid="palette"
-      className="st-palette flex h-screen w-screen flex-col overflow-hidden"
+      className="st-palette relative flex h-screen w-screen flex-col overflow-hidden"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", sans-serif',
@@ -63,6 +65,8 @@ export function Palette() {
         {view === "switcher" && <BoardSwitcher />}
         {view === "settings" && <BoardSettings />}
       </div>
+
+      {tagPaletteOpen && <TagPalette />}
 
       <FooterHints view={view} />
 
