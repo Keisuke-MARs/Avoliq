@@ -85,7 +85,7 @@ CREATE INDEX idx_task_tags_tag ON task_tags(tag_id);
 | `tag_create` | `board_id, name` | `Tag` | 色は自動決定・末尾position。同名（前後trim後・大文字小文字無視）が既にあれば Err |
 | `tag_rename` | `id, name` | `Tag` | 同ボード内で同名衝突すれば Err |
 | `tag_delete` | `id` | `()` | `task_tags` は ON DELETE CASCADE で消える |
-| `task_tag_toggle` | `task_id, tag_id` | `Vec<String>` | 付いていれば外し、無ければ付ける。トグル後の tagIds を返す |
+| `task_tag_toggle` | `task_id, tag_id` | `Vec<String>` | 付いていれば外し、無ければ付ける。トグル後の tagIds を返す。**（実装時追加）** `task.board_id != tag.board_id` は Err（`task_create` / `task_move` と同じ作法でボード整合性を検証。別ボードのタグを付けられないようにするため） |
 
 `name` は前後の空白を trim して保存する。空文字は Err。
 
@@ -211,6 +211,11 @@ interface AppState {
 
 ## タグパレット（`src/components/TagPalette.tsx` を新規作成）
 
+**実装時に判明した追加ファイル**: 1行分の表示（付け外し表示・インライン改名）を
+`src/components/TagPaletteRow.tsx` に分離した（計画時のファイル構成表には無かった）。
+`TagPalette.tsx` が絞り込み・キー入力・IME防御を、`TagPaletteRow.tsx` が1行の見た目と
+改名入力欄のフォーカス保護を担当する形に責務を分けている。
+
 ### 位置づけ
 
 `View` は増やさない。`board` / `detail` の**上に重なるオーバーレイ**として
@@ -227,14 +232,23 @@ interface AppState {
 | board | `⌘K` | `selectedTaskId !== null` のときのみ。無選択なら無反応（トーストも出さない） |
 | detail | `⌘K` | 常時。開く前に `flushDetail()` で保留中の自動保存を確定する |
 
-`useKeyboard` は **`⌘K` を拾う前に `if (e.defaultPrevented) return;` を先頭に置く**。
 BlockNote のリンク作成ボタンが `editorDOMElement` に `⌘K` のリスナを張っており
 （`@blocknote/react` の `CreateLinkButton`）、`stopPropagation` していないため
-window 側と両方発火してしまう。BlockNote が先に `preventDefault()` するので、
-このチェック1行で共存できる。
+window 側と両方発火してしまう。BlockNote は本文にテキスト選択がある場合だけ
+自身のハンドラで先に `preventDefault()` するので、`defaultPrevented` を見れば共存できる。
 
 > **仕様として明記**: 詳細画面で**本文にテキスト選択がある状態の `⌘K` はリンク作成が優先**され、
 > タグパレットは開かない。選択が無ければタグパレットが開く。
+
+> **当初案からの変更（実装中に判明）**: 当初は「`useKeyboard` の `onKeyDown` の**先頭**に
+> `if (e.defaultPrevented) return;` を無条件で置く」設計だったが、これは既存機能を壊すことが
+> 実装中のレビューで判明した。BlockNote の `OverrideEscape` 拡張は、テキスト選択の有無に
+> 関わらず**エディタにフォーカスがあるだけで** `Escape` にも `preventDefault()` するため、
+> `onKeyDown` の先頭に無条件で置くと、詳細画面の既存機能である「Esc → 盤面へ戻る」まで
+> 一緒に潰れてしまう。代わりに、ガードは **`handleDetailKey` の `⌘K` 分岐の中だけ**に置き
+> （`if (event.defaultPrevented) return;` の直後で `flushDetail(); store.openTagPalette();`）、
+> **board 側には置いていない**（board には BlockNote エディタが存在せず `⌘K` を
+> `preventDefault` する相手がいないため、対称性を理由に足す必要がない）。
 
 `tagPaletteOpen === true` の間、`useKeyboard` は `switcher` / `settings` と同様に
 **早期 return** し、キーは TagPalette 自身のハンドラだけが処理する（二重発火の防止）。
@@ -251,6 +265,13 @@ Enter        ハイライト中のタグを付け外し（トグル）。入力�
 ⌘⌫           ハイライト中のタグを削除（ConfirmDialog で確認）
 Esc          閉じる（トグル時点で保存済み。保存操作は無い）
 ```
+
+**実装メモ: ハイライトの管理方法（実装中に判明・当初案から変更）**: 当初は候補配列の
+`highlight: number`（index）でハイライト位置を持つ想定だったが、実装中のレビューで
+「トグルすると付与済み/使用件数で並び替わるため、index方式だと押した直後に別の行を
+指してしまう」事故が起きることが判明した。実装では **`highlightId: string | null`
+（ハイライト中のタグid）** で持つ形に変更している。id で持てば、トグルで `rows` の並びが
+変わっても同じタグを指し続けられる。`null` は「着地点なし」（IME変換中など）を表す。
 
 各行の左に**タグ色のスウォッチ**（6px円）、右に**使用件数**を出す。
 最下部に自前のヒント行を持ち、`FooterHints` を覆う
@@ -340,6 +361,11 @@ export function filterTasks(tasks: Task[], query: string, tags: Tag[]): Task[];
 - **絞り込み中のフィードバック**: サジェスト各行に出すタグ色のスウォッチと、
   レーンヘッダーの件数が絞り込み後の値に変わることで伝える。検索バーの文字列は
   プレーンなまま（トークン化しない）にして編集可能性を保つ
+- **表示条件（実装中に判明・追加）**: ドロップダウンの表示は `focused && view === "board" && ...`
+  とし、`view === "board"` を必須にする。`SearchBar` は `Palette.tsx` から view に関係なく
+  常時マウントされたままなので、フォーカスの有無だけで判定すると、検索バーで `#` を打った
+  状態からカードを開いて詳細画面に移っても、ドロップダウンが詳細画面の上に浮いたまま
+  残ってしまう
 
 > **当初案からの変更（計画作成時に判断）**: 検索バー内の `#バグ` の部分だけを
 > Avoliq Blue `#0A84FF` の文字色＋下線にする案を採っていたが、`<input>` のテキストの一部だけを
@@ -366,7 +392,9 @@ detail: ["⌘←→","ステータス"], ["⌘T","タイトル"], ["⌘K","タ�
    直書きしている箇所は個別に修正が必要
 2. **Rust 側で `Task` を返す全コマンドの `tagIds` 埋め漏れ**。`repo.rs` の行→Task 組み立てを
    1箇所に集約して防ぐ
-3. **`⌘K` と BlockNote のリンク作成の共存**。`useKeyboard` の先頭の `defaultPrevented` チェック
+3. **`⌘K` と BlockNote のリンク作成の共存**。`useKeyboard.ts` の `handleDetailKey` の `⌘K` 分岐
+   の中だけに置く `defaultPrevented` チェック（`onKeyDown` の先頭ではない。理由は上記
+   「起動」節の「当初案からの変更」を参照）
 4. **`board_delete` の明示削除順**に `task_tags → tags` を追加
 5. **`selectBoard` の boardEpoch チェックに `tags` を含める**（非同期競合の防御規約）
 6. **`filterTasks` のシグネチャ変更**（第3引数に `tags` が増える）。呼び出し元は**4箇所**:
@@ -374,6 +402,15 @@ detail: ["⌘←→","ステータス"], ["⌘T","タイトル"], ["⌘K","タ�
    `appStore.ts` の `setSearchQuery` と `deleteSelectedTask`。
    カーソル移動のレーン計算・削除後の選択・実際の表示が食い違わないよう、必ず全部同時に直す。
    第3引数は**省略不可**にして、直し忘れをコンパイルエラーで検出させる
+7. **`task_tag_toggle` のボード整合性検証**（実装時追加）。`task.board_id != tag.board_id` を
+   Err にしないと、別ボードのタグを付けられてしまう
+8. **`SearchBar` のサジェスト表示条件に `view === "board"` を含める**（実装時判明）。
+   `SearchBar` は `Palette.tsx` から view に関係なく常時マウントされたままなので、
+   フォーカス状態だけで判定すると詳細画面に切り替えたあともドロップダウンが浮いたまま
+   残ってしまう
+9. **`TaskCard` のチップ折返し測定は `src/hooks/useChipOverflow.ts` に切り出した**
+   （計画時のファイル構成表には無かった）。「+n」チップの幅見積もりも固定値ではなく、
+   非表示件数の桁数に応じて計算する（タグ数に上限が無いため、2桁以上になりうる）
 
 ## テスト方針
 

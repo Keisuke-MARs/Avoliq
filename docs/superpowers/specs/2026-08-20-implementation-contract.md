@@ -29,8 +29,10 @@ src/                          # React
   main.tsx / App.tsx / index.css
   types.ts                    # 共有型定義（下記）
   lib/api.ts                  # Tauri invoke ラッパー（コマンド1つにつき関数1つ）
+  lib/tagPalette.ts           # タグ色プリセット9色とチップ配色を返す純関数
   store/appStore.ts           # zustand ストア
   hooks/useKeyboard.ts        # キーボードディスパッチ（view別）
+  hooks/useChipOverflow.ts    # チップ列の実測あふれ判定（TaskCardのタグ折返しから切り出し）
   components/
     Palette.tsx               # ルート。view切替（board/detail/switcher/settings）
     SearchBar.tsx
@@ -38,6 +40,8 @@ src/                          # React
     TaskDetail.tsx            # BlockNote
     BoardSwitcher.tsx
     BoardSettings.tsx
+    TagPalette.tsx             # ⌘Kで開くタグ付与・管理オーバーレイ
+    TagPaletteRow.tsx          # TagPaletteの1行（付け外し表示・インライン改名）
 src-tauri/
   src/main.rs / lib.rs
   src/db/mod.rs               # 接続・初期化
@@ -122,6 +126,11 @@ CREATE TABLE schema_migrations (
 | `task_move` | `id, status_id, new_index: i64` | `Task` | 移動元・移動先レーンを再採番 |
 | `task_delete` | `id` | `Task` | ソフトデリート(deleted_at設定)。削除行のpositionは保持し、生存タスクのみ0..n-1に再採番 |
 | `task_restore` | `id` | `Task` | deleted_atをNULLに戻し、削除時のpositionの位置に復元(⌘Zで元の場所に戻る) |
+| `tags_list` | `board_id` | `Vec<Tag>` | position昇順 |
+| `tag_create` | `board_id, name` | `Tag` | 色は自動決定・末尾position。同名(大文字小文字無視)はErr |
+| `tag_rename` | `id, name` | `Tag` | 同名衝突はErr |
+| `tag_delete` | `id` | `()` | task_tagsはCASCADE |
+| `task_tag_toggle` | `task_id, tag_id` | `Vec<String>` | トグル後のtagIdsを返す。`task.board_id != tag.board_id` はErr（task_create/task_moveと同じ作法でボード整合性を検証する） |
 | `setting_get` | `key` | `Option<String>` | |
 | `setting_set` | `key, value` | `()` | ホットキーは key=`hotkey`, 既定値 `Alt+Space`。key=`hotkey` 時は再登録も行う |
 | `palette_hide` | – | `()` | パレット非表示（フロントのEscから呼ぶ） |
@@ -150,6 +159,13 @@ CREATE TABLE schema_migrations (
   epoch一致チェックは `task_create` 応答時・`tasksList` 応答時の両方で行い、いずれかの時点で
   追い越されていたら黙って破棄する
 - 切替後に届いた古い応答のトースト・反映は黙って破棄する（意図した仕様）
+- タグ系のミューテーション（`createTagAndAttach` / `renameTag` / `deleteTag`）も同じ規約に従う。
+  `appStore.ts` はモジュールスコープの `tagSubmitting` フラグ（`taskCreating` と同じ形）を持ち、
+  応答待ち中の連打（⌘Enter作成・⌘R改名確定・⌘⌫削除確認の連打）による二重実行を防ぐ。
+  `selectBoard` は `tags` も `boardEpoch` のチェック対象に含め、要求時に `tagPaletteOpen` を
+  同期で `false` に戻す（ボードが変わればタグ集合も変わるため）。`toggleTaskTag` だけは
+  `tagSubmitting` を見ない（`createTagAndAttach` が `tagSubmitting = true` のまま内部で
+  `toggleTaskTag` を呼ぶため、対称性を取ろうとしてここにガードを足すと自己ロックする）
 
 ## フロント側の追加固定名
 
@@ -190,6 +206,15 @@ export interface Task {
   position: number;
   createdAt: string;
   updatedAt: string;
+  tagIds: string[];          // 付いているタグのid。tags.position昇順（Rust側が保証する）
+}
+
+export interface Tag {
+  id: string;
+  boardId: string;
+  name: string;
+  color: string;             // '#RRGGBB'。作成時に自動決定し以後不変
+  position: number;
 }
 
 export type View = "board" | "detail" | "switcher" | "settings";
@@ -209,6 +234,8 @@ interface AppState {
   lastDeletedTaskId: string | null;   // ⌘Z undo 用（直近1件）
   pendingNewTaskId: string | null;    // createNewTask成功時にセット。TaskDetailが
                                        // 「⌘N直後か」をidで判定し、判定後にクリアする
+  tags: Tag[];                        // currentBoardの分。position昇順
+  tagPaletteOpen: boolean;            // タグパレットの開閉
 
   loadBoards(): Promise<void>;
   selectBoard(boardId: string): Promise<boolean>; // statuses/tasksも再読込。反映=true/失敗・追い越し=false
@@ -223,6 +250,13 @@ interface AppState {
   undoDelete(): Promise<void>;
   updateTaskContent(id: string, contentMd: string): Promise<void>; // 500msデバウンスは呼び出し側(TaskDetail)
   updateTaskTitle(id: string, title: string): Promise<void>;
+
+  openTagPalette(): void;       // selectedTaskId が null なら何もしない
+  closeTagPalette(): void;
+  toggleTaskTag(tagId: string): Promise<void>;         // 対象は selectedTaskId
+  createTagAndAttach(name: string): Promise<void>;     // 作成→即付与
+  renameTag(id: string, name: string): Promise<void>;
+  deleteTag(id: string): Promise<void>;
 }
 ```
 
@@ -233,9 +267,10 @@ interface AppState {
 - board: 文字→SearchBar / Enter→作成 or 詳細 / ↓→ボードへ / ←→↑↓移動 /
   ⌘←→ステータス移動 / ⌘↑↓並び替え / ⌘⌫削除 / ⌘Z復元 /
   ⌘N新規タスク作成(先頭ステータスへ既定タイトルで作成→detailへ) /
-  ⌘P検索バーへフォーカス /
+  ⌘P検索バーへフォーカス / ⌘Kタグパレット（selectedTaskIdがnullなら無反応。トーストも出さない） /
   ⌘1..9ボード切替 / ⌘Bスイッチャー / ⌘,設定
 - detail: ⌘←→ステータス変更 / ⌘Tタイトルへフォーカス /
+  ⌘Kタグパレット（flushDetailで保留中の自動保存を確定してから開く。下記の「⌘KとBlockNoteの共存」を参照） /
   ⌘N新規タスク作成(flushDetail→createNewTask、新タスクの詳細に差し替わる) /
   ⌘P検索(flushDetail→board遷移→検索バーへフォーカス、1フレーム遅延させて確実にフォーカスする) /
   Esc戻る（自動保存済み）
@@ -243,6 +278,24 @@ interface AppState {
   全選択フォーカス、それ以外(カードから開いた・検索から作成した等)は本文エディタ(BlockNote)へ
   自動フォーカス。タイトル入力中にEnter/Tabを押すと本文エディタへフォーカスが移る
   （⌘Tで再度タイトルへ戻れる）
+
+## ⌘K とBlockNoteのリンク作成の共存（変更禁止）
+
+`@blocknote/react` の `CreateLinkButton`（`OverrideEscape` 拡張経由）が `editorDOMElement` に
+`⌘K` のリスナを張っており、`stopPropagation` していないため window 側の `useKeyboard` にも
+イベントが届く。BlockNote は本文にテキスト選択がある場合だけ自身のハンドラで
+`preventDefault()` する。
+
+- **仕様**: 詳細画面で本文にテキスト選択がある状態の `⌘K` は**リンク作成が優先**され、
+  タグパレットは開かない。選択が無ければタグパレットが開く
+- **実装**: `defaultPrevented` ガードは `useKeyboard.ts` の `handleDetailKey` の `⌘K` 分岐の
+  **中だけ**に置く（`if (event.defaultPrevented) return;` の後で `flushDetail(); store.openTagPalette();`）。
+  **board 側には置かない**。当初計画は「`onKeyDown` の先頭に無条件で置く」だったが、これは
+  BlockNote の `OverrideEscape` 拡張がエディタにフォーカスがあるだけで（テキスト選択の有無に
+  関わらず）`Escape` を `preventDefault` するため、`onKeyDown` 先頭に置くと詳細画面の
+  「Esc → 盤面へ戻る」（board 由来ではなく detail 自身の Esc 処理）が壊れる。
+  board にはそもそも BlockNote エディタが存在せず ⌘K を preventDefault する相手がいないため、
+  対称性を理由に board 側へガードを足す必要はない（足しても意味が無く、混乱の元になるだけ）
 
 ## UI原則
 
