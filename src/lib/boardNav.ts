@@ -16,12 +16,22 @@ export interface ParsedQuery {
 }
 
 /**
+ * 全角「＃」を半角「#」に正規化する。
+ * 日本語入力ONの Shift+3 は環境によって全角＃になるため、タグトークンかどうかを判定する
+ * 箇所すべてでこれを通す。parseSearchQuery(検索欄全体のパース)とSearchBar(Tab補完のための
+ * 「最後のトークン」抽出)の2箇所が同じ正規化を必要とするので、ここに1本化して片方だけ直す
+ * 片肺(例: 「＃＃」や「♯」対応を片方にだけ足してしまう)を防ぐ。
+ */
+export function normalizeHash(s: string): string {
+  return s.replace(/＃/g, "#");
+}
+
+/**
  * 検索クエリをパースする。
- * 日本語入力ONの Shift+3 が全角「＃」になる環境があるため、**この関数の冒頭でのみ**正規化する
- * (正規化を複数箇所に散らすと、1箇所漏れただけで「打っても何も起きない」状態になるため)。
+ * 全角「＃」の正規化は normalizeHash に集約している(この関数の中で個別に行わない)。
  */
 export function parseSearchQuery(query: string): ParsedQuery {
-  const normalized = query.replace(/＃/g, "#");
+  const normalized = normalizeHash(query);
   const tagNames: string[] = [];
   const rest: string[] = [];
 

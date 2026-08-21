@@ -334,7 +334,9 @@ export function parseSearchQuery(query: string): ParsedQuery;
 ```
 
 - 先頭で**全角「＃」を半角「#」に正規化**する（日本語入力ONの `Shift+3` 対策）。
-  1箇所でも漏らすと「打っても何も起きない」最悪の体験になるため、正規化はこの関数の冒頭のみで行う
+  1箇所でも漏らすと「打っても何も起きない」最悪の体験になるため、正規化は `normalizeHash`
+  （`src/lib/boardNav.ts`）に集約し、タグトークンを判定する箇所（`parseSearchQuery` 本体、
+  `SearchBar` の直近トークン抽出）は必ずこれ経由で行う。個別に `/＃/g` を書き足さないこと
 - 空白区切りのトークンのうち `#` で始まるものを `tagNames` へ（先頭の `#` を除去。
   `#` 単独は無視）、残りを半角空白1つで連結して `text` にする
 

@@ -4,6 +4,7 @@ import {
   filterTasks,
   locateTask,
   nextSelectedTaskId,
+  normalizeHash,
   parseSearchQuery,
   selectionAfterDelete,
 } from "./boardNav";
@@ -31,6 +32,24 @@ describe("filterTasks", () => {
 
   it("一致しなければ空配列", () => {
     expect(filterTasks(tasks, "存在しない", tags)).toEqual([]);
+  });
+});
+
+describe("normalizeHash", () => {
+  it("全角＃を半角#に変換する", () => {
+    expect(normalizeHash("＃バグ")).toBe("#バグ");
+  });
+
+  it("複数個ある全角＃をすべて変換する", () => {
+    expect(normalizeHash("＃バグ ＃緊急")).toBe("#バグ #緊急");
+  });
+
+  it("半角#と全角＃が混在していても両方半角に揃う", () => {
+    expect(normalizeHash("#バグ ＃緊急")).toBe("#バグ #緊急");
+  });
+
+  it("＃が無ければ変化しない", () => {
+    expect(normalizeHash("ログイン画面")).toBe("ログイン画面");
   });
 });
 

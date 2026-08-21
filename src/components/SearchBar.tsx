@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { SEARCH_INPUT_ID } from "@/hooks/useKeyboard";
+import { normalizeHash } from "@/lib/boardNav";
 import { useAppStore } from "@/store/appStore";
 import type { Tag } from "@/types";
 
@@ -42,8 +43,8 @@ export function SearchBar() {
     tabCycleRef.current = 0;
   }, [currentBoardId]);
 
-  // 全角＃は日本語入力ONのShift+3で出る。boardNav.parseSearchQuery と同じく必ず正規化する
-  const normalized = searchQuery.replace(/＃/g, "#");
+  // 全角＃の正規化はboardNav.normalizeHashに集約している(parseSearchQueryと同じ関数を使う)
+  const normalized = normalizeHash(searchQuery);
   const lastToken = normalized.split(/\s+/).pop() ?? "";
   const isTagToken = lastToken.startsWith("#");
 
