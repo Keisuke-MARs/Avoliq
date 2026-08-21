@@ -98,7 +98,7 @@ function handleBoardKey(e: KeyboardEvent, s: AppState): void {
   // ⌃ / ⌥ 付きはブラウザ/OS側に任せる
   if (e.ctrlKey || e.altKey) return;
 
-  const lanes = buildLanes(s.statuses, filterTasks(s.tasks, s.searchQuery));
+  const lanes = buildLanes(s.statuses, filterTasks(s.tasks, s.searchQuery, s.tags));
 
   switch (e.key) {
     case "Escape": {

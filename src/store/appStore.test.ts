@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/lib/api";
 import { toast } from "sonner";
 import { NEW_TASK_TITLE, isBoardLoading, useAppStore } from "./appStore";
-import { board, board2, statuses, tasks } from "@/test/fixtures";
+import { board, board2, statuses, tags, tasks } from "@/test/fixtures";
 import type { Status, Task } from "@/types";
 
 vi.mock("@/lib/api", () => ({
@@ -15,6 +15,7 @@ vi.mock("@/lib/api", () => ({
   taskDelete: vi.fn(),
   taskRestore: vi.fn(),
   hidePalette: vi.fn(),
+  tagsList: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -28,6 +29,7 @@ async function loadFixtureBoard(): Promise<void> {
   mocked.boardsList.mockResolvedValue([board, board2]);
   mocked.statusesList.mockResolvedValue(statuses);
   mocked.tasksList.mockResolvedValue(tasks);
+  mocked.tagsList.mockResolvedValue(tags);
   await useAppStore.getState().loadBoards();
 }
 
@@ -216,6 +218,53 @@ describe("appStore: selectBoard", () => {
     resolveFirstStatuses([]);
     resolveFirstTasks([]);
     expect(await firstCall).toBe(false);
+  });
+});
+
+describe("appStore: タグ", () => {
+  it("selectBoard はタグも読み込む", async () => {
+    mocked.statusesList.mockResolvedValue(statuses);
+    mocked.tasksList.mockResolvedValue(tasks);
+    mocked.tagsList.mockResolvedValue(tags);
+
+    await useAppStore.getState().selectBoard("board-1");
+
+    expect(useAppStore.getState().tags).toEqual(tags);
+  });
+
+  it("selectBoard は開いていたタグパレットを閉じる", async () => {
+    mocked.statusesList.mockResolvedValue(statuses);
+    mocked.tasksList.mockResolvedValue(tasks);
+    mocked.tagsList.mockResolvedValue(tags);
+    useAppStore.setState({ tagPaletteOpen: true });
+
+    await useAppStore.getState().selectBoard("board-1");
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(false);
+  });
+
+  it("openTagPalette はカード未選択なら開かない", () => {
+    useAppStore.setState({ selectedTaskId: null });
+
+    useAppStore.getState().openTagPalette();
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(false);
+  });
+
+  it("openTagPalette はカード選択中なら開く", () => {
+    useAppStore.setState({ selectedTaskId: "t-a" });
+
+    useAppStore.getState().openTagPalette();
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(true);
+  });
+
+  it("closeTagPalette は閉じる", () => {
+    useAppStore.setState({ tagPaletteOpen: true });
+
+    useAppStore.getState().closeTagPalette();
+
+    expect(useAppStore.getState().tagPaletteOpen).toBe(false);
   });
 });
 

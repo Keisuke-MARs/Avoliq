@@ -1,4 +1,4 @@
-import type { Status, Task } from "@/types";
+import type { Status, Tag, Task } from "@/types";
 
 /** 1レーン分の表示データ（ステータスと、そのステータスに属するタスク） */
 export interface LaneData {
@@ -9,14 +9,67 @@ export interface LaneData {
 /** カーソル移動の方向 */
 export type MoveDir = "left" | "right" | "up" | "down";
 
+/** 検索クエリを「タイトル検索の文字列」と「タグ名」に分けた結果 */
+export interface ParsedQuery {
+  text: string;
+  tagNames: string[];
+}
+
+/**
+ * 検索クエリをパースする。
+ * 日本語入力ONの Shift+3 が全角「＃」になる環境があるため、**この関数の冒頭でのみ**正規化する
+ * (正規化を複数箇所に散らすと、1箇所漏れただけで「打っても何も起きない」状態になるため)。
+ */
+export function parseSearchQuery(query: string): ParsedQuery {
+  const normalized = query.replace(/＃/g, "#");
+  const tagNames: string[] = [];
+  const rest: string[] = [];
+
+  for (const token of normalized.split(/\s+/)) {
+    if (token === "") continue;
+    if (!token.startsWith("#")) {
+      rest.push(token);
+      continue;
+    }
+    const name = token.slice(1);
+    // 「#」だけは入力途中なので無視する
+    if (name === "") continue;
+    const duplicated = tagNames.some((t) => t.toLowerCase() === name.toLowerCase());
+    if (!duplicated) tagNames.push(name);
+  }
+
+  return { text: rest.join(" "), tagNames };
+}
+
 /**
  * 検索クエリでタスクを絞り込む。
- * タイトルの部分一致・英字は大文字小文字を区別しない。空クエリなら全件。
+ * タイトルは部分一致（英字は大文字小文字を区別しない）。
+ * `#タグ名` はタグ名どうしがAND、1つのタグ名に対する候補（前方一致で複数当たる場合）はOR。
  */
-export function filterTasks(tasks: Task[], query: string): Task[] {
-  const q = query.trim().toLowerCase();
-  if (q === "") return tasks;
-  return tasks.filter((t) => t.title.toLowerCase().includes(q));
+export function filterTasks(tasks: Task[], query: string, tags: Tag[]): Task[] {
+  const { text, tagNames } = parseSearchQuery(query);
+  let result = tasks;
+
+  const q = text.trim().toLowerCase();
+  if (q !== "") {
+    result = result.filter((t) => t.title.toLowerCase().includes(q));
+  }
+
+  for (const name of tagNames) {
+    const lower = name.trim().toLowerCase();
+    const exact = tags.find((t) => t.name.trim().toLowerCase() === lower);
+    // 完全一致があればそれだけ。無ければ「打ちかけ」とみなして前方一致の候補をORで拾う
+    const candidates =
+      exact !== undefined
+        ? [exact]
+        : tags.filter((t) => t.name.trim().toLowerCase().startsWith(lower));
+    // どのタグにも当たらないなら、全件を出さずに0件にする
+    if (candidates.length === 0) return [];
+    const ids = new Set(candidates.map((t) => t.id));
+    result = result.filter((task) => task.tagIds.some((id) => ids.has(id)));
+  }
+
+  return result;
 }
 
 /**

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Palette } from "./Palette";
 import * as api from "@/lib/api";
-import { board, board2, statuses, tasks } from "@/test/fixtures";
+import { board, board2, statuses, tags, tasks } from "@/test/fixtures";
 import { useAppStore } from "@/store/appStore";
 import type { Task } from "@/types";
 
@@ -18,6 +18,7 @@ vi.mock("@/lib/api", () => ({
   taskRestore: vi.fn(),
   hidePalette: vi.fn(),
   settingGet: vi.fn(),
+  tagsList: vi.fn(),
 }));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
@@ -58,6 +59,7 @@ beforeEach(() => {
   mocked.boardsList.mockResolvedValue([board, board2]);
   mocked.statusesList.mockResolvedValue(statuses);
   mocked.tasksList.mockResolvedValue(tasks);
+  mocked.tagsList.mockResolvedValue(tags);
   mocked.hidePalette.mockResolvedValue(undefined);
   mocked.settingGet.mockResolvedValue(null);
 });

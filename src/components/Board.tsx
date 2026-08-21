@@ -8,10 +8,11 @@ export function Board() {
   // 生の配列だけを取り出し、レーンの組み立てはレンダリング本体で行う。
   const statuses = useAppStore((s) => s.statuses);
   const tasks = useAppStore((s) => s.tasks);
+  const tags = useAppStore((s) => s.tags);
   const searchQuery = useAppStore((s) => s.searchQuery);
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
 
-  const lanes = buildLanes(statuses, filterTasks(tasks, searchQuery));
+  const lanes = buildLanes(statuses, filterTasks(tasks, searchQuery, tags));
 
   // ボードにタスクが1件も無いとき(検索絞り込みではなく本当に空のとき)の空状態
   if (tasks.length === 0) {

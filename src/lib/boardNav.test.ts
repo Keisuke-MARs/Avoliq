@@ -4,32 +4,106 @@ import {
   filterTasks,
   locateTask,
   nextSelectedTaskId,
+  parseSearchQuery,
   selectionAfterDelete,
 } from "./boardNav";
-import { statuses, tasks } from "@/test/fixtures";
+import { statuses, tags, tasks } from "@/test/fixtures";
 
 const lanes = buildLanes(statuses, tasks);
 
 describe("filterTasks", () => {
   it("空クエリなら全件返す", () => {
-    expect(filterTasks(tasks, "")).toHaveLength(6);
+    expect(filterTasks(tasks, "", tags)).toHaveLength(6);
   });
 
   it("タイトルの部分一致で絞り込む", () => {
-    expect(filterTasks(tasks, "牛").map((t) => t.id)).toEqual(["t-a", "t-c"]);
+    expect(filterTasks(tasks, "牛", tags).map((t) => t.id)).toEqual(["t-a", "t-c"]);
   });
 
   it("前後の空白を無視する", () => {
-    expect(filterTasks(tasks, "  牛丼  ").map((t) => t.id)).toEqual(["t-c"]);
+    expect(filterTasks(tasks, "  牛丼  ", tags).map((t) => t.id)).toEqual(["t-c"]);
   });
 
   it("英字は大文字小文字を区別しない", () => {
     const withAscii = [...tasks, { ...tasks[0], id: "t-g", title: "Release Note" }];
-    expect(filterTasks(withAscii, "release").map((t) => t.id)).toEqual(["t-g"]);
+    expect(filterTasks(withAscii, "release", tags).map((t) => t.id)).toEqual(["t-g"]);
   });
 
   it("一致しなければ空配列", () => {
-    expect(filterTasks(tasks, "存在しない")).toEqual([]);
+    expect(filterTasks(tasks, "存在しない", tags)).toEqual([]);
+  });
+});
+
+describe("parseSearchQuery", () => {
+  it("タグとテキストを分ける", () => {
+    expect(parseSearchQuery("ログイン #バグ #緊急")).toEqual({
+      text: "ログイン",
+      tagNames: ["バグ", "緊急"],
+    });
+  });
+
+  it("全角の＃も半角と同じに扱う", () => {
+    // 日本語入力ONの Shift+3 は環境によって全角＃になる
+    expect(parseSearchQuery("＃バグ")).toEqual({ text: "", tagNames: ["バグ"] });
+  });
+
+  it("# 単独は入力途中とみなして無視する", () => {
+    expect(parseSearchQuery("ログイン #")).toEqual({ text: "ログイン", tagNames: [] });
+  });
+
+  it("同じタグ名は大文字小文字を無視して1つにまとめる", () => {
+    expect(parseSearchQuery("#Bug #bug")).toEqual({ text: "", tagNames: ["Bug"] });
+  });
+
+  it("テキストが複数あれば空白1つで連結する", () => {
+    expect(parseSearchQuery("  ログイン   画面  ")).toEqual({
+      text: "ログイン 画面",
+      tagNames: [],
+    });
+  });
+});
+
+describe("filterTasks（タグ絞り込み）", () => {
+  it("タグ名の完全一致で絞れる", () => {
+    const result = filterTasks(tasks, "#バグ", tags);
+
+    expect(result.map((t) => t.id)).toEqual(["t-a", "t-c"]);
+  });
+
+  it("複数のタグはAND条件になる", () => {
+    const result = filterTasks(tasks, "#バグ #緊急", tags);
+
+    expect(result.map((t) => t.id)).toEqual(["t-c"]);
+  });
+
+  it("タイトル検索と併用できる", () => {
+    const result = filterTasks(tasks, "牛乳 #バグ", tags);
+
+    expect(result.map((t) => t.id)).toEqual(["t-a"]);
+  });
+
+  it("打ちかけの名前は前方一致で拾う（候補のORになる）", () => {
+    // 「設」で始まるタグは「設計」だけ
+    const result = filterTasks(tasks, "#設", tags);
+
+    expect(result.map((t) => t.id)).toEqual(["t-d"]);
+  });
+
+  it("完全一致するタグがあれば前方一致より優先する", () => {
+    const extended = [
+      ...tags,
+      { id: "tag-bug2", boardId: "board-1", name: "バグ報告", color: "#E88A85", position: 3 },
+    ];
+
+    const result = filterTasks(tasks, "#バグ", extended);
+
+    expect(result.map((t) => t.id)).toEqual(["t-a", "t-c"]);
+  });
+
+  it("どのタグにも当たらない名前なら0件になる", () => {
+    const result = filterTasks(tasks, "#存在しない", tags);
+
+    expect(result).toEqual([]);
   });
 });
 

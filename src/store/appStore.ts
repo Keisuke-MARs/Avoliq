@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import * as api from "@/lib/api";
 import { buildLanes, filterTasks, selectionAfterDelete } from "@/lib/boardNav";
-import type { Board, Status, Task, View } from "@/types";
+import type { Board, Status, Tag, Task, View } from "@/types";
 
 export interface AppState {
   boards: Board[];
@@ -20,6 +20,10 @@ export interface AppState {
    * 既存タスクをたまたま同名にしていた場合に誤爆するため、idベースに切り替えている。
    */
   pendingNewTaskId: string | null;
+  /** currentBoard のタグ。position昇順 */
+  tags: Tag[];
+  /** タグパレット(⌘Kで開くオーバーレイ)が開いているか */
+  tagPaletteOpen: boolean;
 
   loadBoards(): Promise<void>;
   /**
@@ -39,6 +43,8 @@ export interface AppState {
   undoDelete(): Promise<void>;
   updateTaskContent(id: string, contentMd: string): Promise<void>;
   updateTaskTitle(id: string, title: string): Promise<void>;
+  openTagPalette(): void;
+  closeTagPalette(): void;
 }
 
 /** ⌘Nで新規タスクを作るときの既定タイトル。TaskDetailはこの値と一致するかで
@@ -116,6 +122,8 @@ export const initialAppState = {
   searchQuery: "",
   lastDeletedTaskId: null as string | null,
   pendingNewTaskId: null as string | null,
+  tags: [] as Tag[],
+  tagPaletteOpen: false,
 };
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -144,17 +152,20 @@ export const useAppStore = create<AppState>()((set, get) => ({
     boardLoading = true;
     // 削除のundoはボードローカルな操作とする。切替を要求した時点で同期的にクリアし、
     // 別ボードで削除したタスクが⌘Zで新しいボードに復活しないようにする。
-    set({ lastDeletedTaskId: null });
+    // タグパレットもボードが変わればタグ集合ごと無効になるので同時に閉じる。
+    set({ lastDeletedTaskId: null, tagPaletteOpen: false });
     try {
-      const [statuses, tasks] = await Promise.all([
+      const [statuses, tasks, tags] = await Promise.all([
         api.statusesList(boardId),
         api.tasksList(boardId),
+        api.tagsList(boardId),
       ]);
       if (epoch !== boardEpoch) return false; // 追い越されたので破棄する(boardLoadingは触らない)
       set({
         currentBoardId: boardId,
         statuses,
         tasks,
+        tags,
         selectedTaskId: null,
         searchQuery: "",
         view: "board",
@@ -174,10 +185,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   setSearchQuery(q) {
-    const { tasks, selectedTaskId } = get();
+    const { tasks, tags, selectedTaskId } = get();
     // 絞り込みの結果、選択中のカードが表示対象から外れたら選択を解除して検索バーへ戻す
     const stillVisible =
-      selectedTaskId !== null && filterTasks(tasks, q).some((t) => t.id === selectedTaskId);
+      selectedTaskId !== null && filterTasks(tasks, q, tags).some((t) => t.id === selectedTaskId);
     set({ searchQuery: q, selectedTaskId: stillVisible ? selectedTaskId : null });
   },
 
@@ -333,13 +344,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   async deleteSelectedTask() {
     if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
-    const { tasks, statuses, selectedTaskId, searchQuery, currentBoardId } = get();
+    const { tasks, statuses, tags, selectedTaskId, searchQuery, currentBoardId } = get();
     if (selectedTaskId === null) return;
     const target = tasks.find((t) => t.id === selectedTaskId);
     if (target === undefined) return;
 
     // 見えているカードの並びを基準に、次に選ぶカードを決める
-    const lanes = buildLanes(statuses, filterTasks(tasks, searchQuery));
+    const lanes = buildLanes(statuses, filterTasks(tasks, searchQuery, tags));
     const nextSelected = selectionAfterDelete(lanes, selectedTaskId);
 
     const snapshot = tasks;
@@ -408,5 +419,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
       if (epoch !== boardEpoch) return;
       toast.error(`タイトルの保存に失敗しました: ${String(e)}`);
     }
+  },
+
+  openTagPalette() {
+    // 対象タスクが無いときは無反応(トーストも出さない)
+    if (get().selectedTaskId === null) return;
+    set({ tagPaletteOpen: true });
+  },
+
+  closeTagPalette() {
+    set({ tagPaletteOpen: false });
   },
 }));

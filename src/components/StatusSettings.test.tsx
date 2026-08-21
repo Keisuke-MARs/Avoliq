@@ -15,6 +15,7 @@ vi.mock("../lib/api", () => ({
   // 直接呼ぶために必要。StatusSettings自体はこれらを使わない。
   statusesList: vi.fn(),
   tasksList: vi.fn(),
+  tagsList: vi.fn(),
 }));
 
 const statuses: Status[] = [
@@ -47,6 +48,7 @@ describe("StatusSettings", () => {
     vi.mocked(api.statusReorder).mockReset();
     vi.mocked(api.statusesList).mockReset();
     vi.mocked(api.tasksList).mockReset();
+    vi.mocked(api.tagsList).mockReset();
     selectBoard.mockClear();
     useAppStore.setState({
       boards: [{ id: "b1", name: "メイン", position: 0 }],
@@ -179,6 +181,7 @@ describe("StatusSettings", () => {
     vi.mocked(api.statusUpdate).mockReturnValue(updatePromise);
     vi.mocked(api.statusesList).mockResolvedValue([]);
     vi.mocked(api.tasksList).mockResolvedValue([]);
+    vi.mocked(api.tagsList).mockResolvedValue([]);
 
     const user = userEvent.setup();
     render(<StatusSettings />);
@@ -220,6 +223,7 @@ describe("StatusSettings", () => {
     vi.mocked(api.statusCreate).mockResolvedValue(created);
     vi.mocked(api.statusesList).mockResolvedValue([...statuses, created]);
     vi.mocked(api.tasksList).mockResolvedValue([]);
+    vi.mocked(api.tagsList).mockResolvedValue([]);
 
     const user = userEvent.setup();
     render(<StatusSettings />);
