@@ -45,13 +45,16 @@ describe("TaskCard のタグ表示", () => {
     expect(screen.getByTestId("task-card-tags").children).toHaveLength(1);
   });
 
-  it("選択中カードではタグ色を捨てて白系の配色になる", () => {
+  it("選択中カードでもタグ配色は変わらない(回帰テスト: 白文字にすると淡い選択面に溶けて読めない)", () => {
     const task = makeTask("t-w", "st-todo", "タスク", 0, ["tag-bug"]);
 
     render(<TaskCard task={task} statusColor="#007AFF" selected />);
 
-    const chip = screen.getByText("バグ");
-    expect(chip).toHaveStyle({ color: "#fff" });
+    // tag-bug は #7EA9E8。ライトモードの通常配色と完全に同じであること
+    expect(screen.getByText("バグ")).toHaveStyle({
+      backgroundColor: "#7EA9E838",
+      color: "#4A7CC4",
+    });
   });
 
   it("タグを改名すると測定のやり直しキーが変わる(回帰テスト: idだけでなく名前もキーに含めること)", () => {

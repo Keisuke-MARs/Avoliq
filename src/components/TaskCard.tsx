@@ -79,7 +79,7 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
             <span
               key={tag.id}
               className="rounded-[5px] px-[5px] text-[9.5px] leading-[14px]"
-              style={tagChipStyle(tag.color, selected, isDark)}
+              style={tagChipStyle(tag.color, isDark)}
             >
               {tag.name}
             </span>
@@ -88,11 +88,8 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
             <span
               data-testid="task-card-tags-more"
               className="rounded-[5px] px-[5px] text-[9.5px] leading-[14px]"
-              style={
-                selected
-                  ? { backgroundColor: "rgba(255,255,255,0.22)", color: "#fff" }
-                  : { backgroundColor: "var(--av-tag-bg)", color: "var(--av-tag-fg)" }
-              }
+              // タグ本体と同じく、選択中かどうかでは配色を変えない
+              style={{ backgroundColor: "var(--av-tag-bg)", color: "var(--av-tag-fg)" }}
             >
               +{hidden}
             </span>

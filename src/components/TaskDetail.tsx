@@ -253,8 +253,7 @@ export function TaskDetail({ isDark }: TaskDetailProps) {
             <span
               key={tag.id}
               className="rounded-[5px] px-1.5 py-0.5 text-[11px]"
-              // 詳細画面はステータス色のベタ塗りが無いので常に通常配色（第2引数はfalse）
-              style={tagChipStyle(tag.color, false, isDark)}
+              style={tagChipStyle(tag.color, isDark)}
             >
               {tag.name}
             </span>

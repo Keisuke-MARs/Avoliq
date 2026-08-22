@@ -21,17 +21,14 @@ export interface ChipStyle {
 }
 
 /**
- * タグチップの配色を返す。
+ * タグチップの配色を返す。選択中かどうかでは変えない。
+ * かつては選択中カードがステータス色のベタ塗りだったため白文字へ切り替えていたが、
+ * 現在の選択表示は accent の淡い面（.av-card[data-selected="true"]）なので、
+ * 白文字にすると淡面に溶けて読めなくなる。選択の合図はリング・淡面・太字が担う。
  * @param hex タグの色（'#RRGGBB'）
- * @param onStatus 選択中カード（ステータス色のベタ塗り）の上に載せるか
  * @param dark ダークモードか
  */
-export function tagChipStyle(hex: string, onStatus: boolean, dark: boolean): ChipStyle {
-  // 選択中カードはステータス色で全面が塗られる。どんなタグ色を載せても濁るので、
-  // ここだけはタグ色を捨てて白の不透明度に一本化する。
-  if (onStatus) {
-    return { backgroundColor: "rgba(255,255,255,0.22)", color: "#fff" };
-  }
+export function tagChipStyle(hex: string, dark: boolean): ChipStyle {
   // 末尾2桁は8bitのアルファ。38 ≒ 22% / 2E ≒ 18%
   if (dark) {
     return { backgroundColor: `${hex}2E`, color: hex };
