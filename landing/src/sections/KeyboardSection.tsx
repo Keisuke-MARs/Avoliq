@@ -1,8 +1,11 @@
+/**
+ * Keyboard セクションの表示を2つに分けている。
+ * 見出し（KeyboardHeading）はテキスト層、キーキャップ列（KeycapRow）は3行目に置くため、
+ * ステージのグリッドで属する行が違う。だからコンポーネントも分けている。
+ */
 import { Keycap } from "../components/Keycap";
+import { KEYS } from "../lib/keyboardKeys";
 import { layerPointerEvents } from "../lib/motion";
-
-/** 実演で光らせるキー。数は motion.ts の DEMO_KEY_COUNT と一致させること（テストで縛っている） */
-export const KEYS = ["↓", "↓", "⌘K", "⌘→"];
 
 export function KeyboardHeading({ opacity }: { opacity: number }) {
   return (
@@ -33,6 +36,8 @@ export function KeycapRow({
   litKey: number;
 }) {
   return (
+    // リンクやクリック対象を含まない（キーキャップは表示のみ）ので、
+    // Statement / KeyboardHeading と違って pointer-events の制御は不要。
     <div className="flex flex-wrap justify-center gap-2" style={{ opacity }}>
       {KEYS.map((k, i) => (
         <Keycap key={`${k}-${i}`} label={k} lit={litKey === i} />

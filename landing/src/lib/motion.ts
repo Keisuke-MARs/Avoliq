@@ -5,6 +5,8 @@
  * 設計書: docs/superpowers/specs/2026-08-23-avoliq-landing-page-design.md
  */
 
+import { KEYS } from "./keyboardKeys";
+
 export function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
@@ -101,8 +103,8 @@ export function layerPointerEvents(opacity: number): "none" | "auto" {
   return opacity < 0.5 ? "none" : "auto";
 }
 
-/** 実演で光らせるキーの数。KeyboardSection の KEYS 配列と一致させること */
-export const DEMO_KEY_COUNT = 4;
+/** 実演で光らせるキーの数。KEYS（keyboardKeys.ts）から導出するので、ズレようがない */
+export const DEMO_KEY_COUNT = KEYS.length;
 
 export interface DemoState {
   /** 光っているキーの添字。光っていなければ -1 */
