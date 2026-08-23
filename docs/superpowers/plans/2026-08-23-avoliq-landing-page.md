@@ -1162,14 +1162,23 @@ git commit -m "feat: ヒーローとスクロール連動のステージを実�
 
 ## Task 6: Statement と Keyboard を同じステージに載せる
 
+ステージは Task 5 で CSS グリッドの3行（テキスト層 / パレット層 / キーキャップ層）になっている。
+Statement と Keyboard の見出しは**テキスト層に Hero と並べて重ね**、キーキャップは**3行目**に置く。
+絶対配置は使わない。重なりは行が分かれていることで構造的に防ぐ。
+
+そのため Keyboard は「見出し」と「キーキャップ列」の2つのコンポーネントに分ける。
+
 **Files:**
 - Create: `landing/src/sections/Statement.tsx`
 - Create: `landing/src/sections/KeyboardSection.tsx`
+- Create: `landing/src/sections/KeyboardSection.test.ts`
 - Modify: `landing/src/sections/StickyStage.tsx`
 
 - [ ] **Step 1: `landing/src/sections/Statement.tsx` を作る**
 
 ```tsx
+import { layerPointerEvents } from "../lib/motion";
+
 interface StatementProps {
   opacity: number;
   y: number;
@@ -1178,8 +1187,12 @@ interface StatementProps {
 export function Statement({ opacity, y }: StatementProps) {
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-[26vh] px-6 text-center"
-      style={{ opacity, transform: `translateY(${y}px)` }}
+      className="w-full text-center"
+      style={{
+        opacity,
+        transform: `translateY(${y}px)`,
+        pointerEvents: layerPointerEvents(opacity),
+      }}
     >
       <h2 className="mx-auto max-w-[40rem] text-[clamp(1.75rem,5vw,2.5rem)] font-semibold leading-[1.4] tracking-[-0.03em]">
         タスクを増やさない。
@@ -1198,60 +1211,106 @@ export function Statement({ opacity, y }: StatementProps) {
 
 - [ ] **Step 2: `landing/src/sections/KeyboardSection.tsx` を作る**
 
+見出しはテキスト層に、キーキャップ列は3行目に置くので、2つのコンポーネントに分ける。
+`KEYS` は `DEMO_KEY_COUNT` と数を一致させる必要があるので export し、テストで縛る。
+
 ```tsx
 import { Keycap } from "../components/Keycap";
+import { layerPointerEvents } from "../lib/motion";
 
-const KEYS = ["↓", "↓", "⌘K", "⌘→"];
+/** 実演で光らせるキー。数は motion.ts の DEMO_KEY_COUNT と一致させること（テストで縛っている） */
+export const KEYS = ["↓", "↓", "⌘K", "⌘→"];
 
-interface KeyboardSectionProps {
-  opacity: number;
-  litKey: number;
+export function KeyboardHeading({ opacity }: { opacity: number }) {
+  return (
+    <div
+      className="w-full text-center"
+      style={{ opacity, pointerEvents: layerPointerEvents(opacity) }}
+    >
+      <div className="text-[11px] uppercase tracking-[0.14em] text-av-azure">
+        Keyboard
+      </div>
+      <h2 className="mt-3 text-[clamp(1.6rem,4.4vw,2.25rem)] font-semibold tracking-[-0.03em]">
+        手は、ホームポジションから離れない。
+      </h2>
+      <p className="mx-auto mt-3.5 max-w-[33rem] text-sm leading-[1.9] text-av-body">
+        矢印で選び、⌘K でタグを付け、⌘→ で次のステータスへ。
+        <br className="hidden sm:inline" />
+        マウスに持ち替える瞬間が、そもそも要りません。
+      </p>
+    </div>
+  );
 }
 
-export function KeyboardSection({ opacity, litKey }: KeyboardSectionProps) {
+export function KeycapRow({
+  opacity,
+  litKey,
+}: {
+  opacity: number;
+  litKey: number;
+}) {
   return (
-    <div className="pointer-events-none absolute inset-0" style={{ opacity }}>
-      <div className="absolute inset-x-0 top-[10vh] px-6 text-center">
-        <div className="text-[11px] uppercase tracking-[0.14em] text-av-azure">
-          Keyboard
-        </div>
-        <h2 className="mt-3 text-[clamp(1.6rem,4.4vw,2.25rem)] font-semibold tracking-[-0.03em]">
-          手は、ホームポジションから離れない。
-        </h2>
-        <p className="mx-auto mt-3.5 max-w-[33rem] text-sm leading-[1.9] text-av-body">
-          矢印で選び、⌘K でタグを付け、⌘→ で次のステータスへ。
-          <br className="hidden sm:inline" />
-          マウスに持ち替える瞬間が、そもそも要りません。
-        </p>
-      </div>
-
-      <div className="absolute inset-x-0 bottom-[10vh] flex justify-center gap-2">
-        {KEYS.map((k, i) => (
-          <Keycap key={`${k}-${i}`} label={k} lit={litKey === i} />
-        ))}
-      </div>
+    <div className="flex flex-wrap justify-center gap-2" style={{ opacity }}>
+      {KEYS.map((k, i) => (
+        <Keycap key={`${k}-${i}`} label={k} lit={litKey === i} />
+      ))}
     </div>
   );
 }
 ```
 
-- [ ] **Step 3: `StickyStage.tsx` に2つを差し込む**
+- [ ] **Step 3: キー数の一致をテストで縛る**
 
-`import { Hero } from "./Hero";` の下に次を足す。
+`landing/src/sections/KeyboardSection.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { DEMO_KEY_COUNT } from "../lib/motion";
+import { KEYS } from "./KeyboardSection";
+
+describe("KeyboardSection", () => {
+  it("キーの数が実演のタイムラインと一致している", () => {
+    // 片方だけ増減すると、最後のキーが永遠に光らない等の静かな不具合になる
+    expect(KEYS.length).toBe(DEMO_KEY_COUNT);
+  });
+});
+```
+
+- [ ] **Step 4: `StickyStage.tsx` に差し込む**
+
+import を足す。
 
 ```tsx
-import { KeyboardSection } from "./KeyboardSection";
+import { KeyboardHeading, KeycapRow } from "./KeyboardSection";
 import { Statement } from "./Statement";
 ```
 
-`<Hero ... />` の直後に次を足す。
+テキスト層（`[&>*]:col-start-1 [&>*]:row-start-1` を持つ div）の中、`av-intro-hero` のラッパーの
+**直後**に2つを足す。登場演出は Hero だけに掛かればよいので、Statement と見出しはラッパーの外に置く。
 
 ```tsx
-        <Statement opacity={s.statement.opacity} y={s.statement.y} />
-        <KeyboardSection opacity={s.keyboard.opacity} litKey={demo.litKey} />
+            <Statement opacity={s.statement.opacity} y={s.statement.y} />
+            <KeyboardHeading opacity={s.keyboard.opacity} />
 ```
 
-- [ ] **Step 4: ブラウザで通しで確認する**
+3行目の空の `<div />` を差し替える。
+
+```tsx
+          {/* キーキャップ層 */}
+          <KeycapRow opacity={s.keyboard.opacity} litKey={demo.litKey} />
+```
+
+テキスト層のコメントから「このタスクでは Hero のみ」の記述を消す。
+
+- [ ] **Step 5: テストが通ることを確認する**
+
+```bash
+cd landing && npm test
+```
+
+期待する結果: 28件（既存27件＋キー数の1件）が PASS。
+
+- [ ] **Step 6: ブラウザで通しで確認する**
 
 ```bash
 cd landing && npm run dev
@@ -1259,12 +1318,12 @@ cd landing && npm run dev
 
 `http://localhost:5173/Avoliq/` をゆっくりスクロールし、次の順で起きることを確認する。
 
-1. パレットが開く
+1. 読み込み直後に Hero とパレットが見えている（登場演出が再生される）
 2. Hero が上へ抜け、パレットが縮んで背景へ退き、Statement が出る
 3. Statement が消え、パレットが拡大して前へ出て、Keyboard の見出しとキーが出る
-4. キーが順に光り、選択枠が移動し、タグが付き、カードが右のレーンへ移る
+4. キーが順に光り、選択枠が移動し、タグが付き、カードが隣のレーンへ挿入される
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 7: コミット**
 
 ```bash
 cd /Users/kei06/dev/Avoliq
