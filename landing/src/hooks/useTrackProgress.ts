@@ -5,6 +5,10 @@ import { trackProgress } from "../lib/motion";
  * 対象要素（sticky トラック）のスクロール進捗 0→1 を返す。
  * disabled が true のときは計算せず、常に終端の 1 を返す。
  * これは動き低減時に「最終状態で静止させる」ための逃げ道になっている。
+ *
+ * 呼び出し側は identity の安定した ref（useRef の戻り値）を渡すこと。
+ * インラインで毎レンダー生成した ref を渡すと、依存配列 [ref, disabled] により
+ * レンダーのたびに effect が再実行され、リスナーの登録・解除が走ってしまう。
  */
 export function useTrackProgress(
   ref: RefObject<HTMLElement | null>,

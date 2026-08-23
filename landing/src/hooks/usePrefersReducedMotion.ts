@@ -11,6 +11,8 @@ export function usePrefersReducedMotion(): boolean {
 
   useEffect(() => {
     const mql = window.matchMedia(QUERY);
+    // マウント時点の値がstateの初期値とズレている可能性があるので取り直す
+    setReduced(mql.matches);
     const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
