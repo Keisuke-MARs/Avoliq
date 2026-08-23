@@ -1007,8 +1007,15 @@ interface HeroProps {
 export function Hero({ opacity, y }: HeroProps) {
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-[14vh] px-6 text-center"
-      style={{ opacity, transform: `translateY(${y}px)` }}
+      className="w-full px-6 text-center"
+      style={{
+        opacity,
+        transform: `translateY(${y}px)`,
+        // opacity が薄い（=実質見えていない）ときはリンクの当たり判定も消す。
+        // テキスト層は Hero / Statement / Keyboard を同じセルに重ねてクロスフェードさせる構造なので、
+        // pointer-events を CSS クラスの固定値にすると、見えなくなった後もボタンだけ押せてしまう。
+        pointerEvents: opacity < 0.5 ? "none" : "auto",
+      }}
     >
       <div className="text-[11px] uppercase tracking-[0.14em] text-av-azure">
         for macOS
@@ -1024,7 +1031,7 @@ export function Hero({ opacity, y }: HeroProps) {
         <br className="hidden sm:inline" />
         用が済んだら Esc で消える。
       </p>
-      <div className="pointer-events-auto mt-7 flex justify-center gap-2.5">
+      <div className="mt-7 flex justify-center gap-2.5">
         <a
           href="https://github.com/Keisuke-MARs/Avoliq"
           className="rounded-full bg-av-blue px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-85"
@@ -1064,7 +1071,7 @@ export function StickyStage() {
 
   return (
     <div ref={trackRef} className="relative h-[400vh]">
-      <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
+      <div className="sticky top-0 h-screen overflow-hidden">
         {/* 背後の発光 */}
         <div
           aria-hidden
@@ -1076,18 +1083,33 @@ export function StickyStage() {
           }}
         />
 
-        <div
-          style={{
-            opacity: s.palette.opacity,
-            filter: `blur(${s.palette.blur}px)`,
-            transform: `translateY(${s.palette.y}px) scale(${s.palette.scale})`,
-            willChange: "transform, opacity, filter",
-          }}
-        >
-          <PaletteMock demo={demo} />
-        </div>
+        {/*
+          重なりを数値（top-[14vh] 等）で個別に避けるのではなく、グリッドの行を分けることで
+          構造的に起きないようにする。ビューポートの高さが変わっても、行が分かれている限り
+          テキスト層とパレット層は絶対に重ならない。
+        */}
+        <div className="absolute inset-0 grid grid-rows-[auto_auto_auto] content-center justify-items-center gap-y-10 px-6">
+          {/* テキスト層: Hero / Statement / Keyboard の見出しを同じセルに重ねてクロスフェードさせる。
+              このタスクでは Hero のみ */}
+          <div className="grid w-full [&>*]:col-start-1 [&>*]:row-start-1">
+            <Hero opacity={s.hero.opacity} y={s.hero.y} />
+          </div>
 
-        <Hero opacity={s.hero.opacity} y={s.hero.y} />
+          {/* パレット層 */}
+          <div
+            style={{
+              opacity: s.palette.opacity,
+              filter: `blur(${s.palette.blur}px)`,
+              transform: `translateY(${s.palette.y}px) scale(${s.palette.scale})`,
+              willChange: "transform, opacity, filter",
+            }}
+          >
+            <PaletteMock demo={demo} />
+          </div>
+
+          {/* キーキャップ層: Task 6 で Keyboard セクションが使う。いまは空 */}
+          <div />
+        </div>
       </div>
     </div>
   );
