@@ -60,7 +60,9 @@ export function StickyStage() {
               style={{
                 opacity: s.palette.opacity,
                 filter: `blur(${s.palette.blur}px)`,
-                transform: `translateY(${s.palette.y}px) scale(${s.palette.scale})`,
+                // scale だけにする。translate はグリッドの行分けによる重なり防止を
+                // 突き破ってしまうため使わない（詳細は motion.ts のコメント参照）。
+                transform: `scale(${s.palette.scale})`,
                 // このページではパレットは常時アニメーションする唯一の要素であり、
                 // 使い回すコンポーネントでもないため、常時 willChange を付けたままにしている。
                 willChange: "transform, opacity, filter",

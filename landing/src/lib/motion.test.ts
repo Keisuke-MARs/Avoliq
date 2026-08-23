@@ -115,13 +115,25 @@ describe("stageState", () => {
     }
   });
 
-  it("パレットは先頭で中央にあり、Statement区間で下へ退き、Keyboard区間で戻る", () => {
-    // 開く演出は CSS の登場演出が担うので、スクロール前は中央（オフセットなし）
-    expect(stageState(0).palette.y).toBe(0);
-    // Statement 区間では下へ退く
-    expect(stageState(0.3).palette.y).toBeGreaterThan(0);
-    // Keyboard 区間では上へ戻る（退いた位置より小さくなる）
-    expect(stageState(0.48).palette.y).toBeLessThan(stageState(0.3).palette.y);
+  it("パレットは先頭で等倍、Statement区間で縮み、Keyboard区間で拡大して戻る", () => {
+    // 開く演出は CSS の登場演出が担うので、スクロール前は等倍（scale=1）
+    expect(stageState(0).palette.scale).toBeCloseTo(1, 5);
+    // Statement 区間（back=1, fore=0）では 0.7 倍に縮む
+    expect(stageState(0.3).palette.scale).toBeCloseTo(0.7, 5);
+    // Keyboard 区間（back=1, fore=1）では 0.938 倍まで拡大して戻る
+    // （Statement 区間より大きいが、初期の等倍は超えない）
+    expect(stageState(0.48).palette.scale).toBeCloseTo(0.938, 5);
+    expect(stageState(0.48).palette.scale).toBeGreaterThan(
+      stageState(0.3).palette.scale,
+    );
+  });
+
+  it("パレットのスケールは1を超えない", () => {
+    // scale が 1 以下である限り、パレットは自分のレイアウト枠からはみ出せない。
+    // これがグリッドの行分けによる重なり防止が破られない根拠になっている。
+    for (let p = 0; p <= 1.0001; p += 0.01) {
+      expect(stageState(p).palette.scale).toBeLessThanOrEqual(1);
+    }
   });
 
   it("Heroのテキストは開いた直後は動いておらず、上へ抜ける区間で負の値になる", () => {

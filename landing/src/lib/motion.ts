@@ -31,8 +31,6 @@ export function trackProgress(
 }
 
 export interface PaletteStyle {
-  /** px。下方向が正 */
-  y: number;
   scale: number;
   /** px */
   blur: number;
@@ -57,8 +55,14 @@ export function stageState(p: number): StageState {
   const fore = range(p, 0.36, 0.48);
 
   return {
+    // パレットの動きは scale / opacity / blur だけにする。translate を掛けると
+    // グリッドの行分けによる重なり防止を突き破れてしまうため。scale は 1 以下であれば
+    // 中心に縮むだけなので、自分のレイアウト枠から出ることがない。
+    // （以前は y（translateY）も持たせていたが、それは絶対配置だった頃に
+    // 「テキストと重ならないよう避ける」ために入れた名残で、いまはグリッドが
+    // 分離を保証しているので役目が終わっている。実測で back プラトー区間
+    // （p=0.30〜0.36）にキーキャップ層とのオーバーラップが起きたため撤去した）
     palette: {
-      y: 70 * back - 64 * fore,
       scale: (1 - 0.3 * back) * (1 + 0.34 * fore),
       blur: back * (1 - fore) * 3,
       opacity: clamp(1 - 0.45 * back * (1 - fore), 0, 1),
