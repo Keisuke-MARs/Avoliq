@@ -13,7 +13,11 @@ export function Shot({ src, alt }: ShotProps) {
         alt={alt}
         loading="lazy"
         decoding="async"
-        className="block w-full"
+        // 実画像は1600x1120。遅延読み込みが発火する前にブラウザへ比率を伝え、
+        // レイアウトシフト（下のセクションがガクッとずれる現象）を防ぐ。
+        width={1600}
+        height={1120}
+        className="block h-auto w-full"
       />
     </div>
   );
