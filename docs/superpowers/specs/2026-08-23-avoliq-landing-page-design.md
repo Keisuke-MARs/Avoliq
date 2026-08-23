@@ -191,7 +191,13 @@ LP は背景が暗い側に固定されているため、同じ色でも比が�
 ### そのほか
 
 - 絵文字は使わない
-- ロゴは `design/avoliq-logo.png` を `landing/public/` へコピーして使う
+- ロゴは**アイコンとワードマークを分けて扱う**。
+  `design/avoliq-logo.png` は黒文字のワードマークで、暗背景のフッターでは読めない。
+  `invert` を当てるとワードマークは読めるようになるが、今度はアイコン側が潰れる。
+  1枚の画像で両方を解決するのは無理なので、
+  **アイコンは `design/avoliq-app-icon.png` を使い、「Avoliq」の文字は HTML のテキストで描く**。
+  コントラストの問題が根本から消え、文字がラスター画像より鮮明になり、LP のタイポグラフィとも揃う。
+  配信するアイコンは表示サイズに合わせて縮小する（原寸 1024px を配るのは無駄）
 
 ## 5. モーション設計
 
@@ -332,7 +338,9 @@ landing/
   vite.config.ts
   tsconfig.json
   public/
-    avoliq-logo.png
+    avoliq-app-icon.png     # フッターのアイコン（表示サイズに合わせて縮小）
+    favicon.png
+    ogp.png
     shots/                  # スクリーンショット
   src/
     main.tsx
