@@ -6,6 +6,9 @@ interface KeycapProps {
 export function Keycap({ label, lit }: KeycapProps) {
   return (
     <span
+      // キーの内容（矢印・⌘K・⌘→ 等）は Keyboard セクションの本文が説明する視覚的な言い換えなので、
+      // スクリーンリーダーの読み上げ対象からは外す。
+      aria-hidden="true"
       className={[
         // Tailwind v4 では -translate-y-0.5 は transform ではなくネイティブの CSS translate
         // プロパティを出力する。transition の対象には transform ではなく translate を指定する。
