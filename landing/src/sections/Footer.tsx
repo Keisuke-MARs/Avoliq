@@ -33,12 +33,20 @@ export function Footer() {
         </Reveal>
 
         <div className="mt-24 flex flex-col items-center gap-4 border-t border-white/10 pt-10">
-          <img
-            src={`${import.meta.env.BASE_URL}avoliq-logo.png`}
-            alt="Avoliq"
-            width={132}
-            className="opacity-70"
-          />
+          {/* 元のワードマーク画像は黒文字のため暗背景のフッターでは読めない。
+              アイコンはそのまま画像を使い、「Avoliq」はHTMLテキストで描くことで
+              コントラストの問題を画像側の加工に頼らず根本から避ける */}
+          <div className="flex items-center gap-3 opacity-70">
+            <img
+              src={`${import.meta.env.BASE_URL}avoliq-app-icon.png`}
+              alt=""
+              width={36}
+              height={36}
+            />
+            <span className="text-xl font-semibold tracking-[-0.02em] text-av-ink">
+              Avoliq
+            </span>
+          </div>
           <p className="text-xs text-av-muted">
             Avoliq — 直感的に、自然に思考を整え、次へ進める。
           </p>
