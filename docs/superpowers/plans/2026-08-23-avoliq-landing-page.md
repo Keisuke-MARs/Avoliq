@@ -2115,11 +2115,21 @@ git commit -m "feat: 技術仕様セクションを追加"
 - Modify: `landing/src/App.tsx`
 - Create: `landing/public/avoliq-logo.png`（本体からコピー）
 
-- [ ] **Step 1: ロゴをコピーする**
+- [ ] **Step 1: アイコンをコピーする**
+
+`design/avoliq-logo.png` は**黒文字のワードマーク**なので、暗背景のフッターでは読めない。
+`invert` を当てるとワードマークは読めるようになるが、今度はアイコン側（グレーの角丸タイルに
+明るいバー）が潰れる。1枚の画像で両方を解決するのは無理なので、**分ける**。
+
+- アイコンは `design/avoliq-app-icon.png` をそのまま使う（暗背景で見える）
+- 「Avoliq」の文字は画像ではなく **HTML のテキスト**として描く
+
+こうするとコントラストの問題が根本から消え、文字がラスター画像より鮮明になり、
+LP のタイポグラフィとも揃う。
 
 ```bash
 cd /Users/kei06/dev/Avoliq
-cp design/avoliq-logo.png landing/public/avoliq-logo.png
+cp design/avoliq-app-icon.png landing/public/avoliq-app-icon.png
 ```
 
 - [ ] **Step 2: `landing/src/sections/Footer.tsx` を作る**
@@ -2160,12 +2170,20 @@ export function Footer() {
         </Reveal>
 
         <div className="mt-24 flex flex-col items-center gap-4 border-t border-white/10 pt-10">
-          <img
-            src={`${import.meta.env.BASE_URL}avoliq-logo.png`}
-            alt="Avoliq"
-            width={132}
-            className="opacity-70"
-          />
+          {/* ワードマークは画像ではなくテキストで描く。画像は黒文字で暗背景に載らないうえ、
+              テキストのほうが鮮明で、LP のタイポグラフィとも揃うため */}
+          <div className="flex items-center gap-3 opacity-80">
+            <img
+              src={`${import.meta.env.BASE_URL}avoliq-app-icon.png`}
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9"
+            />
+            <span className="text-lg font-semibold tracking-[-0.02em]">
+              Avoliq
+            </span>
+          </div>
           <p className="text-xs text-av-muted">
             Avoliq — 直感的に、自然に思考を整え、次へ進める。
           </p>
@@ -2204,14 +2222,10 @@ export default function App() {
 }
 ```
 
-- [ ] **Step 4: ロゴが暗背景で見えることを確認する**
+- [ ] **Step 4: アイコンの角が四角い枠として見えないことを確認する**
 
-`design/avoliq-logo.png` は黒文字なので、暗背景では読めない可能性がある。
-読めない場合は、ロゴのアイコン部分だけを使うか、`invert` を当てる。
-
-```tsx
-            className="opacity-70 invert"
-```
+アイコン画像の四隅が透明ではなく塗られている場合、背景色との差で四角い枠が見えてしまう。
+拡大したスクリーンショットで確認する。
 
 - [ ] **Step 5: ビルドが通ることを確認する**
 
