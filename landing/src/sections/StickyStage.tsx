@@ -14,7 +14,7 @@ export function StickyStage() {
 
   return (
     <div ref={trackRef} className="relative h-[400vh]">
-      <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
+      <div className="sticky top-0 h-screen overflow-hidden">
         {/* 背後の発光 */}
         <div
           aria-hidden
@@ -26,18 +26,33 @@ export function StickyStage() {
           }}
         />
 
-        <div
-          style={{
-            opacity: s.palette.opacity,
-            filter: `blur(${s.palette.blur}px)`,
-            transform: `translateY(${s.palette.y}px) scale(${s.palette.scale})`,
-            willChange: "transform, opacity, filter",
-          }}
-        >
-          <PaletteMock demo={demo} />
-        </div>
+        {/*
+          重なりを数値（top-[14vh] 等）で個別に避けるのではなく、グリッドの行を分けることで
+          構造的に起きないようにする。ビューポートの高さが変わっても、行が分かれている限り
+          テキスト層とパレット層は絶対に重ならない。
+        */}
+        <div className="absolute inset-0 grid grid-rows-[auto_auto_auto] content-center justify-items-center gap-y-10 px-6">
+          {/* テキスト層: Hero / Statement / Keyboard の見出しを同じセルに重ねてクロスフェードさせる。
+              このタスクでは Hero のみ */}
+          <div className="grid w-full [&>*]:col-start-1 [&>*]:row-start-1">
+            <Hero opacity={s.hero.opacity} y={s.hero.y} />
+          </div>
 
-        <Hero opacity={s.hero.opacity} y={s.hero.y} />
+          {/* パレット層 */}
+          <div
+            style={{
+              opacity: s.palette.opacity,
+              filter: `blur(${s.palette.blur}px)`,
+              transform: `translateY(${s.palette.y}px) scale(${s.palette.scale})`,
+              willChange: "transform, opacity, filter",
+            }}
+          >
+            <PaletteMock demo={demo} />
+          </div>
+
+          {/* キーキャップ層: Task 6 で Keyboard セクションが使う。いまは空 */}
+          <div />
+        </div>
       </div>
     </div>
   );
