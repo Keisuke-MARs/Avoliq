@@ -17,6 +17,7 @@ const FACTS = [
 
 export function FeatureLocal() {
   return (
+    // py-32: ここでページのリズムを一段変える帯として、前後のセクション（py-28）より余白を広く取っている
     <section className="relative overflow-hidden bg-av-deep px-6 py-32">
       <div
         aria-hidden
@@ -51,7 +52,9 @@ export function FeatureLocal() {
                 className="rounded-2xl border border-white/10 bg-av-surface/70 px-5 py-6 text-left"
               >
                 <dt className="text-sm font-semibold">{f.head}</dt>
-                <dd className="mt-2 break-all text-xs leading-[1.8] text-av-body">
+                {/* break-all は禁則処理を無視して任意の文字位置で強制改行するため日本語の文章が不自然に折れる。
+                    break-words（overflow-wrap: break-word）なら、はみ出す長い語（DBパス）だけを折り返せる */}
+                <dd className="mt-2 break-words text-xs leading-[1.8] text-av-body">
                   {f.body}
                 </dd>
               </div>
