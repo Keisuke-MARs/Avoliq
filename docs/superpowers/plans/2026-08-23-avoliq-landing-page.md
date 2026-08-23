@@ -2113,7 +2113,8 @@ git commit -m "feat: 技術仕様セクションを追加"
 **Files:**
 - Create: `landing/src/sections/Footer.tsx`
 - Modify: `landing/src/App.tsx`
-- Create: `landing/public/avoliq-logo.png`（本体からコピー）
+- Create: `landing/public/avoliq-app-icon.png`（`design/` からコピー）
+- Delete: `landing/public/avoliq-logo.png`（黒文字のワードマークは暗背景で読めないため使わない）
 
 - [ ] **Step 1: アイコンをコピーする**
 
@@ -2154,7 +2155,7 @@ export function Footer() {
       <div className="relative mx-auto max-w-[52rem] text-center">
         <Reveal>
           <h2 className="text-[clamp(1.7rem,4.6vw,2.5rem)] font-semibold leading-[1.4] tracking-[-0.03em]">
-            コードは、すべて公開しています。
+            判断の続きは、コードにあります。
           </h2>
           <p className="mx-auto mt-4 max-w-[32rem] text-sm leading-[1.95] text-av-body">
             ここに書いた判断が実際にどう実装されているかは、リポジトリで確かめられます。
@@ -2172,20 +2173,19 @@ export function Footer() {
         <div className="mt-24 flex flex-col items-center gap-4 border-t border-white/10 pt-10">
           {/* ワードマークは画像ではなくテキストで描く。画像は黒文字で暗背景に載らないうえ、
               テキストのほうが鮮明で、LP のタイポグラフィとも揃うため */}
-          <div className="flex items-center gap-3 opacity-80">
+          <div className="flex items-center gap-3 opacity-70">
             <img
               src={`${import.meta.env.BASE_URL}avoliq-app-icon.png`}
               alt=""
               width={36}
               height={36}
-              className="h-9 w-9"
             />
-            <span className="text-lg font-semibold tracking-[-0.02em]">
+            <span className="text-xl font-semibold tracking-[-0.02em] text-av-ink">
               Avoliq
             </span>
           </div>
           <p className="text-xs text-av-muted">
-            Avoliq — 直感的に、自然に思考を整え、次へ進める。
+            直感的に、自然に思考を整え、次へ進める。
           </p>
         </div>
       </div>
