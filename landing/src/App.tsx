@@ -1,3 +1,4 @@
+import { DesignNotes } from "./sections/DesignNotes";
 import { FeatureBoard } from "./sections/FeatureBoard";
 import { FeatureGrid } from "./sections/FeatureGrid";
 import { FeatureLocal } from "./sections/FeatureLocal";
@@ -12,6 +13,7 @@ export default function App() {
       <FeatureBoard />
       <FeatureLocal />
       <FeatureGrid />
+      <DesignNotes />
     </main>
   );
 }
