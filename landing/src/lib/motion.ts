@@ -50,26 +50,27 @@ export interface StageState {
 }
 
 export function stageState(p: number): StageState {
-  // 01 開く / 02 背景へ退く / 03 前へ出る
-  const open = range(p, 0.0, 0.1);
+  // 「開く」演出（ぼけ→鮮明、縮小→等倍）はマウント時に一度だけ再生する CSS アニメーション
+  // （index.css の intro キーフレーム）が担う。ここでは p=0 の時点で
+  // 「すでに開ききった状態」を返し、02 背景へ退く / 03 前へ出るの2区間だけを扱う。
   const back = range(p, 0.16, 0.3);
   const fore = range(p, 0.36, 0.48);
 
   return {
     palette: {
-      y: (24 - 24 * open) + 70 * back - 64 * fore,
-      scale: (0.92 + 0.08 * open) * (1 - 0.3 * back) * (1 + 0.34 * fore),
-      blur: (1 - open) * 12 + back * (1 - fore) * 3,
-      opacity: clamp(open * (1 - 0.45 * back * (1 - fore)), 0, 1),
+      y: 70 * back - 64 * fore,
+      scale: (1 - 0.3 * back) * (1 + 0.34 * fore),
+      blur: back * (1 - fore) * 3,
+      opacity: clamp(1 - 0.45 * back * (1 - fore), 0, 1),
     },
     glowOpacity: clamp(
-      0.35 + 0.35 * open + 0.3 * fore - 0.25 * back * (1 - fore),
+      0.7 + 0.3 * fore - 0.25 * back * (1 - fore),
       0,
       1,
     ),
     hero: {
       // 0.12-0.2: Heroテキストがフェードアウトする
-      opacity: clamp(open * (1 - range(p, 0.12, 0.2)), 0, 1),
+      opacity: clamp(1 - range(p, 0.12, 0.2), 0, 1),
       // 0.12-0.22: 上へ抜けていく移動。opacityが0になった後も少しだけ動き続けて余韻を残す
       y: -40 * range(p, 0.12, 0.22),
     },
@@ -86,6 +87,14 @@ export function stageState(p: number): StageState {
     },
     demo: range(p, 0.5, 0.92),
   };
+}
+
+/**
+ * 重ねたテキスト層のうち、実質見えていないものの当たり判定を消す。
+ * 消さないと、見えていないセクションのリンクが押せてしまう。
+ */
+export function layerPointerEvents(opacity: number): "none" | "auto" {
+  return opacity < 0.5 ? "none" : "auto";
 }
 
 /** 実演で光らせるキーの数。KeyboardSection の KEYS 配列と一致させること */

@@ -1,3 +1,5 @@
+import { layerPointerEvents } from "../lib/motion";
+
 interface HeroProps {
   opacity: number;
   y: number;
@@ -6,14 +8,14 @@ interface HeroProps {
 export function Hero({ opacity, y }: HeroProps) {
   return (
     <div
-      className="w-full px-6 text-center"
+      className="w-full text-center"
       style={{
         opacity,
         transform: `translateY(${y}px)`,
         // opacity が薄い（=実質見えていない）ときはリンクの当たり判定も消す。
         // テキスト層は Hero / Statement / Keyboard を同じセルに重ねてクロスフェードさせる構造なので、
         // pointer-events を CSS クラスの固定値にすると、見えなくなった後もボタンだけ押せてしまう。
-        pointerEvents: opacity < 0.5 ? "none" : "auto",
+        pointerEvents: layerPointerEvents(opacity),
       }}
     >
       <div className="text-[11px] uppercase tracking-[0.14em] text-av-azure">
@@ -30,7 +32,7 @@ export function Hero({ opacity, y }: HeroProps) {
         <br className="hidden sm:inline" />
         用が済んだら Esc で消える。
       </p>
-      <div className="mt-7 flex justify-center gap-2.5">
+      <div className="mt-7 flex flex-wrap justify-center gap-2.5">
         <a
           href="https://github.com/Keisuke-MARs/Avoliq"
           className="rounded-full bg-av-blue px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-85"

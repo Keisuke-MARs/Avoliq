@@ -3,6 +3,7 @@ import {
   clamp,
   demoState,
   DEMO_KEY_COUNT,
+  layerPointerEvents,
   range,
   stageState,
   trackProgress,
@@ -58,18 +59,17 @@ describe("trackProgress", () => {
 });
 
 describe("stageState", () => {
-  it("先頭ではパレットがぼけて縮んでいる", () => {
+  it("先頭ではパレットが開ききっている", () => {
     const s = stageState(0);
-    expect(s.palette.blur).toBeGreaterThan(6);
-    expect(s.palette.scale).toBeLessThan(1);
-    expect(s.palette.opacity).toBe(0);
-  });
-
-  it("開き終えた直後はぼけが取れて等倍になる", () => {
-    const s = stageState(0.12);
     expect(s.palette.blur).toBeCloseTo(0, 1);
     expect(s.palette.scale).toBeCloseTo(1, 2);
     expect(s.palette.opacity).toBeCloseTo(1, 2);
+  });
+
+  it("スクロールしていない状態でもHeroとパレットが見えている", () => {
+    const s = stageState(0);
+    expect(s.hero.opacity).toBe(1);
+    expect(s.palette.opacity).toBe(1);
   });
 
   it("Statement区間ではパレットが縮んで減光する", () => {
@@ -138,6 +138,13 @@ describe("stageState", () => {
     expect(stageState(0.2).statement.y).toBeGreaterThan(0);
     expect(stageState(0.26).statement.y).toBeCloseTo(0, 5);
     expect(stageState(0.5).statement.y).toBeCloseTo(0, 5);
+  });
+});
+
+describe("layerPointerEvents", () => {
+  it("しきい値0.5をまたいで当たり判定が切り替わる", () => {
+    expect(layerPointerEvents(0.49)).toBe("none");
+    expect(layerPointerEvents(0.5)).toBe("auto");
   });
 });
 

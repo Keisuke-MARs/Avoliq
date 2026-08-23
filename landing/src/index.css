@@ -16,6 +16,43 @@
 }
 
 @layer base {
+  /*
+   * Spotlight風の「開く」登場演出。スクロール進捗ではなく、ページに来た瞬間に
+   * 一度だけ再生する。スクロール由来の transform/opacity/filter は同じ要素の
+   * インラインstyleが毎フレーム上書きするため、必ず外側のラッパー要素に掛けること。
+   */
+  @keyframes av-intro-palette {
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+      filter: blur(12px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes av-intro-hero {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .av-intro-palette {
+    animation: av-intro-palette 850ms var(--ease-av) both;
+  }
+
+  .av-intro-hero {
+    animation: av-intro-hero 700ms var(--ease-av) 120ms both;
+  }
+
   html {
     color-scheme: dark;
     scroll-behavior: smooth;
@@ -43,6 +80,15 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+    }
+
+    /* 登場演出そのものを止め、最初から最終状態（見えている状態）で静止させる */
+    .av-intro-palette,
+    .av-intro-hero {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+      filter: none !important;
     }
   }
 }

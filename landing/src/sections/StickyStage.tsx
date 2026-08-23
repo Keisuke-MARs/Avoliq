@@ -35,19 +35,34 @@ export function StickyStage() {
           {/* テキスト層: Hero / Statement / Keyboard の見出しを同じセルに重ねてクロスフェードさせる。
               このタスクでは Hero のみ */}
           <div className="grid w-full [&>*]:col-start-1 [&>*]:row-start-1">
-            <Hero opacity={s.hero.opacity} y={s.hero.y} />
+            {/*
+              登場演出（av-intro-hero）とスクロール演出（Hero に渡す opacity/y の
+              インラインstyle）は別の要素に分ける。同じ要素に両方を掛けると、
+              インラインstyleが毎フレーム再設定されてCSSアニメーションと競合するため。
+            */}
+            <div className="av-intro-hero">
+              <Hero opacity={s.hero.opacity} y={s.hero.y} />
+            </div>
           </div>
 
-          {/* パレット層 */}
-          <div
-            style={{
-              opacity: s.palette.opacity,
-              filter: `blur(${s.palette.blur}px)`,
-              transform: `translateY(${s.palette.y}px) scale(${s.palette.scale})`,
-              willChange: "transform, opacity, filter",
-            }}
-          >
-            <PaletteMock demo={demo} />
+          {/* パレット層
+              外側の div（av-intro-palette）にマウント時一度きりの登場演出を掛け、
+              内側の div にスクロール由来の transform/opacity/filter を毎フレーム設定する。
+              同じ要素に両方を書くと、インラインstyleの再設定でCSSアニメーションが
+              上書き・中断されてしまうため、層を分けて衝突を避けている。 */}
+          <div className="av-intro-palette">
+            <div
+              style={{
+                opacity: s.palette.opacity,
+                filter: `blur(${s.palette.blur}px)`,
+                transform: `translateY(${s.palette.y}px) scale(${s.palette.scale})`,
+                // このページではパレットは常時アニメーションする唯一の要素であり、
+                // 使い回すコンポーネントでもないため、常時 willChange を付けたままにしている。
+                willChange: "transform, opacity, filter",
+              }}
+            >
+              <PaletteMock demo={demo} />
+            </div>
           </div>
 
           {/* キーキャップ層: Task 6 で Keyboard セクションが使う。いまは空 */}
