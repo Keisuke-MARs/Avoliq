@@ -23,9 +23,11 @@ export function Footer() {
             ここに書いた判断が実際にどう実装されているかは、リポジトリで確かめられます。
           </p>
           <div className="mt-8">
+            {/* ボタン地の色（青）とブラウザ既定のフォーカスリングが衝突して見えなくなるため、
+                白リング＋ページ地色オフセットの専用スタイルを当てる（Hero の2ボタンと揃える） */}
             <a
               href={REPO}
-              className="inline-block rounded-full bg-av-blue px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-85"
+              className="inline-block rounded-full bg-av-blue px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-av-deep"
             >
               GitHub で見る
             </a>

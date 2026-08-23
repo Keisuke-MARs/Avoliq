@@ -33,15 +33,17 @@ export function Hero({ opacity, y }: HeroProps) {
         用が済んだら Esc で消える。
       </p>
       <div className="mt-7 flex flex-wrap justify-center gap-2.5">
+        {/* ボタン地の色（青/暗背景）とブラウザ既定のフォーカスリングが衝突して見えなくなるため、
+            白リング＋ページ地色オフセットの専用スタイルを両ボタンに揃えて当てる */}
         <a
           href="https://github.com/Keisuke-MARs/Avoliq"
-          className="rounded-full bg-av-blue px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-85"
+          className="rounded-full bg-av-blue px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-av-deep"
         >
           GitHub で見る
         </a>
         <a
           href="#design-notes"
-          className="rounded-full border border-white/20 px-5 py-2.5 text-sm transition-colors hover:bg-white/10"
+          className="rounded-full border border-white/20 px-5 py-2.5 text-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-av-deep"
         >
           設計を読む
         </a>
