@@ -4,6 +4,8 @@ import { useTrackProgress } from "../hooks/useTrackProgress";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { demoState, stageState } from "../lib/motion";
 import { Hero } from "./Hero";
+import { KeyboardHeading, KeycapRow } from "./KeyboardSection";
+import { Statement } from "./Statement";
 
 export function StickyStage() {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -32,17 +34,20 @@ export function StickyStage() {
           テキスト層とパレット層は絶対に重ならない。
         */}
         <div className="absolute inset-0 grid grid-rows-[auto_auto_auto] content-center justify-items-center gap-y-10 px-6">
-          {/* テキスト層: Hero / Statement / Keyboard の見出しを同じセルに重ねてクロスフェードさせる。
-              このタスクでは Hero のみ */}
+          {/* テキスト層: Hero / Statement / Keyboard の見出しを同じセルに重ねてクロスフェードさせる */}
           <div className="grid w-full [&>*]:col-start-1 [&>*]:row-start-1">
             {/*
               登場演出（av-intro-hero）とスクロール演出（Hero に渡す opacity/y の
               インラインstyle）は別の要素に分ける。同じ要素に両方を掛けると、
               インラインstyleが毎フレーム再設定されてCSSアニメーションと競合するため。
+              登場演出は Hero だけに掛かればよいので、Statement と Keyboard の見出しは
+              ラッパーの外に置く。
             */}
             <div className="av-intro-hero">
               <Hero opacity={s.hero.opacity} y={s.hero.y} />
             </div>
+            <Statement opacity={s.statement.opacity} y={s.statement.y} />
+            <KeyboardHeading opacity={s.keyboard.opacity} />
           </div>
 
           {/* パレット層
@@ -65,8 +70,8 @@ export function StickyStage() {
             </div>
           </div>
 
-          {/* キーキャップ層: Task 6 で Keyboard セクションが使う。いまは空 */}
-          <div />
+          {/* キーキャップ層 */}
+          <KeycapRow opacity={s.keyboard.opacity} litKey={demo.litKey} />
         </div>
       </div>
     </div>
