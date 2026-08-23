@@ -133,7 +133,9 @@ describe("stageState", () => {
     expect(stageState(0.22).hero.y).toBeLessThan(0);
   });
 
-  it("Statementのテキストは現れきると0に収束する", () => {
+  it("Statementのテキストは区間の始点で20px下にあり、現れきると0に収束する", () => {
+    expect(stageState(0.17).statement.y).toBe(20);
+    expect(stageState(0.2).statement.y).toBeGreaterThan(0);
     expect(stageState(0.26).statement.y).toBeCloseTo(0, 5);
     expect(stageState(0.5).statement.y).toBeCloseTo(0, 5);
   });
