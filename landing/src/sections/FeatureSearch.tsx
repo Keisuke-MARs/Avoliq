@@ -24,7 +24,7 @@ export function FeatureSearch() {
         <Reveal delay={0.08} className="mt-12">
           <Shot
             src={`${import.meta.env.BASE_URL}shots/search.png`}
-            alt="検索欄に入力した文字列がそのまま新規タスクの候補として表示されている画面"
+            alt="検索欄にタスク名を入力した状態で、Enter でそのまま新規作成できると案内されている画面"
           />
         </Reveal>
       </div>

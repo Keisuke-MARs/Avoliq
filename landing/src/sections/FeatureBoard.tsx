@@ -24,7 +24,7 @@ export function FeatureBoard() {
         <Reveal delay={0.08} className="mt-12">
           <Shot
             src={`${import.meta.env.BASE_URL}shots/board.png`}
-            alt="3つのレーンにカードが並び、カードにタグが付いているボード画面"
+            alt="未着手・進行中・確認中・完了の4つのレーンにタスクカードが並び、カードにタグが付いているボード画面"
           />
         </Reveal>
       </div>
