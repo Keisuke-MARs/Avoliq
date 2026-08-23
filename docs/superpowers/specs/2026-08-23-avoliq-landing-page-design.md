@@ -227,15 +227,17 @@ landing/
   src/
     main.tsx
     App.tsx
-    index.css               # --av-* トークン、ベーススタイル
+    index.css               # 色トークン、ベーススタイル
+    lib/
+      motion.ts             # 進捗 → スタイル値の純粋関数群（テスト対象）
     hooks/
-      useScrollProgress.ts  # sticky ステージの進捗 0→1
+      useTrackProgress.ts   # sticky ステージの進捗 0→1
       useReveal.ts          # IntersectionObserver フェードアップ
-      useReducedMotion.ts
+      usePrefersReducedMotion.ts
     sections/
       Hero.tsx
       Statement.tsx
-      Keyboard.tsx
+      KeyboardSection.tsx
       StickyStage.tsx       # 01〜03 を包む sticky コンテナ
       FeatureSearch.tsx
       FeatureBoard.tsx
@@ -250,7 +252,7 @@ landing/
       Shot.tsx              # スクリーンショットの枠と影
 ```
 
-`StickyStage.tsx` が `useScrollProgress` の値を持ち、
+`StickyStage.tsx` が `useTrackProgress` の値を持ち、
 `PaletteMock` と Hero / Statement / Keyboard のテキストへ配る。
 各セクションコンポーネントは進捗値を受け取るだけで、スクロールを直接見ない。
 
