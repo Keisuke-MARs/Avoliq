@@ -964,6 +964,7 @@ export function PaletteMock({ demo }: PaletteMockProps) {
             selected={false}
             className={demo.cardMoved ? "translate-y-[calc(2rem+0.375rem)]" : ""}
           />
+        </Lane>
       </div>
     </div>
   );
