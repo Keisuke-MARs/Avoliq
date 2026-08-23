@@ -24,7 +24,10 @@ function Card({
     <div
       className={[
         "relative flex h-8 items-center rounded-md px-2.5 text-[11px] text-av-body",
-        "transition-[background-color,box-shadow,transform] duration-500 ease-av",
+        // Tailwind v4 では translate-x-* / translate-y-* は transform ではなく
+        // ネイティブの CSS translate プロパティを出力する。そのため transition の対象には
+        // transform ではなく translate を指定する必要がある（指定を誤ると瞬間移動になる）。
+        "transition-[background-color,box-shadow,translate] duration-500 ease-av",
         selected
           ? "bg-av-blue/30 shadow-[0_0_0_1px_var(--color-av-azure)]"
           : "bg-white/10",
@@ -43,7 +46,10 @@ function Lane({ title, children }: { title: string; children: ReactNode }) {
       <div className="text-[9px] uppercase tracking-[0.09em] text-av-muted">
         {title}
       </div>
-      {children}
+      {/* カード3枚分の高さを常に確保する。挿入の演出でカードが1枚分下がっても
+          パレットの枠からはみ出さないようにするため（transform はレイアウトの寸法を変えない）。
+          6.75rem = カード高さ 2rem × 3 + カード間 0.375rem × 2 */}
+      <div className="flex min-h-[6.75rem] flex-col gap-1.5">{children}</div>
     </div>
   );
 }
@@ -71,12 +77,19 @@ export function PaletteMock({ demo }: PaletteMockProps) {
           <Card
             label={DOING[0]}
             selected={demo.selectedCard === 2}
-            className={demo.cardMoved ? "translate-x-[104%]" : ""}
+            className={[
+              // レーン幅とカード幅は flex-1 で一致するので、隣レーンへの移動量は
+              // 「レーン幅1つ分 + レーン間の gap-2（0.5rem）」が厳密値になる
+              demo.cardMoved ? "translate-x-[calc(100%+0.5rem)]" : "",
+              // 移動中は Done レーンのカードと一瞬すれ違うので、必ず手前に出す
+              demo.cardMoved ? "z-10" : "",
+            ].join(" ")}
           >
             <span
               className={[
                 "absolute right-2 h-3 w-7 rounded bg-av-azure/45",
-                "transition-[opacity,transform] duration-300 ease-av",
+                // scale-* も translate-* と同じ理由で transform ではなく scale プロパティを出力する
+                "transition-[opacity,scale] duration-300 ease-av",
                 demo.chipOn ? "scale-100 opacity-100" : "scale-50 opacity-0",
               ].join(" ")}
             />
@@ -84,8 +97,21 @@ export function PaletteMock({ demo }: PaletteMockProps) {
         </Lane>
 
         <Lane title="Done">
-          <Card label={DONE[0]} selected={false} />
-          <Card label={DONE[1]} selected={false} />
+          {/*
+            「上に乗る」のではなく「挿入されて既存カードが場所を空ける」ように見せる。
+            移動量は「カード1枚分の高さ（h-8 = 2rem）+ カード間の隙間（gap-1.5 = 0.375rem）」。
+            高さや隙間の値を変えたときはここも合わせて調整すること。
+          */}
+          <Card
+            label={DONE[0]}
+            selected={false}
+            className={demo.cardMoved ? "translate-y-[calc(2rem+0.375rem)]" : ""}
+          />
+          <Card
+            label={DONE[1]}
+            selected={false}
+            className={demo.cardMoved ? "translate-y-[calc(2rem+0.375rem)]" : ""}
+          />
         </Lane>
       </div>
     </div>
