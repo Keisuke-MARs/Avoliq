@@ -595,7 +595,7 @@ cd landing && npm test
 
 期待する結果: PASS（`motion.test.ts` の全ケースが緑）。
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 6: コミット**
 
 ```bash
 cd /Users/kei06/dev/Avoliq
@@ -2250,14 +2250,30 @@ git commit -m "feat: CTAとフッターを追加してLPの全セクションを
 - Create: `landing/public/ogp.png`
 - Create: `landing/public/favicon.png`
 
-- [ ] **Step 1: favicon を作る**
+- [ ] **Step 1: 配信するアイコンを適切なサイズに縮小する**
+
+`landing/public/avoliq-app-icon.png` は 1024x1024 の原寸（約 1MB）のまま置かれているが、
+フッターでの表示サイズは 36x36 でしかない。Retina を考慮しても 144x144 あれば足りる。
+1MB を配信するのは無駄なので縮小する。
+
+```bash
+cd /Users/kei06/dev/Avoliq
+sips -Z 144 landing/public/avoliq-app-icon.png --out landing/public/avoliq-app-icon.png
+ls -la landing/public/avoliq-app-icon.png
+```
+
+縮小後にフッターで見た目が劣化していないことをブラウザで確認すること。
+
+- [ ] **Step 2: favicon を作る**
 
 ```bash
 cd /Users/kei06/dev/Avoliq
 sips -Z 512 design/avoliq-app-icon.png --out landing/public/favicon.png
 ```
 
-- [ ] **Step 2: OGP 画像を作る**
+favicon は原寸の `design/avoliq-app-icon.png` から作る（縮小後のファイルからではなく）。
+
+- [ ] **Step 3: OGP 画像を作る**
 
 ヒーローを 1200x630 で書き出す。ブラウザで LP を開き、ウィンドウ幅を 1200px にしてヒーローを撮影し、`sips` で 1200x630 に切り出す。
 
@@ -2268,7 +2284,7 @@ sips -g pixelWidth -g pixelHeight landing/public/ogp.png
 
 期待する結果: `pixelWidth: 1200` / `pixelHeight: 630`。
 
-- [ ] **Step 3: `landing/index.html` の `<head>` を差し替える**
+- [ ] **Step 4: `landing/index.html` の `<head>` を差し替える**
 
 `<title>` の下に次を追加する。URL は GitHub Pages のプロジェクトページを前提にする。
 
@@ -2285,7 +2301,7 @@ sips -g pixelWidth -g pixelHeight landing/public/ogp.png
     <meta name="twitter:card" content="summary_large_image" />
 ```
 
-- [ ] **Step 4: ビルドして生成物に画像が含まれることを確認する**
+- [ ] **Step 5: ビルドして生成物に画像が含まれることを確認する**
 
 ```bash
 cd landing && npm run build && ls dist
@@ -2293,7 +2309,7 @@ cd landing && npm run build && ls dist
 
 期待する結果: `dist/favicon.png` と `dist/ogp.png` が存在する。
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 6: コミット**
 
 ```bash
 cd /Users/kei06/dev/Avoliq
