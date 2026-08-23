@@ -1574,6 +1574,10 @@ export function Reveal({ children, delay = 0, className = "" }: RevealProps) {
 
 - [ ] **Step 2: `landing/src/components/Shot.tsx` を作る**
 
+スクリーンショットには撮影時の暗い余白（`#0b0f16`）が焼き込まれており、パレット自身も
+角丸と影を持っている。そこに枠線を足すと「余白の外側」に線が出て不自然になるので、枠線は付けない。
+代わりに、画像と同じ色の角丸コンテナで包み、外側に柔らかい影を落として面から浮かせる。
+
 ```tsx
 interface ShotProps {
   src: string;
@@ -1582,13 +1586,17 @@ interface ShotProps {
 
 export function Shot({ src, alt }: ShotProps) {
   return (
-    <img
-      src={src}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      className="w-full rounded-2xl border border-white/10 shadow-[0_40px_90px_rgba(0,0,0,0.6)]"
-    />
+    // 画像に焼き込まれた背景色と同じ色でコンテナを塗り、継ぎ目が見えないようにする。
+    // 枠線は付けない（画像の余白の外側に線が出てしまうため）。
+    <div className="overflow-hidden rounded-2xl bg-[#0b0f16] shadow-[0_40px_90px_rgba(0,0,0,0.55)]">
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        className="block w-full"
+      />
+    </div>
   );
 }
 ```
