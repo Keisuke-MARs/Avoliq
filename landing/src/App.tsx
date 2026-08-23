@@ -1,4 +1,5 @@
 import { FeatureBoard } from "./sections/FeatureBoard";
+import { FeatureLocal } from "./sections/FeatureLocal";
 import { FeatureSearch } from "./sections/FeatureSearch";
 import { StickyStage } from "./sections/StickyStage";
 
@@ -8,6 +9,7 @@ export default function App() {
       <StickyStage />
       <FeatureSearch />
       <FeatureBoard />
+      <FeatureLocal />
     </main>
   );
 }
