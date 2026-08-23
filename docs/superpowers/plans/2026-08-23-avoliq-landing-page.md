@@ -1340,31 +1340,36 @@ git commit -m "feat: 思想セクションとキーボード実演をステー�
 **Files:**
 - Modify: `landing/src/sections/StickyStage.tsx`
 
+各セクションは通常フロー（絶対配置なし）で組まれているので、静止版は素直に縦へ並べるだけでよい。
+パレットは**静止時もページ全体で1枚だけ**という原則を守り、Hero と同じセクションに置く。
+
 - [ ] **Step 1: `StickyStage.tsx` に静止版の分岐を足す**
 
 `export function StickyStage() {` の中、`const demo = demoState(s.demo);` の直後に次を挿入する。
+フックはすべてこの分岐より前で呼ばれているので、早期 return しても問題ない。
 
 ```tsx
-  // 動きを減らす設定のときは、演出をやめて3セクションを普通に縦へ並べる。
-  // 進捗に依存する表示が全部消えてしまい、情報が欠けるのを防ぐため。
+  // 動きを減らす設定のときは、sticky と進捗連動をやめて3セクションを普通に縦へ並べる。
+  // useTrackProgress は動き低減時に進捗を 1 に固定するので、そのまま描くと
+  // Hero と Statement が消えたままになり、情報が欠けてしまう。
   if (reduced) {
     return (
       <div>
-        {/* Hero / Statement / KeyboardSection は absolute で置かれる作りなので、
-            それぞれを relative min-h-screen のセクションで受けて位置を成立させる */}
-        <section className="relative min-h-screen">
+        <section className="flex min-h-screen flex-col items-center justify-center gap-10 px-6 py-24">
           <Hero opacity={1} y={0} />
+          {/* パレットはページ全体で1枚だけ、という原則は静止時も守る。
+              実演の途中（タグが付いた状態）で止めて、機能が伝わる絵にする。
+              終端(1)にするとカードが移動後の位置で止まり、文脈なしでは意味が読めない */}
+          <PaletteMock demo={demoState(0.6)} />
         </section>
-        <section className="relative min-h-screen">
+
+        <section className="flex min-h-[70vh] items-center justify-center px-6 py-24">
           <Statement opacity={1} y={0} />
         </section>
-        <section className="relative min-h-screen">
-          <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center px-6">
-            {/* 実演の途中経過（タグが付いた状態）で静止させる。
-                終端(1)にするとカードが移動後の位置で止まり、文脈なしでは意味が読めない */}
-            <PaletteMock demo={demoState(0.6)} />
-          </div>
-          <KeyboardSection opacity={1} litKey={-1} />
+
+        <section className="flex min-h-[70vh] flex-col items-center justify-center gap-10 px-6 py-24">
+          <KeyboardHeading opacity={1} />
+          <KeycapRow opacity={1} litKey={-1} />
         </section>
       </div>
     );
@@ -1373,16 +1378,18 @@ git commit -m "feat: 思想セクションとキーボード実演をステー�
 
 - [ ] **Step 2: 動き低減を有効にして確認する**
 
-macOS の「システム設定 → アクセシビリティ → ディスプレイ → 視差効果を減らす」を有効にしてページを再読み込みする。
-または Chrome DevTools の Rendering パネルで `prefers-reduced-motion: reduce` をエミュレートする。
+Chrome DevTools の Rendering パネルで `Emulate CSS media feature prefers-reduced-motion` を
+`reduce` にしてページを再読み込みする。
 
 確認すること:
 
-- Hero・Statement・Keyboard のテキストがすべて読める
-- パレットが1つ表示されており、ぼけていない
+- Hero・Statement・Keyboard のテキストがすべて読める（透明のまま隠れているものが無い）
+- パレットが**1枚だけ**表示されており、ぼけていない・縮んでいない
+- 登場演出（`av-intro-*`）が走らず、最初から最終状態になっている
 - スクロールしても要素が動かない
+- ページの高さが `400vh` のトラックではなく、3セクションぶんの自然な高さになっている
 
-- [ ] **Step 3: 設定を元に戻し、通常表示が壊れていないことを確認する**
+- [ ] **Step 3: エミュレーションを解除し、通常表示が壊れていないことを確認する**
 
 - [ ] **Step 4: コミット**
 
