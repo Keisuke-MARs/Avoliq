@@ -1,0 +1,94 @@
+@import "tailwindcss" source(none);
+@source "./";
+
+@theme {
+  --color-av-deep: #080b11;
+  --color-av-bg: #0c1017;
+  --color-av-surface: #10151f;
+  --color-av-ink: #f1f4f8;
+  --color-av-body: #afb6c1;
+  --color-av-muted: #8b939f;
+  --color-av-blue: #0a84ff;
+  --color-av-azure: #66beff;
+  --color-av-violet: #615eff;
+
+  --ease-av: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@layer base {
+  /*
+   * Spotlight風の「開く」登場演出。スクロール進捗ではなく、ページに来た瞬間に
+   * 一度だけ再生する。スクロール由来の transform/opacity/filter は同じ要素の
+   * インラインstyleが毎フレーム上書きするため、必ず外側のラッパー要素に掛けること。
+   */
+  @keyframes av-intro-palette {
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+      filter: blur(12px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes av-intro-hero {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .av-intro-palette {
+    animation: av-intro-palette 850ms var(--ease-av) both;
+  }
+
+  .av-intro-hero {
+    animation: av-intro-hero 700ms var(--ease-av) 120ms both;
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-av-deep);
+    color: var(--color-av-ink);
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+    /* 日本語の字間を詰める。Apple の日本語ページと同じ扱い */
+    font-feature-settings: "palt";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 動きを減らす設定のときは、演出を一切かけずに最終状態で静止させる */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    /* 登場演出そのものを止め、最初から最終状態（見えている状態）で静止させる */
+    .av-intro-palette,
+    .av-intro-hero {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+      filter: none !important;
+    }
+  }
+}

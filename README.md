@@ -137,6 +137,7 @@ src-tauri/                # Rust
   src/panel.rs            # NSPanel 化・グローバルホットキー・トレイ
 design/                   # ロゴ、アイコン、ステータス色プリセット
 docs/superpowers/         # 設計書（specs）と実装計画（plans）
+landing/                  # ランディングページ（独立したViteプロジェクト）
 ```
 
 ## データの保存先
