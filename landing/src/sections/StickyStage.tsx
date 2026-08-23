@@ -14,6 +14,32 @@ export function StickyStage() {
   const s = stageState(p);
   const demo = demoState(s.demo);
 
+  // 動きを減らす設定のときは、sticky と進捗連動をやめて3セクションを普通に縦へ並べる。
+  // useTrackProgress は動き低減時に進捗を 1 に固定するので、そのまま描くと
+  // Hero と Statement が消えたままになり、情報が欠けてしまう。
+  if (reduced) {
+    return (
+      <div>
+        <section className="flex min-h-screen flex-col items-center justify-center gap-10 px-6 py-24">
+          <Hero opacity={1} y={0} />
+          {/* パレットはページ全体で1枚だけ、という原則は静止時も守る。
+              実演の途中（タグが付いた状態）で止めて、機能が伝わる絵にする。
+              終端(1)にするとカードが移動後の位置で止まり、文脈なしでは意味が読めない */}
+          <PaletteMock demo={demoState(0.6)} />
+        </section>
+
+        <section className="flex min-h-[70vh] items-center justify-center px-6 py-24">
+          <Statement opacity={1} y={0} />
+        </section>
+
+        <section className="flex min-h-[70vh] flex-col items-center justify-center gap-10 px-6 py-24">
+          <KeyboardHeading opacity={1} />
+          <KeycapRow opacity={1} litKey={-1} />
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div ref={trackRef} className="relative h-[400vh]">
       <div className="sticky top-0 h-screen overflow-hidden">
