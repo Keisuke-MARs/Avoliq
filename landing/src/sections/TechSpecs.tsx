@@ -13,6 +13,8 @@ const SPECS: { area: string; value: string }[] = [
 
 export function TechSpecs() {
   return (
+    // pb-28 のみで pt を持たない: 直前の DesignNotes と同じ bg-av-surface が続くため、
+    // 境界で余白を二重に取らずに1枚の帯として繋げる意図的な設計
     <section className="bg-av-surface px-6 pb-28">
       <div className="mx-auto max-w-[52rem]">
         <Reveal>
