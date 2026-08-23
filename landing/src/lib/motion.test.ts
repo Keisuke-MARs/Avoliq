@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clamp,
   demoState,
+  DEMO_KEY_COUNT,
   range,
   stageState,
   trackProgress,
@@ -113,6 +114,29 @@ describe("stageState", () => {
       }
     }
   });
+
+  it("パレットは先頭で下にオフセットしており、開き終えると中央に収まる", () => {
+    expect(stageState(0).palette.y).toBeGreaterThan(0);
+    expect(stageState(0.12).palette.y).toBeCloseTo(0, 5);
+  });
+
+  it("パレットはStatement区間で下へ退き、Keyboard区間で上へ戻る", () => {
+    const open = stageState(0.12).palette.y;
+    const back = stageState(0.3).palette.y;
+    const fore = stageState(0.48).palette.y;
+    expect(back).toBeGreaterThan(open);
+    expect(fore).toBeLessThan(back);
+  });
+
+  it("Heroのテキストは開いた直後は動いておらず、上へ抜ける区間で負の値になる", () => {
+    expect(stageState(0.1).hero.y).toBeCloseTo(0, 5);
+    expect(stageState(0.22).hero.y).toBeLessThan(0);
+  });
+
+  it("Statementのテキストは現れきると0に収束する", () => {
+    expect(stageState(0.26).statement.y).toBeCloseTo(0, 5);
+    expect(stageState(0.5).statement.y).toBeCloseTo(0, 5);
+  });
 });
 
 describe("demoState", () => {
@@ -129,6 +153,12 @@ describe("demoState", () => {
     expect(demoState(0.3).litKey).toBe(1);
     expect(demoState(0.5).litKey).toBe(2);
     expect(demoState(0.7).litKey).toBe(3);
+  });
+
+  it("litKeyはDEMO_KEY_COUNT未満の値しか返さない", () => {
+    for (let d = 0; d <= 1.0001; d += 0.01) {
+      expect(demoState(d).litKey).toBeLessThan(DEMO_KEY_COUNT);
+    }
   });
 
   it("選択枠が上から順に移る", () => {

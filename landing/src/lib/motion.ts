@@ -5,9 +5,6 @@
  * 設計書: docs/superpowers/specs/2026-08-23-avoliq-landing-page-design.md
  */
 
-/** アプリ本体と揃えた減速カーブ */
-export const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
-
 export function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
@@ -71,19 +68,28 @@ export function stageState(p: number): StageState {
       1,
     ),
     hero: {
+      // 0.12-0.2: Heroテキストがフェードアウトする
       opacity: clamp(open * (1 - range(p, 0.12, 0.2)), 0, 1),
+      // 0.12-0.22: 上へ抜けていく移動。opacityが0になった後も少しだけ動き続けて余韻を残す
       y: -40 * range(p, 0.12, 0.22),
     },
     statement: {
+      // 0.17-0.24でフェードイン、0.31-0.38でフェードアウトする
       opacity: clamp(range(p, 0.17, 0.24) * (1 - range(p, 0.31, 0.38)), 0, 1),
+      // 0.17-0.26: 現れながら上へ寄っていく移動。opacityが0.24で出そろった後も
+      // 0.26まで動きが続き、フェードインの終わりより少し遅れて静止する
       y: 20 * (1 - range(p, 0.17, 0.26)),
     },
     keyboard: {
+      // 0.37-0.44: Keyboardの見出しとキーキャップがフェードインする
       opacity: range(p, 0.37, 0.44),
     },
     demo: range(p, 0.5, 0.92),
   };
 }
+
+/** 実演で光らせるキーの数。KeyboardSection の KEYS 配列と一致させること */
+export const DEMO_KEY_COUNT = 4;
 
 export interface DemoState {
   /** 光っているキーの添字。光っていなければ -1 */
@@ -101,7 +107,7 @@ export function demoState(d: number): DemoState {
   }
 
   let litKey = -1;
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < DEMO_KEY_COUNT; i += 1) {
     const from = i * 0.22;
     if (d >= from && d < from + 0.24) {
       litKey = i;
