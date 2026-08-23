@@ -115,17 +115,13 @@ describe("stageState", () => {
     }
   });
 
-  it("パレットは先頭で下にオフセットしており、開き終えると中央に収まる", () => {
-    expect(stageState(0).palette.y).toBeGreaterThan(0);
-    expect(stageState(0.12).palette.y).toBeCloseTo(0, 5);
-  });
-
-  it("パレットはStatement区間で下へ退き、Keyboard区間で上へ戻る", () => {
-    const open = stageState(0.12).palette.y;
-    const back = stageState(0.3).palette.y;
-    const fore = stageState(0.48).palette.y;
-    expect(back).toBeGreaterThan(open);
-    expect(fore).toBeLessThan(back);
+  it("パレットは先頭で中央にあり、Statement区間で下へ退き、Keyboard区間で戻る", () => {
+    // 開く演出は CSS の登場演出が担うので、スクロール前は中央（オフセットなし）
+    expect(stageState(0).palette.y).toBe(0);
+    // Statement 区間では下へ退く
+    expect(stageState(0.3).palette.y).toBeGreaterThan(0);
+    // Keyboard 区間では上へ戻る（退いた位置より小さくなる）
+    expect(stageState(0.48).palette.y).toBeLessThan(stageState(0.3).palette.y);
   });
 
   it("Heroのテキストは開いた直後は動いておらず、上へ抜ける区間で負の値になる", () => {
