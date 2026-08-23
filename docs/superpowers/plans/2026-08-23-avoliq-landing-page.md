@@ -1407,73 +1407,124 @@ git commit -m "feat: 動き低減時は演出をやめて縦並びにする"
 - Create: `landing/public/shots/search.png`
 - Create: `landing/public/shots/board.png`
 
-- [ ] **Step 1: 撮影用にデスクトップを整える**
+### 前提: ユーザーの実データに触れない
 
-パレットは半透明で背後が写り込むため、無地の暗い背景を敷く。
+アプリの DB は `~/Library/Application Support/Avoliq/avoliq.db` にあり、**ユーザーの実際のタスクが入っている**。
+LP の画像は public リポジトリに載り、Git 履歴にも残るため、実データを写してはいけない。
+
+`src-tauri/src/lib.rs` は `app.path().data_dir()` を使っており、これは macOS では `$HOME/Library/Application Support` を見る。
+したがって **`HOME` を一時ディレクトリに差し替えて起動すれば、真っさらな DB が作られ、実データには一切触れない。**
+
+ただし `HOME` を変えると `cargo` と `rustup` のホームも変わってフルビルドになるので、そこは元の場所を明示的に渡す。
+
+- [ ] **Step 1: 隔離した HOME を用意する**
 
 ```bash
-# 単色の壁紙を作って一時的に設定する
+export REAL_HOME="$HOME"
+export SHOT_HOME=/tmp/avoliq-shot-home
+mkdir -p "$SHOT_HOME/Library/Application Support/Avoliq"
+```
+
+- [ ] **Step 2: 一度起動して DB を作る**
+
+```bash
 cd /Users/kei06/dev/Avoliq
-mkdir -p /tmp/avoliq-shot
+HOME="$SHOT_HOME" CARGO_HOME="$REAL_HOME/.cargo" RUSTUP_HOME="$REAL_HOME/.rustup" npm run tauri dev
 ```
 
-デスクトップに他アプリのウィンドウが写り込まないよう、最前面のウィンドウをすべて隠す。
+デバッグビルドが残っているので増分ビルドで済む見込み。
+DB が `$SHOT_HOME/Library/Application Support/Avoliq/avoliq.db` に作られたら、いったん終了する。
 
-- [ ] **Step 2: 本体をダークモードで起動する**
+`seed_if_empty` は空のボード（「メイン」）と既定ホットキーを作るだけで、タスクは入らない。
+
+- [ ] **Step 3: デモデータを SQLite に直接入れる**
+
+UI を自動操作して作るより、DB に直接入れるほうが確実で再現性がある。
+
+まず `src-tauri/src/db/` のマイグレーションを読んで、`boards` / `statuses` / `tasks` / `tags` / `task_tags` の
+実際のスキーマ（カラム名、必須項目、ID の形式、position の扱い、`deleted_at` の有無）を確認すること。
+**推測でカラム名を書かないこと。**
+
+そのうえで `sqlite3` でデモデータを投入する。内容は LP のスクリーンショットに写るものなので、
+**実在の作業に見える自然な日本語**にする。`test` や `あああ` のようなダミーは使わない。
+個人情報・社内固有名詞は入れない。
+
+投入後、`sqlite3` で `SELECT` して意図どおり入ったことを確認する。
+
+- [ ] **Step 4: 撮影用の背景を用意する**
+
+パレットは半透明で背後が写り込む。**ユーザーの壁紙やシステム設定は変更しない。**
+代わりに、無地の暗い色を全画面表示したブラウザウィンドウを背後に置く。
 
 ```bash
-cd /Users/kei06/dev/Avoliq && npm run tauri dev
+printf '<body style="margin:0;background:#0b0f16;height:100vh"></body>' > /tmp/avoliq-shot-bg.html
 ```
 
-デバッグビルドが残っているため増分ビルドで済む。macOS の外観をダークにしておく。
+これをブラウザで開いてフルスクリーンにする。他アプリのウィンドウが写り込まないよう最小化しておく。
 
-- [ ] **Step 3: 撮りたい状態を作る**
+macOS の外観は**ダークモード**にしておく（LP がダーク基調のため）。
+システム設定を変更した場合は、撮影後に必ず元に戻すこと。
 
-`Alt + Space` でパレットを開き、次の2つの状態を作る。
-
-1. **検索即作成**: 検索欄に未登録の文字列を打ち、「Enter で作成」の状態が見えている
-2. **ボードとタグ**: カードにタグが付いており、レーンが3つ並んでいる
-
-タスクは実際の内容にする。空のボードや `test` のようなダミーは避ける。
-
-- [ ] **Step 4: ウィンドウを撮影する**
-
-`computer-use` skill でウィンドウ単位のスクリーンショットを取得する。取得できない場合は全画面を撮ってから切り出す。
+- [ ] **Step 5: アプリを起動してパレットを出す**
 
 ```bash
-# 全画面を撮る（シャッター音とカーソルなし）
+cd /Users/kei06/dev/Avoliq
+HOME="$SHOT_HOME" CARGO_HOME="$REAL_HOME/.cargo" RUSTUP_HOME="$REAL_HOME/.rustup" npm run tauri dev
+```
+
+パレットはグローバルホットキー（既定 `Alt + Space`）で出す。デスクトップアプリの操作には
+`computer-use` skill を使う。使えない場合は `osascript` で代替する。
+
+```bash
+osascript -e 'tell application "System Events" to key code 49 using {option down}'
+```
+
+- [ ] **Step 6: 2つの状態を作って撮る**
+
+ウィンドウは `tauri.conf.json` で `720x480`・`center: true`。影の分の余白を含めて切り出す。
+画面全体を撮ってから切り出すのが確実。
+
+```bash
 screencapture -x -o /tmp/avoliq-shot/full.png
-# 寸法を確認する
 sips -g pixelWidth -g pixelHeight /tmp/avoliq-shot/full.png
 ```
 
-パレットの位置を確認して切り出す。`X Y` は左上座標、`W H` は幅と高さ。
+Retina では論理座標の2倍のピクセルになる。中央 720x480 の周囲に余白を足した領域を `sips -c` で切り出す。
 
-```bash
-# 例: 左上(1200,800) から 1600x1000 を切り出す。実測値に置き換えること
-sips -c 1000 1600 --cropOffset 800 1200 /tmp/avoliq-shot/full.png \
-  --out landing/public/shots/search.png
-```
+撮る状態は次の2つ。
 
-- [ ] **Step 5: 撮れた画像を目視で確認する**
+1. **`search.png`（検索即作成）** — 検索欄に未登録の文字列を打ち、そのまま新規作成できる状態が見えている
+2. **`board.png`（ボードとタグ）** — 3つのレーンにカードが並び、カードにタグが付いている
 
-確認すること:
+- [ ] **Step 7: 撮れた画像を確認する**
 
 - パレットの四辺に余白があり、切れていない
 - 背後に他アプリのウィンドウや個人情報が写っていない
-- Retina 解像度（実寸の2倍）になっている
+- ダークモードで撮れている
+- Retina 解像度（論理サイズの2倍）になっている
+- **ユーザーの実データが写っていない**
 
-**綺麗に撮れない場合:** 実スクリーンショットを諦め、`Shot.tsx` の中に HTML/CSS で UI を再現する。その場合はウィンドウの枠・影・データ量で抽象パレットと差をつける（設計書 7章の代替案）。
+- [ ] **Step 8: 後片付け**
 
-- [ ] **Step 6: 本体を終了し、壁紙とデスクトップの設定を元に戻す**
+- アプリと開発サーバーを終了する（`pkill -f vite` のような広域終了は使わない）
+- 背景用のブラウザウィンドウを閉じる
+- システム設定を変更した場合は元に戻す
+- `$SHOT_HOME` を削除する
+- **ユーザーの `~/Library/Application Support/Avoliq/avoliq.db` が変更されていないことを確認する**（`ls -la` の更新時刻で確認）
 
-- [ ] **Step 7: コミット**
+- [ ] **Step 9: コミット**
 
 ```bash
 cd /Users/kei06/dev/Avoliq
 git add landing/public/shots
 git commit -m "chore: LP用のスクリーンショットを追加"
 ```
+
+### 綺麗に撮れない場合
+
+実スクリーンショットを諦め、`Shot.tsx` の中に HTML/CSS で UI を再現する（設計書 7章の代替案）。
+その場合は 01〜03 の抽象パレットと絵柄が近づくため、ウィンドウの枠・影・データ量で差をつける。
+**この切り替えは勝手に行わず、必ず報告して判断を仰ぐこと。**
 
 ---
 
