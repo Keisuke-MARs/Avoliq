@@ -17,7 +17,7 @@ export function Footer() {
       <div className="relative mx-auto max-w-[52rem] text-center">
         <Reveal>
           <h2 className="text-[clamp(1.7rem,4.6vw,2.5rem)] font-semibold leading-[1.4] tracking-[-0.03em]">
-            コードは、すべて公開しています。
+            判断の続きは、コードにあります。
           </h2>
           <p className="mx-auto mt-4 max-w-[32rem] text-sm leading-[1.95] text-av-body">
             ここに書いた判断が実際にどう実装されているかは、リポジトリで確かめられます。
@@ -48,7 +48,7 @@ export function Footer() {
             </span>
           </div>
           <p className="text-xs text-av-muted">
-            Avoliq — 直感的に、自然に思考を整え、次へ進める。
+            直感的に、自然に思考を整え、次へ進める。
           </p>
         </div>
       </div>
