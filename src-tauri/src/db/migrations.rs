@@ -60,8 +60,25 @@ CREATE TABLE task_tags (
 CREATE INDEX idx_task_tags_tag ON task_tags(tag_id);
 "#;
 
+/// マイグレーション v3: 画像（images）
+///
+/// 画像をデータディレクトリのファイルではなくDBのBLOBで持つのは、
+/// 「バックアップは avoliq.db を1つコピーするだけ」という約束を崩さないため。
+/// task_id への ON DELETE CASCADE により、ボード削除（tasksの物理削除）で
+/// 画像が取り残されることがない。
+const V3: &str = r#"
+CREATE TABLE images (
+  id         TEXT PRIMARY KEY,
+  task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  mime       TEXT NOT NULL,
+  bytes      BLOB NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_images_task ON images(task_id);
+"#;
+
 /// (バージョン, SQL) の一覧。将来のマイグレーションは末尾に足すだけでよい。
-pub const MIGRATIONS: &[(i64, &str)] = &[(1, V1), (2, V2)];
+pub const MIGRATIONS: &[(i64, &str)] = &[(1, V1), (2, V2), (3, V3)];
 
 /// 未適用のマイグレーションを順に適用する。何度呼んでも安全（冪等）。
 pub fn migrate(conn: &mut Connection) -> Result<()> {
@@ -143,7 +160,7 @@ mod tests {
         let applied: i64 = conn
             .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| row.get(0))
             .expect("件数を数えられること");
-        assert_eq!(applied, 2, "同じバージョンが二重に記録されてはいけない");
+        assert_eq!(applied, 3, "同じバージョンが二重に記録されてはいけない");
     }
 
     #[test]
@@ -178,12 +195,12 @@ mod tests {
     }
 
     #[test]
-    fn 適用後のスキーマバージョンは2になる() {
+    fn 適用後のスキーマバージョンは3になる() {
         let conn = db::open_in_memory().expect("インメモリDBを開けること");
 
         let version = super::current_version(&conn).expect("バージョンを取得できること");
 
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
     }
 
     #[test]
@@ -206,5 +223,45 @@ mod tests {
         );
 
         assert!(result.is_err(), "UNIQUE制約で弾かれること");
+    }
+
+    #[test]
+    fn v3で画像のテーブルが作られる() {
+        let conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        assert!(table_exists(&conn, "images"));
+    }
+
+    #[test]
+    fn タスクを物理削除すると画像も一緒に消える() {
+        let conn = db::open_in_memory().expect("インメモリDBを開けること");
+        conn.execute(
+            "INSERT INTO boards (id, name, position) VALUES ('b1', 'メイン', 0)",
+            [],
+        )
+        .expect("ボードを作れること");
+        conn.execute(
+            "INSERT INTO statuses (id, board_id, name, color, position) VALUES ('s1', 'b1', '未着手', '#8E8E93', 0)",
+            [],
+        )
+        .expect("ステータスを作れること");
+        conn.execute(
+            "INSERT INTO tasks (id, board_id, status_id, title, position) VALUES ('t1', 'b1', 's1', 'タスク', 0)",
+            [],
+        )
+        .expect("タスクを作れること");
+        conn.execute(
+            "INSERT INTO images (id, task_id, mime, bytes) VALUES ('i1', 't1', 'image/png', X'89504E47')",
+            [],
+        )
+        .expect("画像を作れること");
+
+        conn.execute("DELETE FROM tasks WHERE id = 't1'", [])
+            .expect("タスクを物理削除できること");
+
+        let remaining: i64 = conn
+            .query_row("SELECT COUNT(*) FROM images", [], |row| row.get(0))
+            .expect("件数を数えられること");
+        assert_eq!(remaining, 0, "ボード削除時に画像が取り残されてはいけない");
     }
 }
