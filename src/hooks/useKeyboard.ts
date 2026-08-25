@@ -33,8 +33,23 @@ function isPrintableKey(e: KeyboardEvent): boolean {
   return e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey;
 }
 
+/** ⌘⇧←→↑↓ は macOS 標準のテキスト選択（行頭・行末・先頭・末尾まで選択）かどうか */
+function isTextSelectionArrow(e: KeyboardEvent): boolean {
+  return (
+    e.shiftKey &&
+    (e.key === "ArrowLeft" ||
+      e.key === "ArrowRight" ||
+      e.key === "ArrowUp" ||
+      e.key === "ArrowDown")
+  );
+}
+
 /** ⌘付きのショートカット。処理したら true を返す */
 function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
+  // 検索欄にフォーカスがある状態で ⌘⇧← などを打ったとき、選択操作を奪わずOSへ譲る。
+  // カード選択中は入力欄から外れているので何も起きないが、⇧なしの⌘矢印で足りるため実害はない
+  if (isTextSelectionArrow(e)) return false;
+
   switch (e.key) {
     case "ArrowLeft":
       void s.moveSelectedTask("left");
@@ -186,13 +201,16 @@ function handleDetailKey(event: KeyboardEvent): void {
     return;
   }
 
-  if (event.metaKey && event.key === "ArrowLeft") {
+  // ⌘⇧←→ は本文(BlockNote)やタイトル欄での「行頭・行末まで選択」。
+  // ここで preventDefault すると選択が奪われてしまうので、⇧付きはエディタ側へ通す。
+  // なお ⌘⇧↑↓ は詳細画面では ⌘↑↓ 自体を扱っていないため、もともと素通りしている
+  if (event.metaKey && !event.shiftKey && event.key === "ArrowLeft") {
     event.preventDefault();
     void store.moveSelectedTask("left");
     return;
   }
 
-  if (event.metaKey && event.key === "ArrowRight") {
+  if (event.metaKey && !event.shiftKey && event.key === "ArrowRight") {
     event.preventDefault();
     void store.moveSelectedTask("right");
     return;

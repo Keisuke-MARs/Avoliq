@@ -8,6 +8,7 @@ import { SEARCH_INPUT_ID, useKeyboard } from "./useKeyboard";
 
 vi.mock("@/lib/api", () => ({
   hidePalette: vi.fn(),
+  taskMove: vi.fn(),
 }));
 
 /** ⌘P押下を再現する KeyboardEvent を作る */
@@ -173,5 +174,95 @@ describe("useKeyboard: ⌘K (タグパレット)", () => {
 
     expect(flush).toHaveBeenCalledTimes(1);
     expect(useAppStore.getState().tagPaletteOpen).toBe(true);
+  });
+});
+
+describe("useKeyboard: ⇧付きの⌘矢印はOS標準のテキスト選択に譲る", () => {
+  afterEach(() => {
+    useAppStore.setState(initialAppState);
+  });
+
+  /** 「進行中(st-doing)のカードを選んだ状態」を作る */
+  function selectDoingCard(view: "board" | "detail"): void {
+    useAppStore.setState({
+      ...initialAppState,
+      tasks,
+      statuses,
+      tags,
+      selectedTaskId: "t-d",
+      view,
+    });
+  }
+
+  /** キー押下を再現し、preventDefaultされたかどうかを返す */
+  function press(key: string, modifiers: { shiftKey?: boolean }): boolean {
+    const event = new KeyboardEvent("keydown", {
+      key,
+      metaKey: true,
+      cancelable: true,
+      ...modifiers,
+    });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  /** 選択中のカード(t-d)が今どのステータスに居るか */
+  function statusOfSelected(): string | undefined {
+    return useAppStore.getState().tasks.find((t) => t.id === "t-d")?.statusId;
+  }
+
+  it.each([
+    { view: "detail" as const, key: "ArrowLeft" },
+    { view: "detail" as const, key: "ArrowRight" },
+    { view: "board" as const, key: "ArrowLeft" },
+    { view: "board" as const, key: "ArrowRight" },
+  ])("$view で ⌘⇧$key はステータスを変えずエディタ/入力欄に渡す", ({ view, key }) => {
+    // ⌘⇧←→ は macOS 標準の「行頭/行末まで選択」。preventDefaultすると選択が奪われる
+    selectDoingCard(view);
+    renderHook(() => useKeyboard());
+
+    const prevented = press(key, { shiftKey: true });
+
+    expect(prevented).toBe(false);
+    expect(statusOfSelected()).toBe("st-doing");
+  });
+
+  it.each([
+    { view: "detail" as const, key: "ArrowLeft", expected: "st-todo" },
+    { view: "detail" as const, key: "ArrowRight", expected: "st-check" },
+    { view: "board" as const, key: "ArrowLeft", expected: "st-todo" },
+    { view: "board" as const, key: "ArrowRight", expected: "st-check" },
+  ])("$view で ⇧なしの ⌘$key は従来どおりステータスを変える", ({ view, key, expected }) => {
+    selectDoingCard(view);
+    renderHook(() => useKeyboard());
+
+    const prevented = press(key, {});
+
+    expect(prevented).toBe(true);
+    expect(statusOfSelected()).toBe(expected);
+  });
+
+  it.each(["ArrowUp", "ArrowDown"])(
+    "board で ⌘⇧%s は並び替えを起こさずテキスト選択に渡す",
+    (key) => {
+      // ⌘⇧↑↓ は macOS 標準の「先頭/末尾まで選択」。検索欄で奪われないようにする
+      selectDoingCard("board");
+      renderHook(() => useKeyboard());
+
+      const prevented = press(key, { shiftKey: true });
+
+      expect(prevented).toBe(false);
+      expect(useAppStore.getState().tasks.find((t) => t.id === "t-d")?.position).toBe(0);
+    },
+  );
+
+  it("board で ⇧なしの ⌘↓ は従来どおりレーン内で並び替える", () => {
+    selectDoingCard("board");
+    renderHook(() => useKeyboard());
+
+    const prevented = press("ArrowDown", {});
+
+    expect(prevented).toBe(true);
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-d")?.position).toBe(1);
   });
 });
