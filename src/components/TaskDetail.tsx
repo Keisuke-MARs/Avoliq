@@ -1,15 +1,52 @@
 import { ja } from "@blocknote/core/locales";
-import { useCreateBlockNote } from "@blocknote/react";
+import {
+  FilePanel,
+  FilePanelController,
+  UploadTab,
+  useCreateBlockNote,
+  useDictionary,
+} from "@blocknote/react";
+import type { FilePanelProps } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { toast } from "sonner";
 import { useDebouncedSave } from "../hooks/useDebouncedSave";
 import { registerDetailBridge } from "../lib/detailBridge";
 import { reflowStrayMarkdownTables } from "../lib/markdownTableFix";
 import { tagChipStyle } from "../lib/tagPalette";
+import { createImageUploader } from "../lib/taskImage";
 import { useAppStore } from "../store/appStore";
 import type { Tag } from "../types";
+
+/**
+ * 外部URLの埋め込みタブを持たないファイルパネル。
+ *
+ * Avoliqは外部通信を行わず、CSPのimg-srcもhttpsを許していないため、
+ * 埋め込みタブでURLを貼れても画像は表示されない。
+ * 「貼れるのに映らない」タブをUIに残さないよう、アップロードタブだけを出す。
+ *
+ * 読み込み中のスピナーはFilePanelの内部stateで制御されており外から渡せないため、
+ * setLoadingは何もしない関数にしている。ローカルのDB書き込みは一瞬で終わるので実害はない。
+ */
+function UploadOnlyFilePanel(props: FilePanelProps) {
+  const dictionary = useDictionary();
+
+  return (
+    <FilePanel
+      {...props}
+      tabs={[
+        {
+          name: dictionary.file_panel.upload.title,
+          tabPanel: (
+            <UploadTab blockId={props.blockId} setLoading={() => undefined} />
+          ),
+        },
+      ]}
+    />
+  );
+}
 
 interface TaskDetailProps {
   /** OSのカラースキーム。購読はPalette側で行い、ここでは受け取るだけ */
@@ -51,8 +88,34 @@ export function TaskDetail({ isDark }: TaskDetailProps) {
    */
   const titleEnterArmedRef = useRef(false);
 
+  /**
+   * 画像を貼り付けたときの保存先タスク。
+   * エディタはマウント中に1度しか作られないので、生成時の値を焼き付けずrefから読む。
+   */
+  const taskIdRef = useRef<string | null>(null);
+  taskIdRef.current = task?.id ?? null;
+
+  /**
+   * 画像の貼り付け処理。エディタ生成時に1度だけ渡るのでuseMemoで固定する。
+   * 失敗時のBlockNote側の表示は小さいので、トーストでも知らせてから投げ直す
+   * (投げ直さないとBlockNoteが成功扱いで空のURLを本文に入れてしまう)。
+   */
+  const uploadImage = useMemo(() => {
+    const upload = createImageUploader(() => taskIdRef.current);
+    return async (file: File) => {
+      try {
+        return await upload(file);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "画像を貼り付けられませんでした",
+        );
+        throw error;
+      }
+    };
+  }, []);
+
   // エディタのUI文言(スラッシュメニュー・プレースホルダ等)を日本語にする
-  const editor = useCreateBlockNote({ dictionary: ja });
+  const editor = useCreateBlockNote({ dictionary: ja, uploadFile: uploadImage });
   // 初期読み込み中のonChangeを保存として拾わないためのフラグ
   const loadingRef = useRef(true);
 
@@ -266,7 +329,10 @@ export function TaskDetail({ isDark }: TaskDetailProps) {
           editor={editor}
           theme={isDark ? "dark" : "light"}
           onChange={handleEditorChange}
-        />
+          filePanel={false}
+        >
+          <FilePanelController filePanel={UploadOnlyFilePanel} />
+        </BlockNoteView>
       </div>
     </div>
   );

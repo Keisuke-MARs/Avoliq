@@ -18,6 +18,11 @@ vi.mock("@blocknote/react", () => ({
     replaceBlocks: () => undefined,
     focus: editorFocus,
   }),
+  // 画像パネル一式。描画までは見ないのでnullを返す最小のスタブでよい
+  FilePanel: () => null,
+  FilePanelController: () => null,
+  UploadTab: () => null,
+  useDictionary: () => ({ file_panel: { upload: { title: "アップロード" } } }),
 }));
 
 vi.mock("@blocknote/shadcn", () => ({
