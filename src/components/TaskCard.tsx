@@ -25,9 +25,13 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
   // block は縦方向しか見ないので、⌘←→ でレーンをまたいだとき選択カードが
   // 横方向の表示範囲外に取り残される。どちらも "nearest" なので、
   // 既に見えている場合はスクロールしない。
+  // 依存にstatusId・positionも含めるのは、選択されたまま位置だけが変わる操作があるため。
+  // ⌘↑↓(reorderSelectedTask)はpositionしか変えず、カードのkeyも親レーンも同じなので
+  // 再マウントされない。selectedだけを見ていると、並び替えでレーンのスクロール外へ
+  // 出ても追従しない（2行表示でレーンあたりの可視枚数が減るぶん踏みやすい）。
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [selected]);
+  }, [selected, task.statusId, task.position]);
 
   // 既に消えたタグidが残っていても落ちないよう、引けたものだけ使う
   const tags = task.tagIds
@@ -65,8 +69,8 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
       // 色そのものはCSS側が決める。ここはステータス色を渡すだけ
       style={{ "--av-status": statusColor } as CSSProperties}
     >
-      {/* タイトルは line-clamp-2 で最大2行。1レーン約165〜205pxでは1行だと
-          10文字前後で切れて何のタスクか判別できないため。
+      {/* タイトルは line-clamp-2 で最大2行。1レーン約160〜205pxでは1行だと
+          10文字前後で切れて何のタスクか判別できないため（Issue #3）。
           短いタイトルは1行のままなので、レーンに収まるカード数はほとんど減らない。
           break-words を併記するのは、truncate が持っていた whitespace-nowrap が
           外れることで、URLのような切れ目の無いタイトルが横にはみ出すのを防ぐため。 */}

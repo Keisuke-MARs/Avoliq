@@ -134,6 +134,41 @@ describe("TaskCard の選択追従", () => {
       block: "nearest",
       inline: "nearest",
     });
+    // Element.prototype へのスパイなので、どの要素で呼ばれたかまで見ないと
+    // 「カード自身が寄る」ことの検証にならない
+    expect(vi.mocked(Element.prototype.scrollIntoView).mock.instances[0]).toBe(
+      screen.getByTestId("task-card"),
+    );
+  });
+
+  it("同じレーン内で並び替えても画面内へ寄せ直す(回帰テスト: 依存がselectedだけだと⌘↑↓で追従しない)", () => {
+    const task = makeTask("t-move", "st-todo", "タスク", 0);
+
+    const { rerender } = render(
+      <TaskCard task={task} statusColor="#007AFF" selected />,
+    );
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+
+    // ⌘↑↓(reorderSelectedTask)はpositionだけを変える。カードのkeyも親レーンも
+    // 変わらないので再マウントされず、依存配列が[selected]のままだと再実行されない
+    rerender(<TaskCard task={{ ...task, position: 2 }} statusColor="#007AFF" selected />);
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it("ステータスを移しても画面内へ寄せ直す(回帰テスト: ⌘←→で移動先レーンが横スクロール圏外にありうる)", () => {
+    const task = makeTask("t-cross", "st-todo", "タスク", 0);
+
+    const { rerender } = render(
+      <TaskCard task={task} statusColor="#007AFF" selected />,
+    );
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+
+    rerender(
+      <TaskCard task={{ ...task, statusId: "st-doing" }} statusColor="#5AC8FA" selected />,
+    );
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
   it("選択されていないカードはスクロールさせない", () => {

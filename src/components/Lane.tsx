@@ -13,7 +13,10 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
   // 小さく縮めるために置かれていたが、下限が無いためステータスを増やすほど
   // レーンが潰れる（8レーンで約95px＝2〜3文字で折り返し、実質読めない）。
   // 160px は 880px 幅で5レーンまで横スクロールせずに収まる最大の丸い値
-  // （160×5 + gap 48 + padding 24 = 872 ≤ 880）。
+  // （160×5 + gap 48 + padding 24 = 872 ≤ 879）。右辺が880ではなく879なのは、
+  // Paletteのw-screen 880pxから .av-glass のボーダー0.5px×2を引いた内側の幅だから
+  // （box-sizing: border-box）。余裕は7pxしかないので、ボーダー幅・gap・paddingの
+  // どれかを触るときはこの式を計算し直すこと。
   // このときタイトル幅は 160 − 24 − 14 = 122px で、2行なら約19文字。
   return (
     <section

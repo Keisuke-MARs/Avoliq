@@ -33,7 +33,7 @@
 - Modify: `src/components/TaskCard.tsx:64-67`
 - Test: `src/components/TaskCard.test.tsx`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `src/components/TaskCard.test.tsx` の末尾に、次の describe をまるごと追加する。
 ファイル先頭の import はすべて既存のものでまかなえる（`initialAppState`・`makeTask`・
@@ -79,7 +79,7 @@ describe("TaskCard のタイトル表示", () => {
 });
 ```
 
-- [ ] **Step 2: テストを走らせて失敗を確認する**
+- [x] **Step 2: テストを走らせて失敗を確認する**
 
 Run: `npm test -- src/components/TaskCard.test.tsx -t "TaskCard のタイトル表示"`
 
@@ -87,7 +87,7 @@ Expected: 3件とも FAIL。
 1件目は `expect(element).toHaveClass("line-clamp-2")` で
 「Expected the element to have class: line-clamp-2 / Received: min-w-0 truncate」。
 
-- [ ] **Step 3: 最小限の実装を書く**
+- [x] **Step 3: 最小限の実装を書く**
 
 `src/components/TaskCard.tsx` のタイトル行（現在64〜67行目）を次のように置き換える。
 
@@ -117,13 +117,13 @@ Expected: 3件とも FAIL。
       </div>
 ```
 
-- [ ] **Step 4: テストを走らせて成功を確認する**
+- [x] **Step 4: テストを走らせて成功を確認する**
 
 Run: `npm test -- src/components/TaskCard.test.tsx`
 
 Expected: 追加した3件を含め、このファイルのテストがすべて PASS。
 
-- [ ] **Step 5: コミットする**
+- [x] **Step 5: コミットする**
 
 ```bash
 git add src/components/TaskCard.tsx src/components/TaskCard.test.tsx
@@ -139,7 +139,7 @@ git commit -m "fix: カードのタイトルを2行まで表示して判別で�
 - Modify: `src/components/Board.tsx:71`
 - Test: `src/components/Board.test.tsx`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `src/components/Board.test.tsx` の `describe("Board", ...)` の中に、次の2件を追加する。
 `setupBoard` は同ファイル内にすでに定義されているものをそのまま使う。
@@ -162,13 +162,13 @@ git commit -m "fix: カードのタイトルを2行まで表示して判別で�
   });
 ```
 
-- [ ] **Step 2: テストを走らせて失敗を確認する**
+- [x] **Step 2: テストを走らせて失敗を確認する**
 
 Run: `npm test -- src/components/Board.test.tsx -t "最小幅"`
 
 Expected: FAIL。「Expected the element to have class: min-w-[160px] / Received: flex flex-1 min-w-0 flex-col」。
 
-- [ ] **Step 3: `Lane.tsx` を修正する**
+- [x] **Step 3: `Lane.tsx` を修正する**
 
 `src/components/Lane.tsx` の `return (` 直前に理由のコメントを置き、
 `<section>` の `className`（現在16行目）を差し替える。
@@ -204,7 +204,7 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
     >
 ```
 
-- [ ] **Step 4: `Board.tsx` を修正する**
+- [x] **Step 4: `Board.tsx` を修正する**
 
 `src/components/Board.tsx` の最後の `<div data-testid="board">`（現在71行目）を
 次のように置き換える。
@@ -226,13 +226,13 @@ export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
     >
 ```
 
-- [ ] **Step 5: テストを走らせて成功を確認する**
+- [x] **Step 5: テストを走らせて成功を確認する**
 
 Run: `npm test -- src/components/Board.test.tsx`
 
 Expected: 追加した2件を含め、このファイルのテストがすべて PASS。
 
-- [ ] **Step 6: コミットする**
+- [x] **Step 6: コミットする**
 
 ```bash
 git add src/components/Lane.tsx src/components/Board.tsx src/components/Board.test.tsx
@@ -252,7 +252,7 @@ Task 2 でボードが横スクロールするようになったため、`⌘←
 `scrollIntoView({ block: "nearest" })` は縦方向しか見ないので、選択カードが
 画面外に取り残される。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `src/components/TaskCard.test.tsx` の末尾に、次の describe をまるごと追加する。
 `vi` はファイル先頭ですでに import 済みなので import 行は増やさない。
@@ -286,13 +286,13 @@ describe("TaskCard の選択追従", () => {
 });
 ```
 
-- [ ] **Step 2: テストを走らせて失敗を確認する**
+- [x] **Step 2: テストを走らせて失敗を確認する**
 
 Run: `npm test -- src/components/TaskCard.test.tsx -t "TaskCard の選択追従"`
 
 Expected: 1件目が FAIL（「Received: {"block": "nearest"}」）、2件目は PASS。
 
-- [ ] **Step 3: 実装を書く**
+- [x] **Step 3: 実装を書く**
 
 `src/components/TaskCard.tsx` の `useEffect`（現在23〜26行目）を次のように置き換える。
 
@@ -318,13 +318,13 @@ Expected: 1件目が FAIL（「Received: {"block": "nearest"}」）、2件目は
   }, [selected]);
 ```
 
-- [ ] **Step 4: テストを走らせて成功を確認する**
+- [x] **Step 4: テストを走らせて成功を確認する**
 
 Run: `npm test -- src/components/TaskCard.test.tsx`
 
 Expected: このファイルのテストがすべて PASS。
 
-- [ ] **Step 5: コミットする**
+- [x] **Step 5: コミットする**
 
 ```bash
 git add src/components/TaskCard.tsx src/components/TaskCard.test.tsx
@@ -341,7 +341,7 @@ git commit -m "fix: 横スクロール時も選択中のカードが画面内に
 このタスクは設定値だけの変更で、jsdom上のテストでは検証できない。
 検証は Task 5 の手動スモークで行う。
 
-- [ ] **Step 1: `tauri.conf.json` を修正する**
+- [x] **Step 1: `tauri.conf.json` を修正する**
 
 `app.windows[0].width` の値を `720` から `880` に変更する。`height` の `480` は変更しない。
 
@@ -359,13 +359,13 @@ git commit -m "fix: 横スクロール時も選択中のカードが画面内に
         "height": 480,
 ```
 
-- [ ] **Step 2: JSONとして壊れていないことを確認する**
+- [x] **Step 2: JSONとして壊れていないことを確認する**
 
 Run: `node -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).app.windows[0].width)"`
 
 Expected: `880`
 
-- [ ] **Step 3: コミットする**
+- [x] **Step 3: コミットする**
 
 ```bash
 git add src-tauri/tauri.conf.json
@@ -378,13 +378,13 @@ git commit -m "fix: ウィンドウ幅を880pxに広げてレーンあたりの�
 
 **Files:** なし（検証のみ）
 
-- [ ] **Step 1: テストスイート全体を走らせる**
+- [x] **Step 1: テストスイート全体を走らせる**
 
 Run: `npm test`
 
 Expected: 全テスト PASS。落ちるものがあれば、その原因を潰してから次へ進む。
 
-- [ ] **Step 2: 型チェックが通ることを確認する**
+- [x] **Step 2: 型チェックが通ることを確認する**
 
 Run: `npx tsc --noEmit`
 
@@ -405,6 +405,12 @@ Expected: エラーなしで終了（終了コード0、出力なし）。
 7. `Enter` でタスク詳細を開き、レイアウトが破綻していないこと
    （幅が広がるので本文欄が816pxになる。読み幅の調整は今回のスコープ外だが、
    崩れていないことだけ確認する）
+8. 6レーンで右端までスクロールしたとき、最後のレーンの右に12pxの余白が残ること
+   （WebKitにはスクロールコンテナの末尾側paddingが可視領域に含まれない挙動があり、
+   `Board` の `px-3` が効かず最後のレーンが縁に張り付く可能性がある。
+   出るなら最後のレーンに疑似要素のスペーサーを置くか、レーン側の `pr` で吸収する）
+9. `⌘↑` `⌘↓` でカードを並び替えたとき、選択カードがレーンの表示範囲から
+   出ずに追従すること（Task 6 で直した既存バグの確認）
 
 - [ ] **Step 4: スモークで問題が見つかった場合**
 
@@ -414,11 +420,61 @@ Expected: エラーなしで終了（終了コード0、出力なし）。
 
 ---
 
+### Task 6: コードレビューの指摘を反映する（計画に無かった追加分）
+
+Task 1〜4 の完了後にコードレビューを受け、次を追加で実施した。
+
+- [x] **⌘↑↓ で選択カードが追従しない既存バグを直す**
+
+`src/components/TaskCard.tsx` の `useEffect` の依存配列を
+`[selected]` → `[selected, task.statusId, task.position]` に広げた。
+
+`⌘←` `⌘→` は `statusId` が変わってカードが別レーン＝別の親へ移るため再マウントされ、
+effect が走っていた。一方 `⌘↑` `⌘↓` は `position` しか変えず、`Lane` が
+`key={task.id}` で並べているため**同じ親の中で並び替わるだけで再マウントされない**。
+`selected` も `true` のままなので effect が再実行されず追従しなかった。
+
+今回の変更が原因ではないが、2行表示でレーンあたりの可視枚数が減るぶん
+踏みやすくなるため、同じ変更に含めて直した。
+`src/components/TaskCard.test.tsx` に、並び替え時とステータス移動時の
+再発火を確かめる回帰テストを2件追加している。
+
+- [x] **`scrollIntoView` のテストを「どの要素で呼ばれたか」まで見るようにする**
+
+`Element.prototype` へのスパイなので、呼び出し引数だけでは
+「カード自身が寄る」ことの検証にならなかった。`mock.instances[0]` が
+`task-card` と一致することを確かめるアサーションを足した。
+
+- [x] **レーン数の振る舞いのテストを足す**
+
+`src/components/Board.test.tsx` に「ステータス6つでも6レーン描画され、
+全レーンが最小幅を保ち、ボードが横スクロール可能なまま」を追加した。
+クラス名の写しだけでなく、レーン数という振る舞いの側を固定するため。
+
+- [x] **コメントと設計書の数値・記述の誤りを直す**
+
+| 箇所 | 誤り | 訂正 |
+|---|---|---|
+| `TaskCard.tsx` | 「1レーン約165〜205px」（165は720px時代の値） | 「約160〜205px」＋ Issue #3 の出典を復活 |
+| `Lane.tsx` / 設計書 | `872 ≤ 880`（余裕8px） | `872 ≤ 879`（`.av-glass` のボーダー0.5px×2を引いた内側の幅。余裕は7px） |
+| 設計書 | 「`useChipOverflow` はレーン幅が変わっても再測定される」 | ResizeObserver は無く、`resetKey` はタグ名の連結のみ。実際に測り直されるのは Board の再マウント経由 |
+| 設計書 | 「ランディングページは影響なし」 | `PaletteMock` は影響なしだが、`landing/public/shots/*.png` は720px幅の実写のため撮り直しが必要（別Issue） |
+
+- [ ] **フォローアップIssueを立てる**
+
+1. LPのスクリーンショット（`landing/public/shots/board.png` / `search.png`）を
+   880px幅で撮り直す。放置すると公開ページで今回直したバグを見せ続けることになる。
+2. 詳細ビューの読み幅（`px-8` 固定のため880px化で本文欄が816pxになる）に
+   `max-width` を入れるか検討する。
+
+---
+
 ## 完了条件
 
-- [ ] `npm test` が全件 PASS
-- [ ] `npx tsc --noEmit` がエラーなし
-- [ ] 手動スモークチェックの7項目すべてを確認
+- [x] `npm test` が全件 PASS
+- [x] `npx tsc --noEmit` がエラーなし
+- [x] コードレビューで approved
+- [ ] 手動スモークチェックの9項目すべてを確認
 - [ ] Issue #3 の「確認すること」を満たす:
   - 長いタイトルのタスクが判別できる（2行・約25文字）
   - レーン数を増やしても表示が崩れない（最小幅160px + 横スクロール）

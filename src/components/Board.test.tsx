@@ -65,6 +65,28 @@ describe("Board", () => {
     expect(board).toHaveClass("overflow-y-hidden");
   });
 
+  it("ステータスが6つでも全レーンを描画し、最小幅と横スクロールを保つ", () => {
+    // 880px幅では6レーンから横スクロールに移行する。等分をやめた影響で
+    // レーンが落ちたり畳まれたりしないこと(=描画の責務は変えていないこと)を固定する
+    useAppStore.setState({
+      statuses: [
+        ...statuses,
+        { id: "st-wait", boardId: "board-1", name: "保留", color: "#AF52DE", position: 4 },
+        { id: "st-hold", boardId: "board-1", name: "凍結", color: "#FF3B30", position: 5 },
+      ],
+      tasks,
+      currentBoardId: "board-1",
+    });
+    render(<Board />);
+
+    const lanes = screen.getAllByTestId("lane");
+    expect(lanes).toHaveLength(6);
+    for (const lane of lanes) {
+      expect(lane).toHaveClass("min-w-[160px]");
+    }
+    expect(screen.getByTestId("board")).toHaveClass("overflow-x-auto");
+  });
+
   it("カードをposition順に並べる", () => {
     setupBoard();
     render(<Board />);
