@@ -175,3 +175,36 @@ describe("useKeyboard: ⌘K (タグパレット)", () => {
     expect(useAppStore.getState().tagPaletteOpen).toBe(true);
   });
 });
+
+describe("useKeyboard: 先に処理済みのキー", () => {
+  it("defaultPreventedなkeydownでは board のキー処理を走らせない", () => {
+    // SearchBar がタグ候補の ↑↓ / Enter を preventDefault して先に処理する経路を再現する。
+    // ここでガードしないと、候補を1つ下へ動かした同じキーでカードまで移動してしまう
+    const input = document.createElement("input");
+    input.id = SEARCH_INPUT_ID;
+    document.body.appendChild(input);
+    input.addEventListener("keydown", (e) => e.preventDefault());
+
+    useAppStore.setState({ ...initialAppState, statuses, tasks, tags, view: "board" });
+    renderHook(() => useKeyboard());
+
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
+    );
+
+    expect(useAppStore.getState().selectedTaskId).toBeNull();
+
+    input.remove();
+  });
+
+  it("preventDefaultされていなければ従来どおりカードが選ばれる", () => {
+    useAppStore.setState({ ...initialAppState, statuses, tasks, tags, view: "board" });
+    renderHook(() => useKeyboard());
+
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
+    );
+
+    expect(useAppStore.getState().selectedTaskId).toBe("t-a");
+  });
+});
