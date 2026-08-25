@@ -1,14 +1,22 @@
 import { renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as api from "@/lib/api";
 import { hidePalette } from "@/lib/api";
 import { registerDetailBridge } from "@/lib/detailBridge";
 import { initialAppState, useAppStore } from "@/store/appStore";
 import { statuses, tags, tasks } from "@/test/fixtures";
+import type { Task } from "@/types";
 import { SEARCH_INPUT_ID, useKeyboard } from "./useKeyboard";
 
 vi.mock("@/lib/api", () => ({
   hidePalette: vi.fn(),
   taskMove: vi.fn(),
+  taskDelete: vi.fn(),
+  taskRestore: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
 
 /** ⌘P押下を再現する KeyboardEvent を作る */
@@ -264,5 +272,94 @@ describe("useKeyboard: ⇧付きの⌘矢印はOS標準のテキスト選択に�
 
     expect(prevented).toBe(true);
     expect(useAppStore.getState().tasks.find((t) => t.id === "t-d")?.position).toBe(1);
+  });
+
+  it.each(["ArrowUp", "ArrowDown"])("detail で ⌘⇧%s は本文の選択に渡す", (key) => {
+    // detail は ⌘↑↓ 自体を扱っていないので元から素通りするはず。
+    // 将来 detail に並び替えを足す人が ⇧ ガードを忘れたら、このテストが赤くなって気付ける
+    selectDoingCard("detail");
+    renderHook(() => useKeyboard());
+
+    const prevented = press(key, { shiftKey: true });
+
+    expect(prevented).toBe(false);
+    expect(useAppStore.getState().tasks.find((t) => t.id === "t-d")?.position).toBe(0);
+  });
+});
+
+describe("useKeyboard: board でカード未選択のときは入力欄のキー操作を優先する", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    useAppStore.setState(initialAppState);
+  });
+
+  /** フィクスチャから指定idのタスクを取り出す(APIの戻り値のスタブに使う) */
+  function taskOf(id: string): Task {
+    const task = tasks.find((t) => t.id === id);
+    if (task === undefined) throw new Error(`fixture task not found: ${id}`);
+    return task;
+  }
+
+  /** キー押下を再現し、preventDefaultされたかどうかを返す */
+  function pressMeta(key: string, modifiers: { shiftKey?: boolean } = {}): boolean {
+    const event = new KeyboardEvent("keydown", {
+      key,
+      metaKey: true,
+      cancelable: true,
+      ...modifiers,
+    });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  it.each(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace"])(
+    "カード未選択の ⌘%s は空振りするだけなので検索欄へ譲る",
+    (key) => {
+      // カード未選択 = 検索欄にキャレットがある状態。ストア側はどれも早期returnするのに
+      // preventDefaultだけ残ると、行頭/行末への移動や行頭までの削除が死んでしまう
+      useAppStore.setState({ ...initialAppState, tasks, statuses, tags, selectedTaskId: null });
+      renderHook(() => useKeyboard());
+
+      const prevented = pressMeta(key);
+
+      expect(prevented).toBe(false);
+      expect(useAppStore.getState().tasks).toEqual(tasks);
+    },
+  );
+
+  it("カード選択中の ⌘⌫ は従来どおり削除する", () => {
+    vi.mocked(api.taskDelete).mockResolvedValue(taskOf("t-d"));
+    useAppStore.setState({ ...initialAppState, tasks, statuses, tags, selectedTaskId: "t-d" });
+    renderHook(() => useKeyboard());
+
+    const prevented = pressMeta("Backspace");
+
+    expect(prevented).toBe(true);
+    expect(api.taskDelete).toHaveBeenCalledWith("t-d");
+  });
+
+  it("⌘⇧Z は標準のredoなので復元を走らせず入力欄へ譲る", () => {
+    // case "z" / "Z" は Caps Lock 対策。⇧ 付きまで拾うと検索欄の redo を奪ってしまう
+    useAppStore.setState({ ...initialAppState, tasks, statuses, tags, lastDeletedTaskId: "t-f" });
+    renderHook(() => useKeyboard());
+
+    const prevented = pressMeta("Z", { shiftKey: true });
+
+    expect(prevented).toBe(false);
+    expect(api.taskRestore).not.toHaveBeenCalled();
+  });
+
+  it("⇧なしの ⌘Z は従来どおり削除を取り消す", () => {
+    vi.mocked(api.taskRestore).mockResolvedValue(taskOf("t-f"));
+    useAppStore.setState({ ...initialAppState, tasks, statuses, tags, lastDeletedTaskId: "t-f" });
+    renderHook(() => useKeyboard());
+
+    const prevented = pressMeta("z");
+
+    expect(prevented).toBe(true);
+    expect(api.taskRestore).toHaveBeenCalledWith("t-f");
   });
 });

@@ -44,11 +44,20 @@ function isTextSelectionArrow(e: KeyboardEvent): boolean {
   );
 }
 
+/**
+ * カードを選んでいないと何も起きない(ストア側が早期returnする)⌘ショートカットのキー。
+ * カード未選択 = 検索欄にキャレットがある状態なので、空振りさせるくらいなら
+ * 入力欄の標準操作(⌘←→=行頭/行末へ移動、⌘⌫=行頭まで削除)に譲る。
+ */
+const CARD_REQUIRED_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace"];
+
 /** ⌘付きのショートカット。処理したら true を返す */
 function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
   // 検索欄にフォーカスがある状態で ⌘⇧← などを打ったとき、選択操作を奪わずOSへ譲る。
   // カード選択中は入力欄から外れているので何も起きないが、⇧なしの⌘矢印で足りるため実害はない
   if (isTextSelectionArrow(e)) return false;
+
+  if (s.selectedTaskId === null && CARD_REQUIRED_KEYS.includes(e.key)) return false;
 
   switch (e.key) {
     case "ArrowLeft":
@@ -68,6 +77,9 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
       return true;
     case "z":
     case "Z":
+      // "Z"はCaps Lock対策(このときshiftKeyは立たない)。
+      // ⌘⇧Zは入力欄のredoなので、アプリのundoとは別物として扱いOSへ譲る
+      if (e.shiftKey) return false;
       void s.undoDelete();
       return true;
     case "n":
