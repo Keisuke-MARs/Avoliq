@@ -612,6 +612,25 @@ describe("SearchBar: 奪ってはいけないキー", () => {
     expect(fireEvent.keyDown(input, { key: "ArrowDown" })).toBe(true);
   });
 
+  it("⌘↓ は奪わない（カードの並び替えを壊さないため）", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "#" } });
+    // 候補にハイライトが乗っている状態でも奪ってはいけない
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    expect(fireEvent.keyDown(input, { key: "ArrowDown", metaKey: true })).toBe(true);
+  });
+
+  it("⇧↑ は奪わない（入力欄のテキスト選択を壊さないため）", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "#" } });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    expect(fireEvent.keyDown(input, { key: "ArrowUp", shiftKey: true })).toBe(true);
+  });
+
   it("Tab は奪わない（候補送りは廃止した）", () => {
     render(<SearchBar />);
     const input = screen.getByTestId("search-input");
@@ -713,6 +732,10 @@ export function SearchBar() {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     // IMEが処理中のキーには触らない
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    // 修飾キー付きは別の役目を持つので奪わない。⌘↑↓はカードの並び替え、⇧↑↓は入力欄の
+    // テキスト選択。特に⌘系は useKeyboard 側のdefaultPreventedガードより前で処理されるため、
+    // ここで奪うと「候補が動く」と「カードが並び替わる」が同時に起きてしまう
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
     // 候補が出ていないときは何も奪わない。カード移動も「開く / 作成」も従来どおり
     // window のハンドラ(useKeyboard)へ届く
     if (view !== "board" || !isTagToken || suggestions.length === 0) return;

@@ -109,6 +109,10 @@ const [highlightIndex, setHighlightIndex] = useState<number | null>(null);
 
 - 端で折り返さない（wrap しない）。「いま何番目を見ているか」が分かることが本issueの目的なので、
   端で止まる方が位置を見失いにくい。
+- **修飾キー（⌘ / ⌃ / ⌥ / ⇧）が付いているキーは一切奪わない。** `⌘↑` `⌘↓` は
+  カードの並び替え、`⇧↑` `⇧↓` は入力欄のテキスト選択という別の役目を持つ。
+  さらに `handleBoardKey` の `defaultPrevented` ガードは ⌘系の分岐より後にあるため、
+  ここで ⌘付きを奪うと「候補が動く」と「カードが並び替わる」が同時に起きてしまう。
 - IME 処理中（`event.nativeEvent.isComposing || event.keyCode === 229`）は従来どおり何もしない。
 - 奪わないキーでは `preventDefault()` を呼ばない。呼んでしまうと window 側のガードに
   引っかかり、カード移動や「開く / 作成」が黙って死ぬ。
