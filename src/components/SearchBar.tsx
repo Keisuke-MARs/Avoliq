@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { SEARCH_INPUT_ID } from "@/hooks/useKeyboard";
 import { normalizeHash } from "@/lib/boardNav";
 import { useAppStore } from "@/store/appStore";
@@ -17,12 +17,12 @@ export function SearchBar() {
   const currentBoardId = useAppStore((s) => s.currentBoardId);
 
   /**
-   * Tab連打で候補を送るための状態。
-   * base = ユーザーが実際に打った文字（補完で置き換わる前の値）、cycle = 何番目の候補を出しているか。
-   * 補完自体が searchQuery を書き換えるので、打った文字を別に覚えておかないと候補が固定されてしまう。
+   * いま何番目の候補を見ているか。null は「着地点なし」を表す
+   * (TagPalette の highlightId: null と同じ意味づけ)。
+   * 着地点が無い間は Enter を奪わないので、board の「開く / 作成」も、
+   * 日本語入力の変換確定 Enter も、従来どおり素通りする。
    */
-  const tabBaseRef = useRef<string | null>(null);
-  const tabCycleRef = useRef(0);
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null);
 
   /**
    * SearchBar は Palette.tsx で view に関係なく常時マウントされたままなので
@@ -34,13 +34,11 @@ export function SearchBar() {
 
   /**
    * ボード切替(selectBoard)はonChange/onBlurを経由せず、searchQueryとcurrentBoardIdを
-   * 直接まとめて書き換える。そのため候補送りの状態(tabBaseRef/tabCycleRef)を放置すると、
-   * 切替後に前のボードの続きの位置からTab補完が始まってしまう。currentBoardIdの変化を
-   * 検知して、そのタイミングで必ずリセットする。
+   * 直接まとめて書き換える。そのためハイライトを放置すると、切替後に前のボードの候補を
+   * 指したままになってしまう。currentBoardIdの変化を検知して、そのタイミングでリセットする。
    */
   useEffect(() => {
-    tabBaseRef.current = null;
-    tabCycleRef.current = 0;
+    setHighlightIndex(null);
   }, [currentBoardId]);
 
   // 全角＃の正規化はboardNav.normalizeHashに集約している(parseSearchQueryと同じ関数を使う)
@@ -49,15 +47,13 @@ export function SearchBar() {
   const isTagToken = lastToken.startsWith("#");
 
   /**
-   * トークン文字列から候補タグを計算する。
-   * useMemo にすると tabBaseRef(ref)の変化では再計算されず、
-   * 「Tab以外のキーで参照だけリセットして再描画は起きない」ケースで前回描画時の
-   * 古い候補配列を使ってしまう(候補送りが1周目に巻き戻るバグになる)。
-   * そのためTab押下時は毎回このまま呼び出して候補を作り直す。
+   * 最後のトークンに前方一致するタグを、使用件数の多い順に返す。
+   * 描画のたびに作り直すので、常に現在の入力と一致する
+   * (件数が少なく計算も軽いため、memo化して状態がズレる危険を持ち込まない)。
    */
-  function computeSuggestions(tokenSource: string): Tag[] {
+  function computeSuggestions(): Tag[] {
     if (!isTagToken) return [];
-    const prefix = tokenSource.replace(/^#/, "").toLowerCase();
+    const prefix = lastToken.replace(/^#/, "").toLowerCase();
     const counts = new Map<string, number>();
     for (const task of tasks) {
       for (const id of task.tagIds) counts.set(id, (counts.get(id) ?? 0) + 1);
@@ -70,45 +66,53 @@ export function SearchBar() {
       .slice(0, MAX_SUGGESTIONS);
   }
 
-  // ドロップダウン表示用。描画のたびに計算するので常に現在の入力と一致する
-  const suggestions = computeSuggestions(tabBaseRef.current ?? lastToken);
+  const suggestions = computeSuggestions();
+
+  /**
+   * 実際に使うハイライト位置。tasks/tags が外から変わって候補が減ったときに、
+   * 範囲外の行を指したままにしないためのクランプ。
+   */
+  const activeIndex =
+    highlightIndex !== null && highlightIndex < suggestions.length ? highlightIndex : null;
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     // IMEが処理中のキーには触らない
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    // 修飾キー付きは別の役目を持つので奪わない。⌘↑↓はカードの並び替え、⇧↑↓は
+    // 「検索欄からレーンへ入る」操作(useKeyboard側が⇧付きでも拾う仕様)。
+    // 特に⌘系は useKeyboard 側のdefaultPreventedガードより前で処理されるため、
+    // ここで奪うと「候補が動く」と「カードが並び替わる」が同時に起きてしまう
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    // 候補が出ていないときは何も奪わない。カード移動も「開く / 作成」も従来どおり
+    // window のハンドラ(useKeyboard)へ届く
+    if (view !== "board" || !isTagToken || suggestions.length === 0) return;
 
-    if (event.key !== "Tab") {
-      // Tab以外が来たら補完のサイクルはリセットする
-      tabBaseRef.current = null;
-      tabCycleRef.current = 0;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setHighlightIndex(
+        activeIndex === null ? 0 : Math.min(activeIndex + 1, suggestions.length - 1),
+      );
       return;
     }
-    if (!isTagToken) return;
 
-    // tabBaseRef はまだ書き換えず、今回使う base だけ先に確定する。
-    // 直前のTab以外のキーで参照だけリセットされ再描画が起きていない場合に備え、
-    // 描画時のsuggestionsを使い回さずここで確定した base から作り直す
-    const base = tabBaseRef.current ?? lastToken;
-    const freshSuggestions = computeSuggestions(base);
-    // 候補が0件ならここで抜ける。tabBaseRef/tabCycleRefはまだ何も書き換えていないので
-    // 状態は汚れない(次に候補が出たとき、変な位置から候補送りが始まらない)。
-    // ここで preventDefault していないので、Tabのネイティブなフォーカス移動も邪魔しない
-    if (freshSuggestions.length === 0) return;
-
-    // 候補が1件以上あるときだけ preventDefault する。補完は Tab だけで行う。
-    // Enter は board の「詳細を開く / 新規作成」の中核キーなので、ここで奪うと
-    // board のゴールデンパスが壊れる。Tab はIMEの変換確定を生成せず、
-    // board でも未割当(default: break)なので安全に奪える
-    event.preventDefault();
-    if (tabBaseRef.current === null) {
-      tabBaseRef.current = base;
-      tabCycleRef.current = 0;
+    if (event.key === "ArrowUp") {
+      // 着地点が無い状態の↑は候補の操作ではないので、window側(カード移動)に譲る
+      if (activeIndex === null) return;
+      event.preventDefault();
+      setHighlightIndex(activeIndex === 0 ? null : activeIndex - 1);
+      return;
     }
-    const picked = freshSuggestions[tabCycleRef.current % freshSuggestions.length];
-    tabCycleRef.current += 1;
 
-    const head = normalized.slice(0, normalized.length - lastToken.length);
-    setSearchQuery(`${head}#${picked.name}`);
+    if (event.key === "Enter") {
+      // 着地点が無いEnterは board の「開く / 作成」の中核キーなので絶対に奪わない
+      if (activeIndex === null) return;
+      event.preventDefault();
+      const picked = suggestions[activeIndex];
+      const head = normalized.slice(0, normalized.length - lastToken.length);
+      // 末尾のスペースで最後のトークンを空にする。候補が閉じ、そのまま続けて検索語を打てる
+      setSearchQuery(`${head}#${picked.name} `);
+      setHighlightIndex(null);
+    }
   };
 
   return (
@@ -133,18 +137,17 @@ export function SearchBar() {
         placeholder="タスクを検索、または入力して新規作成"
         value={searchQuery}
         onChange={(e) => {
-          // 打ち直したら補完のサイクルもリセットする
-          tabBaseRef.current = null;
-          tabCycleRef.current = 0;
+          // 打ち直したら着地点も捨てる。IMEの変換中もここを通るので、
+          // 変換の途中でハイライトが復活することはない
+          setHighlightIndex(null);
           setSearchQuery(e.target.value);
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => {
-          // フォーカスが外れたら候補送りの状態も一緒に捨てる。
-          // (例: カード選択でuseKeyboardがblurSearchInputを呼んだあと、再び検索欄へ戻って
-          // Tabを押したとき、前回の続きの位置から補完されると使用者が混乱するため)
-          tabBaseRef.current = null;
-          tabCycleRef.current = 0;
+          // フォーカスが外れたら着地点も一緒に捨てる
+          // (例: カード選択でuseKeyboardがblurSearchInputを呼んだあと、再び検索欄へ戻ったとき、
+          // 前回のハイライトが残っていると使用者が混乱するため)
+          setHighlightIndex(null);
           setFocused(false);
         }}
         onKeyDown={handleKeyDown}
@@ -166,20 +169,28 @@ export function SearchBar() {
           className="av-surface-raised absolute left-11 top-[52px] z-20 w-56 overflow-hidden rounded-lg py-1 shadow-lg"
           style={{ border: "0.5px solid var(--av-hairline)" }}
         >
-          {suggestions.map((tag) => (
+          {suggestions.map((tag, i) => (
             <div
               key={tag.id}
+              // 着地点が目で追えることが本機能の目的なので、ハイライト行だけ面を変え、
+              // 確定キーの案内もその行にだけ出す
+              data-highlighted={i === activeIndex ? "true" : undefined}
               className="flex items-center gap-2 px-2.5 py-1 text-[12px]"
-              style={{ color: "var(--av-text-primary)" }}
+              style={{
+                color: "var(--av-text-primary)",
+                backgroundColor: i === activeIndex ? "var(--av-surface-hover)" : undefined,
+              }}
             >
               <span
                 className="h-1.5 w-1.5 shrink-0 rounded-full"
                 style={{ backgroundColor: tag.color }}
               />
               <span className="min-w-0 flex-1 truncate">{tag.name}</span>
-              <span className="shrink-0 text-[10px]" style={{ color: "var(--av-text-muted)" }}>
-                Tab
-              </span>
+              {i === activeIndex && (
+                <span className="shrink-0 text-[10px]" style={{ color: "var(--av-text-muted)" }}>
+                  Enter
+                </span>
+              )}
             </div>
           ))}
         </div>

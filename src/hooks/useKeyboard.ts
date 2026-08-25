@@ -128,9 +128,19 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
 /** ボード画面のキーマップ */
 function handleBoardKey(e: KeyboardEvent, s: AppState): void {
   if (e.metaKey) {
+    // ⌘系は先にhandleMetaKeyへ通す。boardにはBlockNoteのような競合相手がおらず
+    // defaultPreventedを立てて先取りする側がいないため、ここではガードしない
+    // (対称性のためにガードを足すと下の⌘Kのテストが赤くなる)
     if (handleMetaKey(e, s)) e.preventDefault();
     return;
   }
+
+  // SearchBar のタグ候補選択(↑↓ / Enter)のように、既に処理済みのキーはここでは触らない。
+  // 検索欄と board は同じ window の keydown 1本を共有しているので、
+  // このガードが無いと「候補を1つ下へ」と「カードを1つ下へ」が同時に起きる。
+  // detail側の⌘K(BlockNoteのリンク作成に譲る)と同じ作法。
+  if (e.defaultPrevented) return;
+
   // ⌃ / ⌥ 付きはブラウザ/OS側に任せる
   if (e.ctrlKey || e.altKey) return;
 

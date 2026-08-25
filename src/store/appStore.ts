@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 import * as api from "@/lib/api";
-import { buildLanes, filterTasks, selectionAfterDelete } from "@/lib/boardNav";
+import { buildLanes, buildTaskDraftFromQuery, filterTasks, selectionAfterDelete } from "@/lib/boardNav";
 import type { Board, Status, Tag, Task, View } from "@/types";
 
 export interface AppState {
@@ -260,10 +260,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
   async createTaskFromSearch() {
     if (boardLoading) return; // ボード切替の読込中は旧ボードのtasksを触ってしまうので拒否する
     if (taskCreating) return; // 応答待ち中のEnter連打等による二重作成を防ぐ
-    const { currentBoardId, statuses, searchQuery } = get();
-    const title = searchQuery.trim();
+    const { currentBoardId, statuses, searchQuery, tags } = get();
+    // 「#タグ名」はタイトルではなく付与するタグとして扱う。
+    // 完全一致しないトークンはタイトルに残る(buildTaskDraftFromQueryのコメント参照)
+    const draft = buildTaskDraftFromQuery(searchQuery, tags);
     const firstStatus = [...statuses].sort((a, b) => a.position - b.position)[0];
-    if (currentBoardId === null || firstStatus === undefined || title === "") return;
+    if (currentBoardId === null || firstStatus === undefined || draft.title === "") return;
 
     // 応答が返ってきた時点でも同じ切替要求を見ているか確認するため、開始時点のエポックを覚えておく
     const epoch = boardEpoch;
@@ -271,10 +273,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
     taskCreating = true;
     // IDはRust側で採番するUUIDなので、ここだけは楽観的更新ではなくAPI先行で作る
     try {
-      const created = await api.taskCreate(currentBoardId, firstStatus.id, title);
+      const created = await api.taskCreate(currentBoardId, firstStatus.id, draft.title);
       // 待っている間にボードが切り替えられていたら、作成自体はDBに済んでいるので
       // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
       if (epoch !== boardEpoch) return;
+      // taskCreateはタグを受け取らないので、作成後に1つずつ付ける。
+      // タグ付与の失敗は作成そのものの失敗ではないので、ここだけ独立したtry/catchにして
+      // 下の正引き・画面反映まで進める。ここで止めると、DBにあるタスクが画面に出ないまま
+      // 検索欄も残り、もう一度Enterを押した使用者が同じタスクを二重に作ってしまう
+      try {
+        for (const tagId of draft.tagIds) {
+          await api.taskTagToggle(created.id, tagId);
+          if (epoch !== boardEpoch) return;
+        }
+      } catch (e) {
+        toast.error(`タグの付与に失敗しました: ${String(e)}`);
+      }
       // Rust側が先頭挿入時に同レーンを再採番した後の実状態をDBから正引きする。
       // 手元での「残存タスクのposition+1」という楽観計算だと、応答待ち中に同レーンで
       // 削除等が起きた場合にRust側の再採番結果とズレるため、必ずtasksListで正引きする

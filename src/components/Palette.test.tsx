@@ -16,6 +16,7 @@ vi.mock("@/lib/api", () => ({
   taskMove: vi.fn(),
   taskDelete: vi.fn(),
   taskRestore: vi.fn(),
+  taskTagToggle: vi.fn(),
   hidePalette: vi.fn(),
   settingGet: vi.fn(),
   tagsList: vi.fn(),
@@ -53,6 +54,12 @@ function selectedCardId(): string | null {
     .queryAllByTestId("task-card")
     .find((c) => c.getAttribute("data-selected") === "true");
   return selected?.getAttribute("data-task-id") ?? null;
+}
+
+/** タグ候補ドロップダウンでハイライトされている行を返す。無ければ null */
+function highlightedSuggestion(): HTMLElement | null {
+  const dropdown = screen.queryByTestId("tag-suggest");
+  return dropdown?.querySelector<HTMLElement>("[data-highlighted='true']") ?? null;
 }
 
 beforeEach(() => {
@@ -535,5 +542,113 @@ describe("Palette: ⌘Kでタグパレットを開閉する", () => {
     await user.keyboard("{Escape}");
 
     expect(screen.queryByTestId("tag-palette-scrim")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SearchBar(React の onKeyDown で preventDefault する側)と useKeyboard(window の keydown で
+ * defaultPrevented を見て降りる側)は、DOMイベント1個だけでつながっている。
+ * 片方の単体テストではこの連結を確かめられない(どちらかを消しても両方緑のまま通る)ので、
+ * 実物の Palette を丸ごと描画して「候補の移動」と「カードの移動」が同時に起きないことを固定する。
+ */
+describe("Palette: #タグ候補の選択から作成まで", () => {
+  it("候補が出ている間の↓は候補だけを動かし、カード選択は動かさない", async () => {
+    const user = await renderPalette();
+    await user.keyboard("#");
+    // 「#」だけでは絞り込みは効かないので、カードは6枚とも残ったまま
+    // (=ガードが無ければ↓で先頭カードが選ばれてしまう状況)
+    expect(screen.getAllByTestId("task-card")).toHaveLength(6);
+
+    await user.keyboard("{ArrowDown}");
+
+    // 使用件数の多い順なので バグ(2件) → 緊急(1件) → 設計(1件) の並び
+    expect(highlightedSuggestion()).toHaveTextContent("バグ");
+    // ここが本命。useKeyboard 側の defaultPrevented ガードが無いと t-a が選ばれて落ちる
+    expect(selectedCardId()).toBeNull();
+
+    await user.keyboard("{ArrowDown}");
+
+    expect(highlightedSuggestion()).toHaveTextContent("緊急");
+    expect(selectedCardId()).toBeNull();
+  });
+
+  it("候補ハイライト中のEnterは候補を確定するだけで、タスクは作らない", async () => {
+    const user = await renderPalette();
+    await user.keyboard("#{ArrowDown}{Enter}");
+
+    // 末尾スペースで最後のトークンが空になり、そのまま検索語を打ち継げる状態になる
+    expect(screen.getByTestId("search-input")).toHaveValue("#バグ ");
+    expect(useAppStore.getState().view).toBe("board");
+    expect(mocked.taskCreate).not.toHaveBeenCalled();
+  });
+
+  it("候補が出ていてもハイライトが無いEnterは奪わず、新規作成が走る", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "#",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T02:00:00Z",
+      updatedAt: "2026-08-20T02:00:00Z",
+      tagIds: [],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+
+    const user = await renderPalette();
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
+    // ↓を押していないのでハイライトは無い。候補が出ているだけでEnterを奪ってはいけない
+    await user.keyboard("#");
+    expect(screen.getByTestId("tag-suggest")).toBeInTheDocument();
+    expect(highlightedSuggestion()).toBeNull();
+
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(useAppStore.getState().view).toBe("detail");
+    });
+    // 完全一致しない「#」はタグに解釈されず、そのままタイトルとして残る
+    expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "#");
+  });
+
+  it("#→↓→Enterでタグを確定し、続けて打った語で絞り込んでEnterするとタグ付きで作成される", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "牛乳",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T02:00:00Z",
+      updatedAt: "2026-08-20T02:00:00Z",
+      tagIds: ["tag-bug"],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+
+    const user = await renderPalette();
+    // 作成成功後の反映はtasksListでの正引きになるので、作成タスクを含む実状態を用意する
+    // (初回読込のtasksList呼び出しを消費させないよう、renderPalette完了後にキューする)
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
+
+    await user.keyboard("#{ArrowDown}{Enter}");
+    expect(screen.getByTestId("search-input")).toHaveValue("#バグ ");
+
+    // 日本語は user-event の keyboard では打てないため change イベントで打ち継ぐ
+    fireEvent.change(screen.getByTestId("search-input"), { target: { value: "#バグ 牛乳" } });
+    await waitFor(() => {
+      // バグ かつ 牛乳 に当たるのは t-a「牛乳を買う」だけ(t-c「牛丼を食べる」はタグは同じだが語が違う)
+      expect(screen.getAllByTestId("task-card").map((c) => c.dataset.taskId)).toEqual(["t-a"]);
+    });
+
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(useAppStore.getState().view).toBe("detail");
+    });
+    // タイトルからは #バグ が外れ、タグとして作成後のタスクに付け直される
+    expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "牛乳");
+    expect(mocked.taskTagToggle).toHaveBeenCalledWith("t-new", "tag-bug");
+    expect(useAppStore.getState().selectedTaskId).toBe("t-new");
   });
 });
