@@ -6,18 +6,28 @@ import { NEW_TASK_TITLE, useAppStore } from "../store/appStore";
 import { TaskDetail } from "./TaskDetail";
 
 // BlockNoteはjsdomで動かないためモックする(実挙動はTask 4の手動確認でカバーする)
-const editorFocus = vi.fn();
+//
+// vi.mockのファクトリはファイル先頭へ巻き上げられるため、そこで実体を参照するモックは
+// vi.hoistedで先に作っておかないと初期化前アクセスになる。
+// useCreateBlockNoteを関数ごとモックにしているのは、渡したオプション(uploadFile)を検証するため。
+const { editorFocus, useCreateBlockNoteMock } = vi.hoisted(() => {
+  const focus = vi.fn();
+  return {
+    editorFocus: focus,
+    useCreateBlockNoteMock: vi.fn(() => ({
+      document: [],
+      tryParseMarkdownToBlocks: (md: string) => [
+        { id: "b1", type: "paragraph", content: md },
+      ],
+      blocksToMarkdownLossy: () => "本文",
+      replaceBlocks: () => undefined,
+      focus,
+    })),
+  };
+});
 
 vi.mock("@blocknote/react", () => ({
-  useCreateBlockNote: () => ({
-    document: [],
-    tryParseMarkdownToBlocks: (md: string) => [
-      { id: "b1", type: "paragraph", content: md },
-    ],
-    blocksToMarkdownLossy: () => "本文",
-    replaceBlocks: () => undefined,
-    focus: editorFocus,
-  }),
+  useCreateBlockNote: useCreateBlockNoteMock,
   // 画像パネル一式。描画までは見ないのでnullを返す最小のスタブでよい
   FilePanel: () => null,
   FilePanelController: () => null,
@@ -106,6 +116,16 @@ describe("TaskDetail", () => {
     render(<TaskDetail isDark={false} />);
 
     expect(screen.getByTestId("blocknote-view")).toBeInTheDocument();
+  });
+
+  // uploadFileを渡し忘れると画像の貼り付けが黙って効かなくなる(エラーも出ない)ため、
+  // 配線そのものをここで固定しておく
+  it("エディタに画像アップロードの関数を渡している", () => {
+    render(<TaskDetail isDark={false} />);
+
+    expect(useCreateBlockNoteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ uploadFile: expect.any(Function) }),
+    );
   });
 
   it("タイトルの下にタグを省略なしで表示する", () => {
