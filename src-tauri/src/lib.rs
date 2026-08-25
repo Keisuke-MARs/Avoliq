@@ -41,6 +41,7 @@ pub fn run() {
             commands::tag_rename,
             commands::tag_delete,
             commands::task_tag_toggle,
+            commands::image_create,
             commands::setting_get,
             commands::setting_set,
             commands::palette_hide,
