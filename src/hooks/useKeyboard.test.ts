@@ -437,14 +437,22 @@ describe("useKeyboard: 検索欄からの新規作成はEnter2回", () => {
     expect(createTaskFromSearch).toHaveBeenCalledTimes(1);
   });
 
-  it("WebKitの変換確定Enter（isComposingが立たない）だけでは作らない", () => {
-    // WebKitは compositionend を keydown より先に出すため、確定のEnterは isComposing なしで届く。
-    // これがこのイシューの再現ケースそのもの
+  it("検索欄からフォーカスが外れたら1回目からやり直す", () => {
+    // 1回目のEnterのあとマウスで別の場所をクリックして戻ってきた場合。
+    // キーを1つも打たずに戻れるので、keydownの側だけでは待機を捨てられない
+    const input = document.createElement("input");
+    input.id = SEARCH_INPUT_ID;
+    document.body.appendChild(input);
+    input.focus();
     const createTaskFromSearch = setupSearch();
 
     press("Enter");
+    input.blur();
+    press("Enter");
 
     expect(createTaskFromSearch).not.toHaveBeenCalled();
+
+    input.remove();
   });
 
   it("間に文字キーが挟まったら1回目からやり直す", () => {

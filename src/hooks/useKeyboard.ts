@@ -142,7 +142,9 @@ interface EnterArm {
 /** ボード画面のキーマップ */
 function handleBoardKey(e: KeyboardEvent, s: AppState, arm: EnterArm): void {
   // 素のEnter以外が挟まったら2回押しの待機は捨てる。⌘付きのEnterや、SearchBarがタグ候補の
-  // 確定で先に処理したEnter(defaultPrevented)も「別の操作」なので1回目には数えない
+  // 確定で先に処理したEnter(defaultPrevented)も「別の操作」なので1回目には数えない。
+  // ⇧Enterは1行の入力欄では素のEnterと同じ意味しか持たないので、あえて別扱いにしない
+  // (TaskDetailのタイトル欄も同じ扱い)
   if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) {
     arm.armed = false;
   }
@@ -183,7 +185,11 @@ function handleBoardKey(e: KeyboardEvent, s: AppState, arm: EnterArm): void {
         s.setView("detail");
         return;
       }
-      if (s.searchQuery.trim() === "") return;
+      if (s.searchQuery.trim() === "") {
+        // 作れる状態でないうちは待機も持ち越さない(状態を追いやすくするため)
+        arm.armed = false;
+        return;
+      }
       // キーリピート(押しっぱなし)は2回押しに数えない
       if (e.repeat) return;
       if (!arm.armed) {
@@ -346,7 +352,20 @@ export function useKeyboard(): void {
       // (stopPropagationでここへは届かない前提。届いても二重処理しない)
     }
 
+    // 検索欄からフォーカスが外れたら「続けて2回」ではないので待機を捨てる
+    // (TaskDetailのタイトル欄のonBlurと同じ役目)。これが無いと、1回目のEnterのあと
+    // マウスで別の場所をクリックしてから戻ってきたとき、Enter1回で作られてしまう
+    function onFocusOut(e: FocusEvent) {
+      if (e.target instanceof HTMLElement && e.target.id === SEARCH_INPUT_ID) {
+        enterArm.armed = false;
+      }
+    }
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("focusout", onFocusOut);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("focusout", onFocusOut);
+    };
   }, []);
 }

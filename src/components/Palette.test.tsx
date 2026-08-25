@@ -242,6 +242,42 @@ describe("Palette: 検索と新規作成", () => {
     expect(useAppStore.getState().view).toBe("board");
   });
 
+  it("日本語の変換確定Enterでは作らず、もう1回のEnterで作る", async () => {
+    // WebKitは compositionend を keydown より先に発火するので、変換確定のEnterは
+    // isComposing が立たないまま届く。このイシュー(#5)の暴発はここから起きていた
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "牛乳を買い足す",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T02:00:00Z",
+      updatedAt: "2026-08-20T02:00:00Z",
+      tagIds: [],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+
+    const user = await renderPalette();
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
+    const input = screen.getByTestId("search-input");
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "牛乳を買い足す" } });
+    fireEvent.compositionEnd(input);
+    await user.keyboard("{Enter}");
+
+    expect(mocked.taskCreate).not.toHaveBeenCalled();
+    expect(useAppStore.getState().view).toBe("board");
+
+    // 確定のEnterを1回目として数えるので、英数字入力と同じ「Enter2回」で作成に届く
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "牛乳を買い足す");
+    });
+  });
+
   it("入力なしでEnterを押しても何も起きない", async () => {
     const user = await renderPalette();
     await user.keyboard("{Enter}");
