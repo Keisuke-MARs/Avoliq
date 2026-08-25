@@ -120,4 +120,13 @@ describe("Tauri invoke ラッパー", () => {
       tagId: "g-1",
     });
   });
+
+  it("image_create は taskId / mime / dataBase64 を camelCase で渡す", async () => {
+    await api.imageCreate("task-1", "image/png", "iVBORw0KGgo=");
+    expect(invokeMock).toHaveBeenCalledWith("image_create", {
+      taskId: "task-1",
+      mime: "image/png",
+      dataBase64: "iVBORw0KGgo=",
+    });
+  });
 });
