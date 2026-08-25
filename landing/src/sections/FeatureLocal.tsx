@@ -3,7 +3,7 @@ import { Reveal } from "../components/Reveal";
 const FACTS = [
   {
     head: "ファイル1つ",
-    body: "~/Library/Application Support/Avoliq/avoliq.db",
+    body: "この端末の中の、ファイル1つに収まります",
   },
   {
     head: "通信ゼロ",
@@ -52,9 +52,7 @@ export function FeatureLocal() {
                 className="rounded-2xl border border-white/10 bg-av-surface/70 px-5 py-6 text-left"
               >
                 <dt className="text-sm font-semibold">{f.head}</dt>
-                {/* break-all は禁則処理を無視して任意の文字位置で強制改行するため日本語の文章が不自然に折れる。
-                    break-words（overflow-wrap: break-word）なら、はみ出す長い語（DBパス）だけを折り返せる */}
-                <dd className="mt-2 break-words text-xs leading-[1.8] text-av-body">
+                <dd className="mt-2 text-xs leading-[1.8] text-av-body">
                   {f.body}
                 </dd>
               </div>

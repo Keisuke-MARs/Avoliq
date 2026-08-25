@@ -28,7 +28,7 @@ const NOTES: Note[] = [
     choice: "Rust と rusqlite によるローカル SQLite",
     why: "同期を捨てる代わりに、外部通信をゼロにできる。SQLite なら単一ファイルで完結し、バックアップも移行もファイル操作だけで済む。SQLite 自体をビルドに同梱しているので、実行環境に依存しない。",
     result:
-      "データは ~/Library/Application Support/Avoliq/avoliq.db ひとつ。壊れてもコピーを戻せば済む。",
+      "データは端末の中のファイル1つ。壊れてもコピーを戻せば済む。",
   },
   {
     index: "03",
