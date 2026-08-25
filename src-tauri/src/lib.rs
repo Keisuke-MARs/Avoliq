@@ -10,6 +10,62 @@ fn avoliq_database_path(data_dir: &std::path::Path) -> std::path::PathBuf {
     data_dir.join("Avoliq").join("avoliq.db")
 }
 
+/// 本文の画像を配信する独自スキーム名。src/lib/taskImage.ts の IMAGE_URL_SCHEME と一致させる。
+const IMAGE_URL_SCHEME: &str = "avoliq-img";
+
+/// avoliq-img のURLから画像idを取り出す。
+///
+/// macOSでは `avoliq-img://<id>` の形でハンドラに渡るためホスト部がidになる。
+/// 他のプラットフォームでは `avoliq-img://localhost/<id>` の形になりうるので、
+/// ホストが空か localhost のときだけパスの先頭スラッシュを外して使う。
+fn image_id_from_uri(uri: &tauri::http::Uri) -> Option<String> {
+    let host = uri.host().unwrap_or_default();
+    let candidate = if host.is_empty() || host == "localhost" {
+        uri.path().trim_start_matches('/').to_string()
+    } else {
+        host.to_string()
+    };
+    if candidate.is_empty() {
+        None
+    } else {
+        Some(candidate)
+    }
+}
+
+/// ボディを持たない応答。画像が出ないだけで本文の描画は壊さない。
+fn image_error(status: tauri::http::StatusCode) -> tauri::http::Response<Vec<u8>> {
+    tauri::http::Response::builder()
+        .status(status)
+        .body(Vec::new())
+        .expect("空ボディの応答は必ず組める")
+}
+
+/// avoliq-img の要求に応える。DBから画像を引いてそのまま返す。
+fn serve_image(
+    app: &tauri::AppHandle,
+    uri: &tauri::http::Uri,
+) -> tauri::http::Response<Vec<u8>> {
+    let Some(id) = image_id_from_uri(uri) else {
+        return image_error(tauri::http::StatusCode::BAD_REQUEST);
+    };
+    // DbStateはsetup()でmanageされる。ハンドラが走るのは必ず起動後だが、
+    // 取れなかった場合にpanicさせずエラー応答で済ませる
+    let Some(state) = app.try_state::<commands::DbState>() else {
+        return image_error(tauri::http::StatusCode::INTERNAL_SERVER_ERROR);
+    };
+    let Ok(mut conn) = state.0.lock() else {
+        return image_error(tauri::http::StatusCode::INTERNAL_SERVER_ERROR);
+    };
+    match db::repo::image_read(&mut conn, &id) {
+        Ok((mime, bytes)) => tauri::http::Response::builder()
+            .status(tauri::http::StatusCode::OK)
+            .header(tauri::http::header::CONTENT_TYPE, mime)
+            .body(bytes)
+            .unwrap_or_else(|_| image_error(tauri::http::StatusCode::INTERNAL_SERVER_ERROR)),
+        Err(_) => image_error(tauri::http::StatusCode::NOT_FOUND),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -46,6 +102,14 @@ pub fn run() {
             commands::setting_set,
             commands::palette_hide,
         ])
+        // 本文の画像をDBから直接Webviewへ返す。
+        // 同期版ではなく非同期版を使うのは、DBのロック待ちでWebviewの描画を止めないため
+        .register_asynchronous_uri_scheme_protocol(IMAGE_URL_SCHEME, |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            std::thread::spawn(move || {
+                responder.respond(serve_image(&app, request.uri()));
+            });
+        })
         .setup(|app| {
             // Dockアイコンを出さずメニューバー常駐アプリとして振る舞う
             #[cfg(target_os = "macos")]
@@ -94,5 +158,33 @@ mod tests {
             avoliq_database_path(Path::new("/tmp/application-support")),
             Path::new("/tmp/application-support/Avoliq/avoliq.db"),
         );
+    }
+
+    #[test]
+    fn ホスト部から画像idを取り出す() {
+        let uri: tauri::http::Uri = "avoliq-img://abc-123"
+            .parse()
+            .expect("URIをパースできること");
+
+        assert_eq!(super::image_id_from_uri(&uri), Some("abc-123".to_string()));
+    }
+
+    #[test]
+    fn localhost形式ではパスから画像idを取り出す() {
+        // macOS以外では avoliq-img://localhost/<id> の形で渡りうる
+        let uri: tauri::http::Uri = "avoliq-img://localhost/abc-123"
+            .parse()
+            .expect("URIをパースできること");
+
+        assert_eq!(super::image_id_from_uri(&uri), Some("abc-123".to_string()));
+    }
+
+    #[test]
+    fn idを含まないURLはNoneになる() {
+        let uri: tauri::http::Uri = "avoliq-img://localhost/"
+            .parse()
+            .expect("URIをパースできること");
+
+        assert_eq!(super::image_id_from_uri(&uri), None);
     }
 }
