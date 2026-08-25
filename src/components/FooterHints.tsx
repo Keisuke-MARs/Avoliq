@@ -9,7 +9,10 @@ type Hint = readonly [key: string, label: string];
 const HINTS: Record<View, readonly Hint[]> = {
   board: [
     ["↑↓←→", "移動"],
-    ["Enter", "開く / 作成"],
+    ["Enter", "開く"],
+    // 検索欄からの作成だけ2回押し。日本語の変換確定Enterで暴発させないための仕様なので、
+    // 押す回数が実装と食い違わないようキーの表記でそのまま伝える
+    ["Enter Enter", "作成"],
     ["⌘←→", "ステータス"],
     ["⌘↑↓", "並び替え"],
     ["⌘⌫", "削除"],

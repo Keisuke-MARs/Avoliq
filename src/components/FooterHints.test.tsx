@@ -19,6 +19,15 @@ describe("FooterHints", () => {
     expect(screen.getByText("検索")).toBeInTheDocument();
   });
 
+  it("boardビューでは Enter=開く・Enter Enter=作成 と押す回数まで出す", () => {
+    render(<FooterHints view="board" />);
+
+    expect(screen.getByText("Enter")).toBeInTheDocument();
+    expect(screen.getByText("開く")).toBeInTheDocument();
+    expect(screen.getByText("Enter Enter")).toBeInTheDocument();
+    expect(screen.getByText("作成")).toBeInTheDocument();
+  });
+
   it("detailビューでは詳細画面のヒントに差し替わる", () => {
     render(<FooterHints view="detail" />);
 

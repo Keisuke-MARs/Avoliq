@@ -94,7 +94,8 @@ describe("Palette: 初期表示", () => {
     await renderPalette();
     const footer = screen.getByTestId("keyboard-hints");
     expect(footer).toHaveTextContent("移動");
-    expect(footer).toHaveTextContent("開く / 作成");
+    expect(footer).toHaveTextContent("開く");
+    expect(footer).toHaveTextContent("Enter Enter作成");
     expect(footer).toHaveTextContent("ステータス");
     expect(footer).toHaveTextContent("並び替え");
     expect(footer).toHaveTextContent("削除");
@@ -218,7 +219,8 @@ describe("Palette: 検索と新規作成", () => {
     // (初回読込のtasksList呼び出しを消費させないよう、renderPalette完了後にキューする)
     mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
     fireEvent.change(screen.getByTestId("search-input"), { target: { value: "牛乳を買い足す" } });
-    await user.keyboard("{Enter}");
+    // 日本語の変換確定Enterで暴発させないため、作成はEnter2回で確定する
+    await user.keyboard("{Enter}{Enter}");
 
     await waitFor(() => {
       expect(
@@ -228,6 +230,16 @@ describe("Palette: 検索と新規作成", () => {
     expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "牛乳を買い足す");
     expect(useAppStore.getState().selectedTaskId).toBe("t-new");
     expect(useAppStore.getState().searchQuery).toBe("");
+  });
+
+  it("入力ありでもEnter1回では作らない（日本語の変換確定での暴発を防ぐ）", async () => {
+    const user = await renderPalette();
+    fireEvent.change(screen.getByTestId("search-input"), { target: { value: "牛乳を買い足す" } });
+
+    await user.keyboard("{Enter}");
+
+    expect(mocked.taskCreate).not.toHaveBeenCalled();
+    expect(useAppStore.getState().view).toBe("board");
   });
 
   it("入力なしでEnterを押しても何も起きない", async () => {
@@ -603,7 +615,7 @@ describe("Palette: #タグ候補の選択から作成まで", () => {
     expect(screen.getByTestId("tag-suggest")).toBeInTheDocument();
     expect(highlightedSuggestion()).toBeNull();
 
-    await user.keyboard("{Enter}");
+    await user.keyboard("{Enter}{Enter}");
 
     await waitFor(() => {
       expect(useAppStore.getState().view).toBe("detail");
@@ -641,7 +653,8 @@ describe("Palette: #タグ候補の選択から作成まで", () => {
       expect(screen.getAllByTestId("task-card").map((c) => c.dataset.taskId)).toEqual(["t-a"]);
     });
 
-    await user.keyboard("{Enter}");
+    // 候補確定のEnterは作成の1回目に数えないので、ここから改めて2回押す
+    await user.keyboard("{Enter}{Enter}");
 
     await waitFor(() => {
       expect(useAppStore.getState().view).toBe("detail");

@@ -393,3 +393,158 @@ describe("useKeyboard: 先に処理済みのキー", () => {
     expect(useAppStore.getState().selectedTaskId).toBe("t-a");
   });
 });
+
+describe("useKeyboard: 検索欄からの新規作成はEnter2回", () => {
+  afterEach(() => {
+    useAppStore.setState(initialAppState);
+  });
+
+  /** 検索語を入れた board 状態を用意し、作成アクションだけ差し替えて呼び出しを数える */
+  function setupSearch(): ReturnType<typeof vi.fn<() => Promise<void>>> {
+    const createTaskFromSearch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    useAppStore.setState({
+      ...initialAppState,
+      statuses,
+      tasks,
+      tags,
+      view: "board",
+      searchQuery: "牛乳を買い足す",
+      createTaskFromSearch,
+    });
+    renderHook(() => useKeyboard());
+    return createTaskFromSearch;
+  }
+
+  /** window へ keydown を1つ流す。init で isComposing や repeat も再現できる */
+  function press(key: string, init: KeyboardEventInit = {}): void {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key, cancelable: true, ...init }));
+  }
+
+  it("Enter 1回では作らない（日本語の変換確定で暴発しないため）", () => {
+    const createTaskFromSearch = setupSearch();
+
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+
+  it("Enter 2回で作る", () => {
+    const createTaskFromSearch = setupSearch();
+
+    press("Enter");
+    press("Enter");
+
+    expect(createTaskFromSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("WebKitの変換確定Enter（isComposingが立たない）だけでは作らない", () => {
+    // WebKitは compositionend を keydown より先に出すため、確定のEnterは isComposing なしで届く。
+    // これがこのイシューの再現ケースそのもの
+    const createTaskFromSearch = setupSearch();
+
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+
+  it("間に文字キーが挟まったら1回目からやり直す", () => {
+    const createTaskFromSearch = setupSearch();
+
+    press("Enter");
+    press("a");
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+
+    press("Enter");
+
+    expect(createTaskFromSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("間にIME変換中のキーが挟まったら1回目からやり直す", () => {
+    const createTaskFromSearch = setupSearch();
+
+    press("Enter");
+    press("Enter", { isComposing: true });
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+
+  it("キーリピート（押しっぱなし）は2回に数えない", () => {
+    const createTaskFromSearch = setupSearch();
+
+    press("Enter");
+    press("Enter", { repeat: true });
+    press("Enter", { repeat: true });
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+
+  it("SearchBarが先に処理したEnter（タグ候補の確定）は1回目に数えない", () => {
+    const createTaskFromSearch = setupSearch();
+    const event = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
+    event.preventDefault();
+
+    window.dispatchEvent(event);
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+
+  it("⌘付きのEnterは1回目に数えない", () => {
+    const createTaskFromSearch = setupSearch();
+
+    press("Enter", { metaKey: true });
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+
+  it("検索語が空ならEnterを何回押しても作らない", () => {
+    const createTaskFromSearch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    useAppStore.setState({
+      ...initialAppState,
+      statuses,
+      tasks,
+      tags,
+      view: "board",
+      searchQuery: "",
+      createTaskFromSearch,
+    });
+    renderHook(() => useKeyboard());
+
+    press("Enter");
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+
+  it("カード選択中のEnterは1回で詳細を開く（従来どおり）", () => {
+    useAppStore.setState({
+      ...initialAppState,
+      statuses,
+      tasks,
+      tags,
+      view: "board",
+      selectedTaskId: "t-a",
+    });
+    renderHook(() => useKeyboard());
+
+    press("Enter");
+
+    expect(useAppStore.getState().view).toBe("detail");
+  });
+
+  it("カードを開いてボードへ戻ってきたら1回目からやり直す", () => {
+    // 詳細画面でEnterを押した流れがそのまま作成の1回目に化けないことの担保
+    const createTaskFromSearch = setupSearch();
+    useAppStore.setState({ selectedTaskId: "t-a" });
+
+    press("Enter"); // 詳細を開く
+    useAppStore.setState({ view: "board", selectedTaskId: null });
+    press("Enter");
+
+    expect(createTaskFromSearch).not.toHaveBeenCalled();
+  });
+});
