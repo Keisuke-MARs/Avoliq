@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLanes,
+  buildTaskDraftFromQuery,
   filterTasks,
   locateTask,
   nextSelectedTaskId,
@@ -247,5 +248,78 @@ describe("selectionAfterDelete", () => {
 
   it("存在しないIDなら選択を外す", () => {
     expect(selectionAfterDelete(lanes, "t-zzz")).toBeNull();
+  });
+});
+
+describe("buildTaskDraftFromQuery", () => {
+  it("完全一致するタグトークンをタグへ移し、タイトルから外す", () => {
+    expect(buildTaskDraftFromQuery("#バグ 牛乳を買う", tags)).toEqual({
+      title: "牛乳を買う",
+      tagIds: ["tag-bug"],
+    });
+  });
+
+  it("タグトークンが後ろにあってもタイトルから外す", () => {
+    expect(buildTaskDraftFromQuery("牛乳を #バグ 買う", tags)).toEqual({
+      title: "牛乳を 買う",
+      tagIds: ["tag-bug"],
+    });
+  });
+
+  it("完全一致しないタグトークンはタイトルにそのまま残す", () => {
+    expect(buildTaskDraftFromQuery("#バ 牛乳を買う", tags)).toEqual({
+      title: "#バ 牛乳を買う",
+      tagIds: [],
+    });
+  });
+
+  it("# だけのトークンもタイトルに残す", () => {
+    expect(buildTaskDraftFromQuery("# 牛乳を買う", tags)).toEqual({
+      title: "# 牛乳を買う",
+      tagIds: [],
+    });
+  });
+
+  it("全角の＃でもタグとして扱う", () => {
+    expect(buildTaskDraftFromQuery("＃バグ 牛乳を買う", tags)).toEqual({
+      title: "牛乳を買う",
+      tagIds: ["tag-bug"],
+    });
+  });
+
+  it("英字の大文字小文字は区別しない", () => {
+    const withAscii = [
+      ...tags,
+      { id: "tag-av", boardId: "board-1", name: "Avoliq", color: "#7EA9E8", position: 3 },
+    ];
+    expect(buildTaskDraftFromQuery("#avoliq 設計する", withAscii)).toEqual({
+      title: "設計する",
+      tagIds: ["tag-av"],
+    });
+  });
+
+  it("同じタグを2回書いても1つにまとめる", () => {
+    expect(buildTaskDraftFromQuery("#バグ #バグ 牛乳を買う", tags)).toEqual({
+      title: "牛乳を買う",
+      tagIds: ["tag-bug"],
+    });
+  });
+
+  it("複数のタグをすべて拾う", () => {
+    expect(buildTaskDraftFromQuery("#バグ #緊急 直す", tags)).toEqual({
+      title: "直す",
+      tagIds: ["tag-bug", "tag-urgent"],
+    });
+  });
+
+  it("タグしか無ければタイトルは空になる", () => {
+    expect(buildTaskDraftFromQuery("#バグ", tags)).toEqual({
+      title: "",
+      tagIds: ["tag-bug"],
+    });
+  });
+
+  it("空文字なら何も返さない", () => {
+    expect(buildTaskDraftFromQuery("   ", tags)).toEqual({ title: "", tagIds: [] });
   });
 });

@@ -51,6 +51,45 @@ export function parseSearchQuery(query: string): ParsedQuery {
   return { text: rest.join(" "), tagNames };
 }
 
+/** 検索文字列から作る新規タスクの下書き */
+export interface TaskDraft {
+  title: string;
+  tagIds: string[];
+}
+
+/**
+ * 検索文字列を「タイトル」と「付与するタグID」に分ける。
+ * 既存タグ名と完全一致する `#タグ名` だけをタグとして取り出し、タイトルからは外す。
+ * 完全一致しないトークン（`#` 単体を含む）は、そのままタイトルに残す
+ * （絞り込みの filterTasks は前方一致でも候補を拾うが、作成は取り消せないので
+ *   「打ちかけかもしれない文字列を勝手にタグへ解釈しない」側に倒す。
+ *   入力した文字が黙って消えないことも兼ねる）。
+ */
+export function buildTaskDraftFromQuery(query: string, tags: Tag[]): TaskDraft {
+  const normalized = normalizeHash(query);
+  const tagIds: string[] = [];
+  const rest: string[] = [];
+
+  for (const token of normalized.split(/\s+/)) {
+    if (token === "") continue;
+    if (!token.startsWith("#")) {
+      rest.push(token);
+      continue;
+    }
+    const name = token.slice(1).trim().toLowerCase();
+    const matched =
+      name === "" ? undefined : tags.find((t) => t.name.trim().toLowerCase() === name);
+    if (matched === undefined) {
+      // 完全一致しないタグトークンは、打った文字をそのままタイトルへ返す
+      rest.push(token);
+      continue;
+    }
+    if (!tagIds.includes(matched.id)) tagIds.push(matched.id);
+  }
+
+  return { title: rest.join(" ").trim(), tagIds };
+}
+
 /**
  * 検索クエリでタスクを絞り込む。
  * タイトルは部分一致（英字は大文字小文字を区別しない）。
