@@ -79,3 +79,41 @@ describe("TaskCard のタグ表示", () => {
     expect(keyBefore).not.toBe(keyAfter);
   });
 });
+
+describe("TaskCard のタイトル表示", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tags: tagFixtures });
+  });
+
+  it("長いタイトルは2行まで表示する(回帰テスト: truncateだと1行で切れて何のタスクか判別できない)", () => {
+    const task = makeTask("t-long", "st-todo", "認証まわりのリファクタリングをやる", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected={false} />);
+
+    const title = screen.getByText("認証まわりのリファクタリングをやる");
+    expect(title).toHaveClass("line-clamp-2");
+    expect(title).not.toHaveClass("truncate");
+  });
+
+  it("切れ目の無い文字列でも折り返す(回帰テスト: truncateのwhitespace-nowrapが外れるので折り返し規則を明示する)", () => {
+    const task = makeTask("t-url", "st-todo", "https://example.com/very/long/path", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected={false} />);
+
+    expect(screen.getByText("https://example.com/very/long/path")).toHaveClass(
+      "break-words",
+    );
+  });
+
+  it("ステータスドットは1行目の中心に置く(回帰テスト: items-centerだと2行のとき行間に落ちる)", () => {
+    const task = makeTask("t-long2", "st-todo", "認証まわりのリファクタリングをやる", 0);
+
+    const { container } = render(
+      <TaskCard task={task} statusColor="#007AFF" selected={false} />,
+    );
+
+    const dot = container.querySelector(".av-status-dot") as HTMLElement;
+    expect(dot).toHaveClass("mt-[6px]");
+    expect(dot.parentElement).toHaveClass("items-start");
+  });
+});
