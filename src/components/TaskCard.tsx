@@ -20,9 +20,13 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
   const isDark = useColorScheme();
   const ref = useRef<HTMLDivElement>(null);
 
-  // キーボードで選択が移動したとき、カードが画面外なら見える位置までスクロールする
+  // キーボードで選択が移動したとき、カードが画面外なら見える位置までスクロールする。
+  // inline も見るのは、ステータスが多いとボードが横スクロールするため。
+  // block は縦方向しか見ないので、⌘←→ でレーンをまたいだとき選択カードが
+  // 横方向の表示範囲外に取り残される。どちらも "nearest" なので、
+  // 既に見えている場合はスクロールしない。
   useEffect(() => {
-    if (selected) ref.current?.scrollIntoView({ block: "nearest" });
+    if (selected) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [selected]);
 
   // 既に消えたタグidが残っていても落ちないよう、引けたものだけ使う

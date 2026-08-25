@@ -117,3 +117,30 @@ describe("TaskCard のタイトル表示", () => {
     expect(dot.parentElement).toHaveClass("items-start");
   });
 });
+
+describe("TaskCard の選択追従", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tags: tagFixtures });
+    // setup-vitest.ts が Element.prototype.scrollIntoView を vi.fn() に差し替えている
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+  });
+
+  it("選択されたカードは縦にも横にも画面内へ寄せる(回帰テスト: inlineが無いと横スクロール時に画面外へ残る)", () => {
+    const task = makeTask("t-sel", "st-todo", "タスク", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected />);
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+      block: "nearest",
+      inline: "nearest",
+    });
+  });
+
+  it("選択されていないカードはスクロールさせない", () => {
+    const task = makeTask("t-unsel", "st-todo", "タスク", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected={false} />);
+
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+});
