@@ -45,9 +45,11 @@ function isTextSelectionArrow(e: KeyboardEvent): boolean {
 }
 
 /**
- * カードを選んでいないと何も起きない(ストア側が早期returnする)⌘ショートカットのキー。
- * カード未選択 = 検索欄にキャレットがある状態なので、空振りさせるくらいなら
- * 入力欄の標準操作(⌘←→=行頭/行末へ移動、⌘⌫=行頭まで削除)に譲る。
+ * カード未選択のとき、入力欄の標準操作に譲る⌘ショートカットのキー。
+ * カード未選択 = 検索欄にキャレットがある状態で、かつストア側もどれも早期returnするので、
+ * 空振りさせるくらいなら標準操作(⌘←→=行頭/行末へ移動、⌘⌫=行頭まで削除)を通す。
+ * ⌘Kも未選択では空振りするが、入力欄に⌘Kの標準の意味がない(行末まで削除は⌃K)ため含めない。
+ * ⌘Zはカード選択と無関係(lastDeletedTaskId依存)なので、ここに足すと復元が丸ごと死ぬ。
  */
 const CARD_REQUIRED_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace"];
 
@@ -154,6 +156,9 @@ function handleBoardKey(e: KeyboardEvent, s: AppState): void {
     }
     case "ArrowUp":
     case "ArrowDown": {
+      // ⇧付きでもここで拾う。検索欄は1行なので ⇧↑↓ には「先頭/末尾まで選択」の
+      // 標準の意味があるが、この2キーは「検索欄からレーンへ入る」中心的な操作でもあり、
+      // ⇧付きだけ挙動が変わるほうが読みにくいと判断した(既知のトレードオフ)
       e.preventDefault();
       const next = nextSelectedTaskId(lanes, s.selectedTaskId, e.key === "ArrowUp" ? "up" : "down");
       s.setSelectedTask(next);

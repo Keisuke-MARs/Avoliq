@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/lib/api";
 import { hidePalette } from "@/lib/api";
 import { registerDetailBridge } from "@/lib/detailBridge";
@@ -288,10 +288,7 @@ describe("useKeyboard: ⇧付きの⌘矢印はOS標準のテキスト選択に�
 });
 
 describe("useKeyboard: board でカード未選択のときは入力欄のキー操作を優先する", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
+  // モックのクリアは vite.config.ts の test.clearMocks が全テストの前に走らせている
   afterEach(() => {
     useAppStore.setState(initialAppState);
   });
