@@ -9,11 +9,17 @@ interface LaneProps {
 }
 
 export function Lane({ status, tasks, selectedTaskId }: LaneProps) {
+  // レーンの幅は min-w-0 ではなく min-w-[160px]。min-w-0 はコンテンツ幅より
+  // 小さく縮めるために置かれていたが、下限が無いためステータスを増やすほど
+  // レーンが潰れる（8レーンで約95px＝2〜3文字で折り返し、実質読めない）。
+  // 160px は 880px 幅で5レーンまで横スクロールせずに収まる最大の丸い値
+  // （160×5 + gap 48 + padding 24 = 872 ≤ 880）。
+  // このときタイトル幅は 160 − 24 − 14 = 122px で、2行なら約19文字。
   return (
     <section
       data-testid="lane"
       data-status-id={status.id}
-      className="flex flex-1 min-w-0 flex-col"
+      className="flex flex-1 min-w-[160px] flex-col"
     >
       <header className="mb-2 flex items-center gap-1.5 px-1">
         {/*

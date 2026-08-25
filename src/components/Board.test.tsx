@@ -49,6 +49,22 @@ describe("Board", () => {
     expect((dot as HTMLElement).style.getPropertyValue("--av-status")).toBe("#5AC8FA");
   });
 
+  it("レーンは縮んでも最小幅を保つ(回帰テスト: min-w-0だとステータスを増やすほど潰れて読めなくなる)", () => {
+    setupBoard();
+    render(<Board />);
+    // 880px幅なら5レーンまでは各161.6pxで収まり、6レーン以降はこの幅を保ったまま横スクロールする
+    expect(screen.getAllByTestId("lane")[0]).toHaveClass("min-w-[160px]");
+  });
+
+  it("レーンが収まらないときはボードを横スクロールさせる", () => {
+    setupBoard();
+    render(<Board />);
+    const board = screen.getByTestId("board");
+    expect(board).toHaveClass("overflow-x-auto");
+    // 縦は各レーンの内側(Laneのoverflow-y-auto)が持つので、ボード自体は隠したままにする
+    expect(board).toHaveClass("overflow-y-hidden");
+  });
+
   it("カードをposition順に並べる", () => {
     setupBoard();
     render(<Board />);
