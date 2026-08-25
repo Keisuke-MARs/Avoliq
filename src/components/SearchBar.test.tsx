@@ -5,6 +5,12 @@ import { SearchBar } from "@/components/SearchBar";
 import { initialAppState, useAppStore } from "@/store/appStore";
 import { tags, tasks } from "@/test/fixtures";
 
+/** いまハイライトされている候補行のテキスト（ハイライト無しなら null） */
+function highlightedText(): string | null {
+  const row = screen.getByTestId("tag-suggest").querySelector('[data-highlighted="true"]');
+  return row === null ? null : (row.textContent ?? "");
+}
+
 describe("SearchBar の # サジェスト", () => {
   beforeEach(() => {
     useAppStore.setState({ ...initialAppState, tasks, tags });
@@ -48,73 +54,6 @@ describe("SearchBar の # サジェスト", () => {
     expect(screen.queryByTestId("tag-suggest")).not.toBeInTheDocument();
   });
 
-  it("Tab で候補を補完し、連打で次の候補へ送る", async () => {
-    const user = userEvent.setup();
-    render(<SearchBar />);
-    const input = screen.getByTestId("search-input");
-    await user.type(input, "#");
-
-    await user.keyboard("{Tab}");
-    expect(useAppStore.getState().searchQuery).toBe("#バグ");
-
-    await user.keyboard("{Tab}");
-    expect(useAppStore.getState().searchQuery).toBe("#緊急");
-  });
-
-  it("Enter は補完に使わない（board の Enter を壊さないため）", async () => {
-    const user = userEvent.setup();
-    render(<SearchBar />);
-    await user.type(screen.getByTestId("search-input"), "#");
-
-    await user.keyboard("{Enter}");
-
-    expect(useAppStore.getState().searchQuery).toBe("#");
-  });
-});
-
-describe("SearchBar: Tab連打サイクルのリセット", () => {
-  beforeEach(() => {
-    useAppStore.setState({ ...initialAppState, tasks, tags });
-  });
-
-  it("Tab以外のキーを打つと候補送りのサイクルがリセットされる", async () => {
-    const user = userEvent.setup();
-    render(<SearchBar />);
-    const input = screen.getByTestId("search-input");
-    await user.type(input, "#");
-
-    await user.keyboard("{Tab}");
-    expect(useAppStore.getState().searchQuery).toBe("#バグ");
-    await user.keyboard("{Tab}");
-    expect(useAppStore.getState().searchQuery).toBe("#緊急");
-
-    // Tab以外のキー(キャレット移動)を挟むとサイクルがリセットされる。
-    // リセットされていなければ次のTabで3周目(設計)に進むが、
-    // リセット後は現在の文字列「#緊急」を起点に再計算するので候補は自分自身のみになる
-    await user.keyboard("{ArrowLeft}");
-    await user.keyboard("{Tab}");
-
-    expect(useAppStore.getState().searchQuery).toBe("#緊急");
-  });
-
-  it("入力を打ち直すとサイクルがリセットされる", async () => {
-    const user = userEvent.setup();
-    render(<SearchBar />);
-    const input = screen.getByTestId("search-input");
-    await user.type(input, "#");
-    await user.keyboard("{Tab}"); // -> "#バグ"
-    await user.keyboard("{Tab}"); // -> "#緊急"
-
-    // 全部消して打ち直す
-    await user.clear(input);
-    await user.type(input, "#");
-
-    await user.keyboard("{Tab}");
-
-    // リセットされていなければ3周目の「設計」になるはずだが、
-    // リセットされているので先頭候補の「バグ」に戻る
-    expect(useAppStore.getState().searchQuery).toBe("#バグ");
-  });
 });
 
 describe("SearchBar: 既存のキー操作を邪魔しないこと", () => {
@@ -140,20 +79,6 @@ describe("SearchBar: 既存のキー操作を邪魔しないこと", () => {
     expect(keys).toContain("Enter");
     expect(keys).toContain("ArrowDown");
   });
-
-  it("候補が0件のときはTabのデフォルト動作(フォーカス移動)を邪魔しない", () => {
-    render(<SearchBar />);
-    const input = screen.getByTestId("search-input");
-
-    // 存在しないタグ名なので候補は0件になる
-    fireEvent.change(input, { target: { value: "#存在しないタグ名" } });
-
-    // fireEventはdispatchEventの戻り値を返す。cancelableなイベントでpreventDefault()が
-    // 呼ばれているとfalseになるので、これでTabのデフォルト動作が生きているか判定できる
-    const notPrevented = fireEvent.keyDown(input, { key: "Tab" });
-
-    expect(notPrevented).toBe(true);
-  });
 });
 
 describe("SearchBar: 常時マウントされていることによる副作用の防止", () => {
@@ -177,45 +102,197 @@ describe("SearchBar: 常時マウントされていることによる副作用�
       expect(screen.queryByTestId("tag-suggest")).not.toBeInTheDocument();
     });
   });
+});
 
-  it("ボードを切り替えるとTabの候補送りサイクルがリセットされる", async () => {
+describe("SearchBar: ↑↓ でのハイライト移動", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tasks, tags });
+  });
+
+  it("候補が出た直後はどれもハイライトされていない", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    await user.type(screen.getByTestId("search-input"), "#");
+
+    expect(highlightedText()).toBeNull();
+  });
+
+  it("↓ で先頭候補がハイライトされる", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    await user.type(screen.getByTestId("search-input"), "#");
+
+    await user.keyboard("{ArrowDown}");
+
+    expect(highlightedText()).toContain("バグ");
+  });
+
+  it("↓ を続けると次の候補へ進み、最後の候補で止まる", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    await user.type(screen.getByTestId("search-input"), "#");
+
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(highlightedText()).toContain("緊急");
+
+    // 候補は バグ / 緊急 / 設計 の3件。4回目以降は末尾で止まる（折り返さない）
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(highlightedText()).toContain("設計");
+  });
+
+  it("↑ で1つ上へ戻り、先頭からさらに ↑ でハイライトが消える", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    await user.type(screen.getByTestId("search-input"), "#");
+
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(highlightedText()).toContain("緊急");
+
+    await user.keyboard("{ArrowUp}");
+    expect(highlightedText()).toContain("バグ");
+
+    await user.keyboard("{ArrowUp}");
+    expect(highlightedText()).toBeNull();
+  });
+
+  it("入力を打ち直すとハイライトが消える", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    await user.type(input, "#");
+    await user.keyboard("{ArrowDown}");
+    expect(highlightedText()).toContain("バグ");
+
+    await user.type(input, "設");
+
+    expect(highlightedText()).toBeNull();
+  });
+
+  it("ボードを切り替えるとハイライトが消える", async () => {
     const user = userEvent.setup();
     useAppStore.setState({ currentBoardId: "board-1" });
     render(<SearchBar />);
     const input = screen.getByTestId("search-input");
     await user.type(input, "#");
-
-    await user.keyboard("{Tab}"); // -> "#バグ"
-    await user.keyboard("{Tab}"); // -> "#緊急"
-    expect(useAppStore.getState().searchQuery).toBe("#緊急");
+    await user.keyboard("{ArrowDown}");
+    expect(highlightedText()).toContain("バグ");
 
     // selectBoardはonChange/onBlurを経由せず、searchQueryとcurrentBoardIdを直接書き換える。
     // その経路をここで再現する
-    useAppStore.setState({ currentBoardId: "board-2", searchQuery: "" });
+    useAppStore.setState({ currentBoardId: "board-2", searchQuery: "#" });
 
-    // currentBoardId の変化を検知する useEffect は再描画のコミット後に走る。
-    // ここで待たずに次の操作へ進むと、refs のリセットが間に合う前にアサーションしてしまい
-    // 「リセットされたかどうか」を正しく検証できない。DOM側の反映(入力欄が空になったこと)を
-    // 待つことで、useEffectのリセットも確実に完了させてから次へ進む
+    // currentBoardId の変化を検知する useEffect は再描画のコミット後に走るので、
+    // ハイライトが消えるのを待ってから確認する
     await waitFor(() => {
-      expect(input).toHaveValue("");
+      expect(highlightedText()).toBeNull();
     });
+  });
+});
 
-    // ここで user.type(input, "#") を使うと、DOM の onChange 経由で refs が
-    // その場でリセットされてしまい、currentBoardId の変化によるリセットの検証にならない。
-    // useKeyboard.ts の非フォーカス時の経路(検索欄が非フォーカスのまま印字可能キーが来ると
-    // s.setSearchQuery を store 経由で直接呼ぶ)を再現するため、ここも store を直接呼ぶ
-    useAppStore.getState().setSearchQuery("#");
-    // 同様に、store直呼びの反映(再描画)を待ってから keyDown を発火する。
-    // 待たずに発火すると、input の onKeyDown ハンドラが「#」反映前の古い描画に
-    // 紐づいたクロージャのままになり、isTagToken が false のTab押下として空振りする
-    await waitFor(() => {
-      expect(input).toHaveValue("#");
-    });
-    fireEvent.keyDown(input, { key: "Tab" });
+describe("SearchBar: Enter での確定", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tasks, tags });
+  });
 
-    // リセットされていなければ前ボードのcycle位置(2週目)から続いて「設計」になってしまうが、
-    // リセットされていれば新しいボードでも先頭候補の「バグ」に戻る
-    expect(useAppStore.getState().searchQuery).toBe("#バグ");
+  it("ハイライトした候補を Enter で確定し、末尾にスペースを付ける", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    await user.type(screen.getByTestId("search-input"), "#");
+
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(useAppStore.getState().searchQuery).toBe("#バグ ");
+  });
+
+  it("確定すると候補が閉じ、続けて検索語を打てる", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    await user.type(input, "#");
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(screen.queryByTestId("tag-suggest")).not.toBeInTheDocument();
+
+    await user.type(input, "牛乳");
+    expect(useAppStore.getState().searchQuery).toBe("#バグ 牛乳");
+  });
+
+  it("打ちかけの文字を候補の名前で置き換える", async () => {
+    const user = userEvent.setup();
+    render(<SearchBar />);
+    await user.type(screen.getByTestId("search-input"), "牛乳 #設");
+
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(useAppStore.getState().searchQuery).toBe("牛乳 #設計 ");
+  });
+});
+
+describe("SearchBar: 奪ってはいけないキー", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tasks, tags });
+  });
+
+  // fireEventはdispatchEventの戻り値を返す。cancelableなイベントでpreventDefault()が
+  // 呼ばれているとfalseになるので、これでwindow側のハンドラに渡るかを判定できる
+  it("ハイライト無しのときの Enter は preventDefault しない", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "#" } });
+
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(true);
+  });
+
+  it("ハイライト無しのときの ↑ は preventDefault しない", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "#" } });
+
+    expect(fireEvent.keyDown(input, { key: "ArrowUp" })).toBe(true);
+  });
+
+  it("候補が0件のときは ↓ を奪わない", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    // 存在しないタグ名なので候補は0件になる
+    fireEvent.change(input, { target: { value: "#存在しないタグ名" } });
+
+    expect(fireEvent.keyDown(input, { key: "ArrowDown" })).toBe(true);
+  });
+
+  it("タグトークンでないときは ↓ を奪わない", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "牛乳" } });
+
+    expect(fireEvent.keyDown(input, { key: "ArrowDown" })).toBe(true);
+  });
+
+  it("⌘↓ は奪わない（カードの並び替えを壊さないため）", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "#" } });
+    // 候補にハイライトが乗っている状態でも奪ってはいけない
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    expect(fireEvent.keyDown(input, { key: "ArrowDown", metaKey: true })).toBe(true);
+  });
+
+  it("⇧↑ は奪わない（入力欄のテキスト選択を壊さないため）", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "#" } });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    expect(fireEvent.keyDown(input, { key: "ArrowUp", shiftKey: true })).toBe(true);
+  });
+
+  it("Tab は奪わない（候補送りは廃止した）", () => {
+    render(<SearchBar />);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "#" } });
+
+    expect(fireEvent.keyDown(input, { key: "Tab" })).toBe(true);
+    expect(useAppStore.getState().searchQuery).toBe("#");
   });
 });
