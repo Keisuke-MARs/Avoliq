@@ -33,8 +33,34 @@ function isPrintableKey(e: KeyboardEvent): boolean {
   return e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey;
 }
 
+/** ⌘⇧←→↑↓ は macOS 標準のテキスト選択（行頭・行末・先頭・末尾まで選択）かどうか */
+function isTextSelectionArrow(e: KeyboardEvent): boolean {
+  return (
+    e.shiftKey &&
+    (e.key === "ArrowLeft" ||
+      e.key === "ArrowRight" ||
+      e.key === "ArrowUp" ||
+      e.key === "ArrowDown")
+  );
+}
+
+/**
+ * カード未選択のとき、入力欄の標準操作に譲る⌘ショートカットのキー。
+ * カード未選択 = 検索欄にキャレットがある状態で、かつストア側もどれも早期returnするので、
+ * 空振りさせるくらいなら標準操作(⌘←→=行頭/行末へ移動、⌘⌫=行頭まで削除)を通す。
+ * ⌘Kも未選択では空振りするが、入力欄に⌘Kの標準の意味がない(行末まで削除は⌃K)ため含めない。
+ * ⌘Zはカード選択と無関係(lastDeletedTaskId依存)なので、ここに足すと復元が丸ごと死ぬ。
+ */
+const CARD_REQUIRED_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace"];
+
 /** ⌘付きのショートカット。処理したら true を返す */
 function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
+  // 検索欄にフォーカスがある状態で ⌘⇧← などを打ったとき、選択操作を奪わずOSへ譲る。
+  // カード選択中は入力欄から外れているので何も起きないが、⇧なしの⌘矢印で足りるため実害はない
+  if (isTextSelectionArrow(e)) return false;
+
+  if (s.selectedTaskId === null && CARD_REQUIRED_KEYS.includes(e.key)) return false;
+
   switch (e.key) {
     case "ArrowLeft":
       void s.moveSelectedTask("left");
@@ -53,6 +79,9 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
       return true;
     case "z":
     case "Z":
+      // "Z"はCaps Lock対策(このときshiftKeyは立たない)。
+      // ⌘⇧Zは入力欄のredoなので、アプリのundoとは別物として扱いOSへ譲る
+      if (e.shiftKey) return false;
       void s.undoDelete();
       return true;
     case "n":
@@ -127,6 +156,9 @@ function handleBoardKey(e: KeyboardEvent, s: AppState): void {
     }
     case "ArrowUp":
     case "ArrowDown": {
+      // ⇧付きでもここで拾う。検索欄は1行なので ⇧↑↓ には「先頭/末尾まで選択」の
+      // 標準の意味があるが、この2キーは「検索欄からレーンへ入る」中心的な操作でもあり、
+      // ⇧付きだけ挙動が変わるほうが読みにくいと判断した(既知のトレードオフ)
       e.preventDefault();
       const next = nextSelectedTaskId(lanes, s.selectedTaskId, e.key === "ArrowUp" ? "up" : "down");
       s.setSelectedTask(next);
@@ -186,13 +218,16 @@ function handleDetailKey(event: KeyboardEvent): void {
     return;
   }
 
-  if (event.metaKey && event.key === "ArrowLeft") {
+  // ⌘⇧←→ は本文(BlockNote)やタイトル欄での「行頭・行末まで選択」。
+  // ここで preventDefault すると選択が奪われてしまうので、⇧付きはエディタ側へ通す。
+  // なお ⌘⇧↑↓ は詳細画面では ⌘↑↓ 自体を扱っていないため、もともと素通りしている
+  if (event.metaKey && !event.shiftKey && event.key === "ArrowLeft") {
     event.preventDefault();
     void store.moveSelectedTask("left");
     return;
   }
 
-  if (event.metaKey && event.key === "ArrowRight") {
+  if (event.metaKey && !event.shiftKey && event.key === "ArrowRight") {
     event.preventDefault();
     void store.moveSelectedTask("right");
     return;
