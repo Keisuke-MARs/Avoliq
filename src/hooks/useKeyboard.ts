@@ -125,8 +125,30 @@ function handleMetaKey(e: KeyboardEvent, s: AppState): boolean {
   return false;
 }
 
+/**
+ * 検索欄からの新規作成でEnterを1回受けたかどうかの待機状態。
+ * useEffectごとに作り、モジュールに可変の状態を残さない。
+ *
+ * 日本語入力では変換確定のEnterが isComposing を立てずに届くことがあり
+ * (WebKitはcompositionendをkeydownより先に出す)、変換を確定しただけのつもりで
+ * タスクが作られてしまう。そこでEnterは2回続けて押されたときだけ作成する
+ * (TaskDetailのタイトル欄と同じ作法)。
+ * 間に入力(変換確定を含む)や他のキーが挟まったら、また1回目からやり直す。
+ */
+interface EnterArm {
+  armed: boolean;
+}
+
 /** ボード画面のキーマップ */
-function handleBoardKey(e: KeyboardEvent, s: AppState): void {
+function handleBoardKey(e: KeyboardEvent, s: AppState, arm: EnterArm): void {
+  // 素のEnter以外が挟まったら2回押しの待機は捨てる。⌘付きのEnterや、SearchBarがタグ候補の
+  // 確定で先に処理したEnter(defaultPrevented)も「別の操作」なので1回目には数えない。
+  // ⇧Enterは1行の入力欄では素のEnterと同じ意味しか持たないので、あえて別扱いにしない
+  // (TaskDetailのタイトル欄も同じ扱い)
+  if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) {
+    arm.armed = false;
+  }
+
   if (e.metaKey) {
     // ⌘系は先にhandleMetaKeyへ通す。boardにはBlockNoteのような競合相手がおらず
     // defaultPreventedを立てて先取りする側がいないため、ここではガードしない
@@ -158,10 +180,25 @@ function handleBoardKey(e: KeyboardEvent, s: AppState): void {
     case "Enter": {
       e.preventDefault();
       if (s.selectedTaskId !== null) {
+        // カードを開くのは1回で確定してよい。IMEの変換確定は検索欄(カード未選択)で起きるため
+        arm.armed = false;
         s.setView("detail");
         return;
       }
-      if (s.searchQuery.trim() !== "") void s.createTaskFromSearch();
+      if (s.searchQuery.trim() === "") {
+        // 作れる状態でないうちは待機も持ち越さない(状態を追いやすくするため)
+        arm.armed = false;
+        return;
+      }
+      // キーリピート(押しっぱなし)は2回押しに数えない
+      if (e.repeat) return;
+      if (!arm.armed) {
+        // 1回目。変換確定のEnterの可能性があるのでここでは作らない
+        arm.armed = true;
+        return;
+      }
+      arm.armed = false;
+      void s.createTaskFromSearch();
       return;
     }
     case "ArrowUp":
@@ -283,19 +320,30 @@ function handleDetailKey(event: KeyboardEvent): void {
  */
 export function useKeyboard(): void {
   useEffect(() => {
+    const enterArm: EnterArm = { armed: false };
+
     function onKeyDown(e: KeyboardEvent) {
-      // IME変換中のキーは一切拾わない
-      if (e.isComposing || e.key === "Process") return;
+      // IME変換中のキーは一切拾わない。変換を始めた/確定した時点で直前のEnterとは
+      // 連続していないので、検索欄の2回押しの待機もここで捨てる
+      if (e.isComposing || e.key === "Process") {
+        enterArm.armed = false;
+        return;
+      }
 
       const state = useAppStore.getState();
 
       // タグパレット表示中は TagPalette 自身が全キーを処理する（二重発火の防止）
-      if (state.tagPaletteOpen) return;
-
-      if (state.view === "board") {
-        handleBoardKey(e, state);
+      if (state.tagPaletteOpen) {
+        enterArm.armed = false;
         return;
       }
+
+      if (state.view === "board") {
+        handleBoardKey(e, state, enterArm);
+        return;
+      }
+      // board を離れたら「続けて2回」ではないので待機を捨てる
+      enterArm.armed = false;
       if (state.view === "detail") {
         handleDetailKey(e);
         return;
@@ -304,7 +352,20 @@ export function useKeyboard(): void {
       // (stopPropagationでここへは届かない前提。届いても二重処理しない)
     }
 
+    // 検索欄からフォーカスが外れたら「続けて2回」ではないので待機を捨てる
+    // (TaskDetailのタイトル欄のonBlurと同じ役目)。これが無いと、1回目のEnterのあと
+    // マウスで別の場所をクリックしてから戻ってきたとき、Enter1回で作られてしまう
+    function onFocusOut(e: FocusEvent) {
+      if (e.target instanceof HTMLElement && e.target.id === SEARCH_INPUT_ID) {
+        enterArm.armed = false;
+      }
+    }
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("focusout", onFocusOut);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("focusout", onFocusOut);
+    };
   }, []);
 }
