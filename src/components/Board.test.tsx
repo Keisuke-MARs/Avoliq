@@ -49,6 +49,44 @@ describe("Board", () => {
     expect((dot as HTMLElement).style.getPropertyValue("--av-status")).toBe("#5AC8FA");
   });
 
+  it("レーンは縮んでも最小幅を保つ(回帰テスト: min-w-0だとステータスを増やすほど潰れて読めなくなる)", () => {
+    setupBoard();
+    render(<Board />);
+    // 880px幅なら5レーンまでは各161.6pxで収まり、6レーン以降はこの幅を保ったまま横スクロールする
+    expect(screen.getAllByTestId("lane")[0]).toHaveClass("min-w-[160px]");
+  });
+
+  it("レーンが収まらないときはボードを横スクロールさせる", () => {
+    setupBoard();
+    render(<Board />);
+    const board = screen.getByTestId("board");
+    expect(board).toHaveClass("overflow-x-auto");
+    // 縦は各レーンの内側(Laneのoverflow-y-auto)が持つので、ボード自体は隠したままにする
+    expect(board).toHaveClass("overflow-y-hidden");
+  });
+
+  it("ステータスが6つでも全レーンを描画し、最小幅と横スクロールを保つ", () => {
+    // 880px幅では6レーンから横スクロールに移行する。等分をやめた影響で
+    // レーンが落ちたり畳まれたりしないこと(=描画の責務は変えていないこと)を固定する
+    useAppStore.setState({
+      statuses: [
+        ...statuses,
+        { id: "st-wait", boardId: "board-1", name: "保留", color: "#AF52DE", position: 4 },
+        { id: "st-hold", boardId: "board-1", name: "凍結", color: "#FF3B30", position: 5 },
+      ],
+      tasks,
+      currentBoardId: "board-1",
+    });
+    render(<Board />);
+
+    const lanes = screen.getAllByTestId("lane");
+    expect(lanes).toHaveLength(6);
+    for (const lane of lanes) {
+      expect(lane).toHaveClass("min-w-[160px]");
+    }
+    expect(screen.getByTestId("board")).toHaveClass("overflow-x-auto");
+  });
+
   it("カードをposition順に並べる", () => {
     setupBoard();
     render(<Board />);

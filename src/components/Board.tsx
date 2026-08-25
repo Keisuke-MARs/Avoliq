@@ -66,7 +66,12 @@ export function Board() {
   }
 
   return (
-    <div data-testid="board" className="flex flex-1 gap-3 overflow-hidden px-3 py-3">
+    // レーンが最小幅を下回れないため、ステータスが多いとここが横にあふれる。
+    // 縦は各レーン(Laneのoverflow-y-auto)が持つので、ボード自体は横だけスクロールさせる。
+    <div
+      data-testid="board"
+      className="flex flex-1 gap-3 overflow-x-auto overflow-y-hidden px-3 py-3"
+    >
       {lanes.map((lane) => (
         <Lane
           key={lane.status.id}

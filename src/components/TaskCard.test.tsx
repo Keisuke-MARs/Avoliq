@@ -79,3 +79,103 @@ describe("TaskCard のタグ表示", () => {
     expect(keyBefore).not.toBe(keyAfter);
   });
 });
+
+describe("TaskCard のタイトル表示", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tags: tagFixtures });
+  });
+
+  it("長いタイトルは2行まで表示する(回帰テスト: truncateだと1行で切れて何のタスクか判別できない)", () => {
+    const task = makeTask("t-long", "st-todo", "認証まわりのリファクタリングをやる", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected={false} />);
+
+    const title = screen.getByText("認証まわりのリファクタリングをやる");
+    expect(title).toHaveClass("line-clamp-2");
+    expect(title).not.toHaveClass("truncate");
+  });
+
+  it("切れ目の無い文字列でも折り返す(回帰テスト: truncateのwhitespace-nowrapが外れるので折り返し規則を明示する)", () => {
+    const task = makeTask("t-url", "st-todo", "https://example.com/very/long/path", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected={false} />);
+
+    expect(screen.getByText("https://example.com/very/long/path")).toHaveClass(
+      "break-words",
+    );
+  });
+
+  it("ステータスドットは1行目の中心に置く(回帰テスト: items-centerだと2行のとき行間に落ちる)", () => {
+    const task = makeTask("t-long2", "st-todo", "認証まわりのリファクタリングをやる", 0);
+
+    const { container } = render(
+      <TaskCard task={task} statusColor="#007AFF" selected={false} />,
+    );
+
+    const dot = container.querySelector(".av-status-dot") as HTMLElement;
+    expect(dot).toHaveClass("mt-[6px]");
+    expect(dot.parentElement).toHaveClass("items-start");
+  });
+});
+
+describe("TaskCard の選択追従", () => {
+  beforeEach(() => {
+    useAppStore.setState({ ...initialAppState, tags: tagFixtures });
+    // setup-vitest.ts が Element.prototype.scrollIntoView を vi.fn() に差し替えている
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+  });
+
+  it("選択されたカードは縦にも横にも画面内へ寄せる(回帰テスト: inlineが無いと横スクロール時に画面外へ残る)", () => {
+    const task = makeTask("t-sel", "st-todo", "タスク", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected />);
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+      block: "nearest",
+      inline: "nearest",
+    });
+    // Element.prototype へのスパイなので、どの要素で呼ばれたかまで見ないと
+    // 「カード自身が寄る」ことの検証にならない
+    expect(vi.mocked(Element.prototype.scrollIntoView).mock.instances[0]).toBe(
+      screen.getByTestId("task-card"),
+    );
+  });
+
+  it("同じレーン内で並び替えても画面内へ寄せ直す(回帰テスト: 依存がselectedだけだと⌘↑↓で追従しない)", () => {
+    const task = makeTask("t-move", "st-todo", "タスク", 0);
+
+    const { rerender } = render(
+      <TaskCard task={task} statusColor="#007AFF" selected />,
+    );
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+
+    // ⌘↑↓(reorderSelectedTask)はpositionだけを変える。カードのkeyも親レーンも
+    // 変わらないので再マウントされず、依存配列が[selected]のままだと再実行されない
+    rerender(<TaskCard task={{ ...task, position: 2 }} statusColor="#007AFF" selected />);
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it("ステータスを移しても画面内へ寄せ直す(回帰テスト: ⌘←→で移動先レーンが横スクロール圏外にありうる)", () => {
+    const task = makeTask("t-cross", "st-todo", "タスク", 0);
+
+    const { rerender } = render(
+      <TaskCard task={task} statusColor="#007AFF" selected />,
+    );
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+
+    rerender(
+      <TaskCard task={{ ...task, statusId: "st-doing" }} statusColor="#5AC8FA" selected />,
+    );
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it("選択されていないカードはスクロールさせない", () => {
+    const task = makeTask("t-unsel", "st-todo", "タスク", 0);
+
+    render(<TaskCard task={task} statusColor="#007AFF" selected={false} />);
+
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+});
