@@ -536,6 +536,38 @@ pub fn task_restore(conn: &mut Connection, id: &str) -> Result<Task> {
     task_by_id(conn, id)
 }
 
+/// タスク本文に貼り付けた画像を1枚保存し、生成したidを返す。
+///
+/// サイズと形式の検査はコマンド層で済ませてある前提で、ここは永続化に徹する。
+/// task_id の存在だけ先に確かめるのは、外部キー違反のSQLite原文が
+/// そのままフロントのトーストに出るのを避けるため。
+pub fn image_create(
+    conn: &mut Connection,
+    task_id: &str,
+    mime: &str,
+    bytes: &[u8],
+) -> Result<String> {
+    task_by_id(conn, task_id)?;
+
+    let id = new_id();
+    conn.execute(
+        "INSERT INTO images (id, task_id, mime, bytes) VALUES (?1, ?2, ?3, ?4)",
+        params![&id, task_id, mime, bytes],
+    )?;
+    Ok(id)
+}
+
+/// idから画像の (mime, バイト列) を引く。avoliq-img スキームのハンドラから呼ぶ。
+pub fn image_read(conn: &mut Connection, id: &str) -> Result<(String, Vec<u8>)> {
+    conn.query_row(
+        "SELECT mime, bytes FROM images WHERE id = ?1",
+        params![id],
+        |row| Ok((row.get("mime")?, row.get("bytes")?)),
+    )
+    .optional()?
+    .ok_or_else(|| RepoError::NotFound(format!("画像 {id}")))
+}
+
 /// ホットキー設定の settings キー名
 pub const HOTKEY_SETTING_KEY: &str = "hotkey";
 
@@ -1617,5 +1649,98 @@ mod tests {
         assert_eq!(HOTKEY_SETTING_KEY, "hotkey");
         assert_eq!(HOTKEY_ERROR_SETTING_KEY, "hotkeyError");
         assert_eq!(DEFAULT_HOTKEY, "Alt+Space");
+    }
+
+    /// 画像テスト用に、ボード1枚とタスク1件を作って返す
+    fn setup_task(conn: &mut Connection) -> Task {
+        let board = board_create(conn, "メイン").expect("ボードを作れること");
+        let statuses = statuses_list(conn, &board.id).expect("ステータス一覧を取れること");
+        task_create(conn, &board.id, &statuses[0].id, "画像つきタスク").expect("タスクを作れること")
+    }
+
+    #[test]
+    fn 保存した画像をidで引き戻せる() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        let task = setup_task(&mut conn);
+
+        let id = image_create(&mut conn, &task.id, "image/png", &[0x89, 0x50, 0x4E, 0x47])
+            .expect("画像を保存できること");
+        let (mime, bytes) = image_read(&mut conn, &id).expect("画像を引けること");
+
+        assert_eq!(mime, "image/png");
+        assert_eq!(bytes, vec![0x89, 0x50, 0x4E, 0x47]);
+    }
+
+    #[test]
+    fn 存在しないタスクの画像は保存できない() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        let result = image_create(&mut conn, "no-such-task", "image/png", &[0x89]);
+
+        assert!(
+            matches!(result, Err(RepoError::NotFound(_))),
+            "外部キー違反ではなくNotFoundで返すこと"
+        );
+    }
+
+    #[test]
+    fn 存在しない画像idはNotFoundになる() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+
+        let result = image_read(&mut conn, "no-such-image");
+
+        assert!(matches!(result, Err(RepoError::NotFound(_))));
+    }
+
+    #[test]
+    fn 画像は毎回別のidで保存される() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        let task = setup_task(&mut conn);
+
+        let first = image_create(&mut conn, &task.id, "image/png", &[0x01])
+            .expect("1枚目を保存できること");
+        let second = image_create(&mut conn, &task.id, "image/png", &[0x02])
+            .expect("2枚目を保存できること");
+
+        assert_ne!(first, second);
+        assert_eq!(image_read(&mut conn, &first).expect("1枚目を引けること").1, vec![0x01]);
+        assert_eq!(image_read(&mut conn, &second).expect("2枚目を引けること").1, vec![0x02]);
+    }
+
+    #[test]
+    fn タスクを削除して復元しても画像は残る() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        let task = setup_task(&mut conn);
+        let id = image_create(&mut conn, &task.id, "image/png", &[0x89, 0x50])
+            .expect("画像を保存できること");
+
+        task_delete(&mut conn, &task.id).expect("タスクを削除できること");
+        assert!(
+            image_read(&mut conn, &id).is_ok(),
+            "論理削除では画像を消してはいけない（復元で戻せなくなる）"
+        );
+
+        task_restore(&mut conn, &task.id).expect("タスクを復元できること");
+
+        let (_, bytes) = image_read(&mut conn, &id).expect("復元後も画像を引けること");
+        assert_eq!(bytes, vec![0x89, 0x50]);
+    }
+
+    #[test]
+    fn ボードを削除すると画像も消える() {
+        let mut conn = db::open_in_memory().expect("インメモリDBを開けること");
+        let board = board_create(&mut conn, "メイン").expect("ボードを作れること");
+        let statuses = statuses_list(&mut conn, &board.id).expect("ステータス一覧を取れること");
+        let task = task_create(&mut conn, &board.id, &statuses[0].id, "画像つきタスク")
+            .expect("タスクを作れること");
+        let id = image_create(&mut conn, &task.id, "image/png", &[0x89])
+            .expect("画像を保存できること");
+
+        board_delete(&mut conn, &board.id).expect("ボードを削除できること");
+
+        assert!(
+            matches!(image_read(&mut conn, &id), Err(RepoError::NotFound(_))),
+            "ボード削除で画像が取り残されてはいけない"
+        );
     }
 }

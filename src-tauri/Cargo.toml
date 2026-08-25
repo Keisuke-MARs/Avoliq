@@ -26,6 +26,9 @@ serde_json = "1"
 # bundled: SQLite 本体を同梱してビルドする（システムのSQLiteに依存しない）
 rusqlite = { version = "0.40", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
+# 画像をIPCで受け渡すときのデコード用。
+# Vec<u8> をそのまま渡すとTauriがJSONの数値配列に展開して数倍に膨らむため
+base64 = "0.22"
 # 本アプリは macOS 専用のため NSPanel プラグインは無条件に入れる
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
 

@@ -25,6 +25,7 @@
         "alwaysOnTop": true,
         "shadow": true,
         "skipTaskbar": true,
+        "dragDropEnabled": false,
         "windowEffects": {
           "effects": ["popover"],
           "state": "active",
@@ -33,7 +34,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src ipc: http://ipc.localhost ws://localhost:1420"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: avoliq-img:; font-src 'self' data:; connect-src ipc: http://ipc.localhost ws://localhost:1420"
     }
   },
   "bundle": {
