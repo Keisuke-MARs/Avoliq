@@ -397,6 +397,9 @@ describe("useKeyboard: 先に処理済みのキー", () => {
 describe("useKeyboard: 検索欄からの新規作成はEnter2回", () => {
   afterEach(() => {
     useAppStore.setState(initialAppState);
+    // 検索欄のダミーは必ずここで片付ける。アサーションの直後に消す書き方だと、
+    // 失敗したとき #avoliq-search が残って後続のテストまで巻き添えで落ちる
+    document.getElementById(SEARCH_INPUT_ID)?.remove();
   });
 
   /** 検索語を入れた board 状態を用意し、作成アクションだけ差し替えて呼び出しを数える */
@@ -451,8 +454,6 @@ describe("useKeyboard: 検索欄からの新規作成はEnter2回", () => {
     press("Enter");
 
     expect(createTaskFromSearch).not.toHaveBeenCalled();
-
-    input.remove();
   });
 
   it("間に文字キーが挟まったら1回目からやり直す", () => {
