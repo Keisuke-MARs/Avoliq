@@ -278,10 +278,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
       // 画面には何も反映せず黙って破棄する(別ボードの内容が混ざるのを防ぐ)
       if (epoch !== boardEpoch) return;
       // taskCreateはタグを受け取らないので、作成後に1つずつ付ける。
-      // 途中で失敗しても作成済みのタスクは消さず、catchのトーストで知らせる
-      for (const tagId of draft.tagIds) {
-        await api.taskTagToggle(created.id, tagId);
-        if (epoch !== boardEpoch) return;
+      // タグ付与の失敗は作成そのものの失敗ではないので、ここだけ独立したtry/catchにして
+      // 下の正引き・画面反映まで進める。ここで止めると、DBにあるタスクが画面に出ないまま
+      // 検索欄も残り、もう一度Enterを押した使用者が同じタスクを二重に作ってしまう
+      try {
+        for (const tagId of draft.tagIds) {
+          await api.taskTagToggle(created.id, tagId);
+          if (epoch !== boardEpoch) return;
+        }
+      } catch (e) {
+        toast.error(`タグの付与に失敗しました: ${String(e)}`);
       }
       // Rust側が先頭挿入時に同レーンを再採番した後の実状態をDBから正引きする。
       // 手元での「残存タスクのposition+1」という楽観計算だと、応答待ち中に同レーンで

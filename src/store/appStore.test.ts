@@ -511,7 +511,7 @@ describe("appStore: createTaskFromSearch", () => {
     expect(useAppStore.getState().view).toBe("board");
   });
 
-  it("タグ付けに失敗したらトーストを出す（作成済みのタスクは取り消さない）", async () => {
+  it("タグ付与に失敗しても、作成したタスクは画面に反映して詳細画面へ進む", async () => {
     const created: Task = {
       id: "t-new",
       boardId: "board-1",
@@ -525,12 +525,79 @@ describe("appStore: createTaskFromSearch", () => {
     };
     mocked.taskCreate.mockResolvedValue(created);
     mocked.taskTagToggle.mockRejectedValue(new Error("DB error"));
+    // タグ付与が失敗しても正引きまで進むので、作成したタスクを含む実状態を用意する
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
 
     useAppStore.getState().setSearchQuery("#バグ 牛乳を買う");
     await useAppStore.getState().createTaskFromSearch();
 
+    // タグ付与の失敗は伝えるが、作成自体は失敗として扱わない
     expect(toast.error).toHaveBeenCalled();
-    expect(useAppStore.getState().view).toBe("board");
+    const s = useAppStore.getState();
+    expect(s.view).toBe("detail");
+    expect(s.searchQuery).toBe("");
+    expect(s.tasks.some((t) => t.id === "t-new")).toBe(true);
+  });
+
+  it("タグ付与が途中で失敗したら、残りのタグ付けは行わない", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "直す",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+    mocked.taskTagToggle.mockRejectedValueOnce(new Error("DB error"));
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
+
+    useAppStore.getState().setSearchQuery("#バグ #緊急 直す");
+    await useAppStore.getState().createTaskFromSearch();
+
+    // 1つ目のタグ付与で失敗した時点でループを止め、2つ目は試さない
+    expect(mocked.taskTagToggle).toHaveBeenCalledTimes(1);
+    const s = useAppStore.getState();
+    expect(s.tasks.some((t) => t.id === "t-new")).toBe(true);
+    expect(s.view).toBe("detail");
+  });
+
+  it("タグ付け中に別ボードへの切替要求が先行していたら、以降の処理を反映しない", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "直す",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+    let switchPromise: Promise<boolean> = Promise.resolve(true);
+    // 1つ目のタグ付与の最中に⌘1-9等で本物の切替要求(selectBoard)が入ったことを再現する。
+    // エポックはselectBoard呼び出しの時点(awaitの前)で同期的に進むので、1つ目のタグ付与の
+    // awaitから戻った直後のエポック確認が不一致になり、2つ目のタグ付けもtasksListでの
+    // 正引きも行われずに黙って破棄されるはず
+    mocked.taskTagToggle.mockImplementationOnce(async () => {
+      switchPromise = useAppStore.getState().selectBoard("board-2");
+      return ["tag-bug"];
+    });
+
+    useAppStore.getState().setSearchQuery("#バグ #緊急 直す");
+    await useAppStore.getState().createTaskFromSearch();
+
+    expect(mocked.taskTagToggle).toHaveBeenCalledTimes(1);
+    const s = useAppStore.getState();
+    expect(s.tasks.some((t) => t.id === "t-new")).toBe(false);
+    expect(s.currentBoardId).toBe("board-2");
+    expect(s.view).toBe("board");
+
+    await switchPromise;
   });
 
   it("検索文字列が空なら何もしない", async () => {
