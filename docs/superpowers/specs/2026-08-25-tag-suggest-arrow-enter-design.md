@@ -59,8 +59,13 @@ keydown
 ```
 
 `handleDetailKey` は既に ⌘K で `event.defaultPrevented` を見て BlockNote に譲っており、
-同じ作法を board 側にも置く形になる。board 側で SearchBar より先に `preventDefault` する
-ハンドラは他に無いため、冒頭に置いても既存の挙動は変わらない。
+同じ作法を board 側にも置く形になる。
+
+ただし置き場所は **`e.metaKey` の分岐より後**でなければならない。board の ⌘K は
+「`defaultPrevented` でも横取りする」ことが既存テスト
+（`useKeyboard.test.ts` の「board で ⌘K は defaultPrevented でも横取りする」）で
+意図的に担保されており、`handleBoardKey` の冒頭に置くとそれを壊してしまう。
+SearchBar が奪うのは修飾キーなしの `↑` `↓` `Enter` だけなので、⌘系より後で足りる。
 
 ### 責務の分割
 
