@@ -455,6 +455,84 @@ describe("appStore: createTaskFromSearch", () => {
     expect(s.tasks.find((t) => t.id === "t-d")?.position).toBe(0);
   });
 
+  it("タグトークンをタイトルから外し、そのタグを付けて作成する", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "牛乳を買う",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+    mocked.taskTagToggle.mockResolvedValue(["tag-bug"]);
+    mocked.tasksList.mockResolvedValueOnce([...tasks, { ...created, tagIds: ["tag-bug"] }]);
+
+    useAppStore.getState().setSearchQuery("#バグ 牛乳を買う");
+    await useAppStore.getState().createTaskFromSearch();
+
+    // タイトルにタグトークンが混ざらない
+    expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "牛乳を買う");
+    // 作成したタスクにタグが付く
+    expect(mocked.taskTagToggle).toHaveBeenCalledWith("t-new", "tag-bug");
+    expect(useAppStore.getState().view).toBe("detail");
+  });
+
+  it("完全一致しないタグトークンはタイトルに残したまま作成する", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "#バ 牛乳を買う",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+    mocked.tasksList.mockResolvedValueOnce([...tasks, created]);
+
+    useAppStore.getState().setSearchQuery("#バ 牛乳を買う");
+    await useAppStore.getState().createTaskFromSearch();
+
+    expect(mocked.taskCreate).toHaveBeenCalledWith("board-1", "st-todo", "#バ 牛乳を買う");
+    expect(mocked.taskTagToggle).not.toHaveBeenCalled();
+  });
+
+  it("タグだけを打った状態では作成しない", async () => {
+    useAppStore.getState().setSearchQuery("#バグ");
+    await useAppStore.getState().createTaskFromSearch();
+
+    expect(mocked.taskCreate).not.toHaveBeenCalled();
+    expect(useAppStore.getState().view).toBe("board");
+  });
+
+  it("タグ付けに失敗したらトーストを出す（作成済みのタスクは取り消さない）", async () => {
+    const created: Task = {
+      id: "t-new",
+      boardId: "board-1",
+      statusId: "st-todo",
+      title: "牛乳を買う",
+      contentMd: "",
+      position: 0,
+      createdAt: "2026-08-20T01:00:00Z",
+      updatedAt: "2026-08-20T01:00:00Z",
+      tagIds: [],
+    };
+    mocked.taskCreate.mockResolvedValue(created);
+    mocked.taskTagToggle.mockRejectedValue(new Error("DB error"));
+
+    useAppStore.getState().setSearchQuery("#バグ 牛乳を買う");
+    await useAppStore.getState().createTaskFromSearch();
+
+    expect(toast.error).toHaveBeenCalled();
+    expect(useAppStore.getState().view).toBe("board");
+  });
+
   it("検索文字列が空なら何もしない", async () => {
     await useAppStore.getState().createTaskFromSearch();
     expect(mocked.taskCreate).not.toHaveBeenCalled();
