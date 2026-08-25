@@ -110,4 +110,85 @@ describe("BlockNote Markdownの往復変換", () => {
     expect(back).toContain("箇条書き1");
     expect(back).toContain("番号付き1");
   });
+
+  it("画像のカスタムスキームURLは往復しても変わらない", async () => {
+    const editor = BlockNoteEditor.create();
+    const md = "![shot.png](avoliq-img://0f9ce1a2-1111-2222-3333-444455556666)";
+
+    const blocks = await editor.tryParseMarkdownToBlocks(md);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("image");
+
+    editor.replaceBlocks(editor.document, blocks);
+    const back = await editor.blocksToMarkdownLossy(editor.document);
+
+    // URLが1文字でも書き換わると、保存済みの本文から画像が引けなくなる
+    expect(back.trim()).toBe(md);
+  });
+
+  it("キャプション付きの画像はfigureで書き出され、読み戻してもcaptionが残る", async () => {
+    const editor = BlockNoteEditor.create();
+    // BlockNoteはcaptionが付くとMarkdownではなく生のHTMLで書き出す。
+    // その形でも読み戻せることを確かめる（往復の片道だけ通っても意味がない）
+    const withCaption = [
+      {
+        type: "image",
+        props: { url: "avoliq-img://abc-123", name: "shot.png", caption: "図1" },
+      },
+    ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    editor.replaceBlocks(editor.document, withCaption as any);
+
+    const saved = await editor.blocksToMarkdownLossy(editor.document);
+    expect(saved).toContain('src="avoliq-img://abc-123"');
+
+    const reloaded = await editor.tryParseMarkdownToBlocks(
+      reflowStrayMarkdownTables(saved),
+    );
+
+    expect(reloaded).toHaveLength(1);
+    expect(reloaded[0].type).toBe("image");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = reloaded[0].props as any;
+    expect(props.url).toBe("avoliq-img://abc-123");
+    expect(props.caption).toBe("図1");
+  });
+
+  it("reflowStrayMarkdownTablesは画像の行を変えない", () => {
+    // 読込前に必ず通す関数なので、画像の行を触らないことを固定しておく
+    const md = "本文\n\n![shot.png](avoliq-img://abc-123)\n\n続き\n";
+
+    expect(reflowStrayMarkdownTables(md)).toBe(md);
+  });
+
+  it("画像はテーブルや見出しと混在しても順序と型が保たれる", async () => {
+    const editor = BlockNoteEditor.create();
+    const md = [
+      "# 見出し",
+      "",
+      "![shot.png](avoliq-img://abc-123)",
+      "",
+      "| a | b |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      "",
+      "本文",
+      "",
+    ].join("\n");
+
+    const blocks = await editor.tryParseMarkdownToBlocks(md);
+
+    expect(blocks.map((block) => block.type)).toEqual([
+      "heading",
+      "image",
+      "table",
+      "paragraph",
+    ]);
+
+    editor.replaceBlocks(editor.document, blocks);
+    const back = await editor.blocksToMarkdownLossy(editor.document);
+
+    expect(back).toContain("![shot.png](avoliq-img://abc-123)");
+  });
 });
