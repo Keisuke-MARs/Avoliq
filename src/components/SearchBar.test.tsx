@@ -278,7 +278,9 @@ describe("SearchBar: 奪ってはいけないキー", () => {
     expect(fireEvent.keyDown(input, { key: "ArrowDown", metaKey: true })).toBe(true);
   });
 
-  it("⇧↑ は奪わない（入力欄のテキスト選択を壊さないため）", () => {
+  // ⇧付きの矢印は useKeyboard 側が「検索欄からレーンへ入る」操作として拾う仕様なので、
+  // 候補の操作としてここで奪ってはいけない
+  it("⇧↑ は奪わない（レーンへ入る操作は board 側が拾うため）", () => {
     render(<SearchBar />);
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "#" } });

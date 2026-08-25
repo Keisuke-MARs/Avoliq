@@ -20,10 +20,18 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
   const isDark = useColorScheme();
   const ref = useRef<HTMLDivElement>(null);
 
-  // キーボードで選択が移動したとき、カードが画面外なら見える位置までスクロールする
+  // キーボードで選択が移動したとき、カードが画面外なら見える位置までスクロールする。
+  // inline も見るのは、ステータスが多いとボードが横スクロールするため。
+  // block は縦方向しか見ないので、⌘←→ でレーンをまたいだとき選択カードが
+  // 横方向の表示範囲外に取り残される。どちらも "nearest" なので、
+  // 既に見えている場合はスクロールしない。
+  // 依存にstatusId・positionも含めるのは、選択されたまま位置だけが変わる操作があるため。
+  // ⌘↑↓(reorderSelectedTask)はpositionしか変えず、カードのkeyも親レーンも同じなので
+  // 再マウントされない。selectedだけを見ていると、並び替えでレーンのスクロール外へ
+  // 出ても追従しない（2行表示でレーンあたりの可視枚数が減るぶん踏みやすい）。
   useEffect(() => {
-    if (selected) ref.current?.scrollIntoView({ block: "nearest" });
-  }, [selected]);
+    if (selected) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [selected, task.statusId, task.position]);
 
   // 既に消えたタグidが残っていても落ちないよう、引けたものだけ使う
   const tags = task.tagIds
@@ -61,9 +69,17 @@ export function TaskCard({ task, statusColor, selected }: TaskCardProps) {
       // 色そのものはCSS側が決める。ここはステータス色を渡すだけ
       style={{ "--av-status": statusColor } as CSSProperties}
     >
-      <div className="flex items-center gap-2">
-        <span className="av-status-dot h-1.5 w-1.5 shrink-0 rounded-full" />
-        <span className="min-w-0 truncate">{task.title}</span>
+      {/* タイトルは line-clamp-2 で最大2行。1レーン約160〜205pxでは1行だと
+          10文字前後で切れて何のタスクか判別できないため（Issue #3）。
+          短いタイトルは1行のままなので、レーンに収まるカード数はほとんど減らない。
+          break-words を併記するのは、truncate が持っていた whitespace-nowrap が
+          外れることで、URLのような切れ目の無いタイトルが横にはみ出すのを防ぐため。 */}
+      <div className="flex items-start gap-2">
+        {/* mt-[6px] はドットを1行目の中心に固定するためのもの。items-start にしないと
+            2行のときドットが上下中央（＝行間）に落ちて1行目とずれる。
+            6px = (13px × leading-snug 1.375 − ドット6px) ÷ 2 */}
+        <span className="av-status-dot mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full" />
+        <span className="min-w-0 break-words line-clamp-2">{task.title}</span>
       </div>
       {/* タグを持たないカードは行そのものを描画しない（可視カード数を減らさないため） */}
       {/* 隙間は useChipOverflow の測定式が使う値と必ず一致していなければならないので、

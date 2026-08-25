@@ -100,6 +100,20 @@ export function taskTagToggle(taskId: string, tagId: string): Promise<string[]> 
   return invoke<string[]>("task_tag_toggle", { taskId, tagId });
 }
 
+// ---- 画像 ----
+
+/**
+ * タスク本文に貼り付けた画像を1枚保存し、本文から参照するためのidを返す。
+ * バイト列をそのまま渡すとIPCがJSONの数値配列に展開して数倍に膨らむため、base64で渡す。
+ */
+export function imageCreate(
+  taskId: string,
+  mime: string,
+  dataBase64: string,
+): Promise<string> {
+  return invoke<string>("image_create", { taskId, mime, dataBase64 });
+}
+
 // ---- 設定 ----
 
 export function settingGet(key: string): Promise<string | null> {

@@ -78,8 +78,9 @@ export function SearchBar() {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     // IMEが処理中のキーには触らない
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-    // 修飾キー付きは別の役目を持つので奪わない。⌘↑↓はカードの並び替え、⇧↑↓は入力欄の
-    // テキスト選択。特に⌘系は useKeyboard 側のdefaultPreventedガードより前で処理されるため、
+    // 修飾キー付きは別の役目を持つので奪わない。⌘↑↓はカードの並び替え、⇧↑↓は
+    // 「検索欄からレーンへ入る」操作(useKeyboard側が⇧付きでも拾う仕様)。
+    // 特に⌘系は useKeyboard 側のdefaultPreventedガードより前で処理されるため、
     // ここで奪うと「候補が動く」と「カードが並び替わる」が同時に起きてしまう
     if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
     // 候補が出ていないときは何も奪わない。カード移動も「開く / 作成」も従来どおり
